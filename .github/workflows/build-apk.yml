@@ -1,0 +1,67 @@
+name: Build DENTYAR V59 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: دریافت کد پروژه
+        uses: actions/checkout@v4
+
+      - name: نصب Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: ساخت پروژه Capacitor
+        run: |
+          mkdir -p www
+          cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html www/index.html
+
+          cat > package.json <<'EOF'
+          {
+            "name": "dentyar-v59",
+            "version": "59.0.0",
+            "private": true,
+            "scripts": {
+              "build": "echo DENTYAR V59"
+            },
+            "dependencies": {
+              "@capacitor/core": "^7.4.3",
+              "@capacitor/android": "^7.4.3",
+              "@capacitor/cli": "^7.4.3"
+            }
+          }
+          EOF
+
+          npm install
+
+          npx cap init "دنتی‌یار" "com.dentyar.app" --web-dir www
+          npx cap add android
+          npx cap copy android
+
+      - name: نصب Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: ساخت APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: بارگذاری APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DENTYAR-V59-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
