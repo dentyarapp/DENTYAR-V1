@@ -7,9 +7,7 @@ on:
       - main
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: dentyar-pwa
@@ -33,23 +31,9 @@ jobs:
           test -s dist/manifest.webmanifest
           test -s dist/sw.js
 
-      - name: تنظیم GitHub Pages
-        uses: actions/configure-pages@v5
+      - name: انتشار نسخه وب
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          enablement: true
-
-      - name: آماده‌سازی بسته Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: انتشار DENTYAR
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
