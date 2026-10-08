@@ -235,11 +235,11 @@ jobs:
               @Override
               public void onCreate(Bundle savedInstanceState) {
 
+                  super.onCreate(savedInstanceState);
+
                   registerPlugin(
                       DentyarNativePlugin.class
                   );
-
-                  super.onCreate(savedInstanceState);
               }
           }
           EOF
@@ -248,16 +248,17 @@ jobs:
         run: |
           python3 <<'PY'
           from pathlib import Path
-          import re
 
           path = Path("www/index.html")
           text = path.read_text(encoding="utf-8")
 
-          start = text.find("async function v31NativeFile(")
+          start = text.find(
+              "async function v31NativeFile("
+          )
 
           if start < 0:
               raise SystemExit(
-                  "ERROR: v31NativeFile was not found in the source HTML"
+                  "ERROR: v31NativeFile was not found"
               )
 
           end = text.find(
@@ -271,20 +272,6 @@ jobs:
               )
 
           new_function = r'''async function v31NativeFile(bytes, filename, mime, options={}){
-            /*
-             * DENTYAR V59 APK bridge
-             *
-             * IMPORTANT:
-             * The original HTML remains unchanged in GitHub.
-             * This replacement is injected only into the APK build copy.
-             *
-             * Direct:
-             * Android MediaStore -> Download/DENTYAR/Reports
-             *
-             * Share:
-             * Existing Capacitor Filesystem + Share path is preserved.
-             */
-
             try{
               const C=window.Capacitor;
 
@@ -329,26 +316,17 @@ jobs:
                 );
 
               /*
-               * ==========================================================
-               * DIRECT
-               * ==========================================================
-               *
-               * Direct MUST NOT use Capacitor Documents.
-               * It goes directly to Android MediaStore Downloads.
+               * DIRECT:
+               * Android MediaStore ->
+               * Download/DENTYAR/Reports
                */
 
               if(options.share===false){
 
                 let nativeDirect =
+                  (C.Plugins &&
+                   C.Plugins.DentyarNative) ||
                   null;
-
-                if(
-                  C.Plugins &&
-                  C.Plugins.DentyarNative
-                ){
-                  nativeDirect =
-                    C.Plugins.DentyarNative;
-                }
 
                 if(
                   !nativeDirect &&
@@ -365,7 +343,7 @@ jobs:
                   typeof nativeDirect.saveToDownloads!=='function'
                 ){
                   throw new Error(
-                    'DentyarNative plugin is not available in this APK'
+                    'DentyarNative plugin is not available'
                   );
                 }
 
@@ -384,7 +362,7 @@ jobs:
                   result.saved!==true
                 ){
                   throw new Error(
-                    'Android MediaStore did not confirm the file save'
+                    'Android MediaStore did not confirm the save'
                   );
                 }
 
@@ -401,11 +379,9 @@ jobs:
               }
 
               /*
-               * ==========================================================
-               * SHARE
-               * ==========================================================
-               *
-               * The known-working Share mechanism remains unchanged.
+               * SHARE:
+               * Keep the existing working
+               * Capacitor Filesystem + Share path.
                */
 
               let fs =
@@ -430,7 +406,7 @@ jobs:
                 typeof fs.writeFile!=='function'
               ){
                 throw new Error(
-                  'Capacitor Filesystem plugin is not included in this APK'
+                  'Capacitor Filesystem plugin is not included'
                 );
               }
 
@@ -643,11 +619,11 @@ jobs:
           )
 
           print(
-              "OK: APK-only JavaScript bridge injected."
+              "OK: APK-only bridge injected"
           )
           PY
 
-      - name: بررسی نهایی اتصال Direct
+      - name: بررسی اتصال Direct
         run: |
           python3 <<'PY'
           from pathlib import Path
@@ -668,21 +644,20 @@ jobs:
           ]
 
           missing = [
-              item
-              for item in required
+              item for item in required
               if item not in text
           ]
 
           if missing:
-              print(
-                  "ERROR: APK bridge validation failed:"
-              )
+              print("ERROR: Direct bridge validation failed")
+
               for item in missing:
                   print(" - " + item)
+
               raise SystemExit(1)
 
           print(
-              "OK: Direct Native bridge validation passed."
+              "OK: Direct bridge validation passed"
           )
           PY
 
