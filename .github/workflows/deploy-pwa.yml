@@ -1,0 +1,53 @@
+name: Deploy DENTYAR V59 PWA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dentyar-pwa
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: دریافت کد پروژه
+        uses: actions/checkout@v4
+
+      - name: آماده‌سازی نسخه وب نصب‌شونده
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html dist/index.html
+          cp manifest.webmanifest dist/manifest.webmanifest
+          cp sw.js dist/sw.js
+          test -s dist/index.html
+          test -s dist/manifest.webmanifest
+          test -s dist/sw.js
+
+      - name: تنظیم GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: آماده‌سازی بسته Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: انتشار DENTYAR
+        id: deployment
+        uses: actions/deploy-pages@v4
