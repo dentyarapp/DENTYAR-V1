@@ -1,0 +1,13 @@
+{
+  "name": "دنتی‌یار | دستیار هوشمند دندان‌پزشکی",
+  "short_name": "دنتی‌یار",
+  "description": "سامانه مدیریت مطب دندان‌پزشکی دنتی‌یار",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "./DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f766e",
+  "icons": []
+}
