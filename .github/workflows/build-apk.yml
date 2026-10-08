@@ -167,7 +167,7 @@ jobs:
       - name: بررسی حضور اجزای گزارش
         run: |
           test -s www/index.html
-          grep -q "DENTYAR_NATIVE_REPORT_BRIDGE_V2" www/index.html
+          grep -q "async function v31NativeFile" www/index.html
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
