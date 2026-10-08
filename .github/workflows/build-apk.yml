@@ -18,9 +18,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-        
+          cache: npm
 
-      - name: ساخت پروژه Capacitor
+      - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
         run: |
           mkdir -p www
           cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html www/index.html
@@ -34,9 +34,11 @@ jobs:
               "build": "echo DENTYAR V59"
             },
             "dependencies": {
-              "@capacitor/core": "^7.4.3",
-              "@capacitor/android": "^7.4.3",
-              "@capacitor/cli": "^7.4.3"
+              "@capacitor/core": "7.4.3",
+              "@capacitor/android": "7.4.3",
+              "@capacitor/cli": "7.4.3",
+              "@capacitor/filesystem": "7.1.4",
+              "@capacitor/share": "7.0.2"
             }
           }
           EOF
@@ -45,7 +47,298 @@ jobs:
 
           npx cap init "دنتی‌یار" "com.dentyar.app" --web-dir www
           npx cap add android
-          npx cap copy android
+          npx cap sync android
+
+      - name: ایجاد Native Direct Export Plugin
+        run: |
+          mkdir -p android/app/src/main/java/com/dentyar/app
+
+          cat > android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.app;
+
+          import android.content.ContentResolver;
+          import android.content.ContentValues;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Environment;
+          import android.provider.MediaStore;
+          import android.util.Base64;
+
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          import java.io.OutputStream;
+
+          @CapacitorPlugin(name = "DentyarNative")
+          public class DentyarNativePlugin extends Plugin {
+
+              @PluginMethod
+              public void saveToDownloads(PluginCall call) {
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                      call.reject("Android 10 or newer is required");
+                      return;
+                  }
+
+                  String fileName = call.getString("filename", "DENTYAR-report");
+                  String mimeType = call.getString("mimeType", "application/octet-stream");
+                  String data = call.getString("data", "");
+
+                  if (data == null || data.isEmpty()) {
+                      call.reject("Empty report data");
+                      return;
+                  }
+
+                  fileName = fileName.replaceAll("[\\\\/:*?"<>|]", "_");
+
+                  ContentResolver resolver = getContext().getContentResolver();
+                  ContentValues values = new ContentValues();
+                  values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+                  values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
+                  values.put(
+                      MediaStore.Downloads.RELATIVE_PATH,
+                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/Reports"
+                  );
+                  values.put(MediaStore.Downloads.IS_PENDING, 1);
+
+                  Uri uri = null;
+
+                  try {
+                      uri = resolver.insert(
+                          MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                          values
+                      );
+
+                      if (uri == null) {
+                          throw new Exception("MediaStore could not create the report file");
+                      }
+
+                      byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+
+                      try (OutputStream out = resolver.openOutputStream(uri)) {
+                          if (out == null) {
+                              throw new Exception("Could not open report output stream");
+                          }
+                          out.write(bytes);
+                          out.flush();
+                      }
+
+                      ContentValues done = new ContentValues();
+                      done.put(MediaStore.Downloads.IS_PENDING, 0);
+                      resolver.update(uri, done, null, null);
+
+                      JSObject result = new JSObject();
+                      result.put("saved", true);
+                      result.put("uri", uri.toString());
+                      result.put("path", "Download/DENTYAR/Reports/" + fileName);
+                      call.resolve(result);
+
+                  } catch (Exception e) {
+                      if (uri != null) {
+                          try {
+                              resolver.delete(uri, null, null);
+                          } catch (Exception ignored) {}
+                      }
+                      call.reject("Direct export failed: " + e.getMessage(), e);
+                  }
+              }
+          }
+          EOF
+
+      - name: ثبت Native Plugin
+        run: |
+          cat > android/app/src/main/java/com/dentyar/app/MainActivity.java <<'EOF'
+          package com.dentyar.app;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  registerPlugin(DentyarNativePlugin.class);
+              }
+          }
+          EOF
+
+      - name: اصلاح پل گزارش برای Direct و Share
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("www/index.html")
+          text = path.read_text(encoding="utf-8")
+
+          if "DENTYAR_NATIVE_REPORT_BRIDGE_V2" in text:
+              raise SystemExit("Report bridge V2 already injected; refusing duplicate injection")
+
+          start = text.find("async function downloadBlob(bytes, filename, mime, options={}){")
+          if start < 0:
+              raise SystemExit("downloadBlob function not found")
+
+          end = text.find("\nfunction dentyarReportAction(){", start)
+          if end < 0:
+              raise SystemExit("dentyarReportAction boundary not found")
+
+          original = text[start:end]
+
+          replacement = r'''/* DENTYAR_NATIVE_REPORT_BRIDGE_V2 */
+          async function __dentyarOriginalDownloadBlob(bytes, filename, mime, options={}){
+          ''' + original.split("{", 1)[1]
+
+          bridge = r'''
+          async function downloadBlob(bytes, filename, mime, options={}){
+            const C = window.Capacitor;
+
+            if(
+              options &&
+              options.share === false &&
+              C &&
+              typeof C.isNativePlatform === 'function' &&
+              C.isNativePlatform()
+            ){
+              let native = null;
+
+              try{
+                if(C.Plugins && C.Plugins.DentyarNative){
+                  native = C.Plugins.DentyarNative;
+                }
+                if(!native && typeof C.registerPlugin === 'function'){
+                  native = C.registerPlugin('DentyarNative');
+                }
+
+                if(!native || typeof native.saveToDownloads !== 'function'){
+                  throw new Error('DentyarNative plugin is not available');
+                }
+
+                const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+                let binary = '';
+                const chunk = 0x8000;
+
+                for(let p=0; p<arr.length; p+=chunk){
+                  binary += String.fromCharCode.apply(null, arr.subarray(p,p+chunk));
+                }
+
+                const data = btoa(binary);
+                const safeName = String(filename || 'DENTYAR-report')
+                  .replace(/[\\/:*?"<>|]/g, '_');
+
+                const result = await native.saveToDownloads({
+                  filename: safeName,
+                  mimeType: String(mime || 'application/octet-stream'),
+                  data: data
+                });
+
+                if(!result || result.saved !== true){
+                  throw new Error('Native direct export did not confirm save');
+                }
+
+                return 'saved';
+
+              }catch(e){
+                console.error('DENTYAR Direct export failed:', e);
+                throw e;
+              }
+            }
+
+            if(
+              options &&
+              options.share === true &&
+              C &&
+              typeof C.isNativePlatform === 'function' &&
+              C.isNativePlatform()
+            ){
+              try{
+                let fs = (C.Plugins && C.Plugins.Filesystem) || null;
+                if(!fs && typeof C.registerPlugin === 'function'){
+                  fs = C.registerPlugin('Filesystem');
+                }
+
+                let sh = (C.Plugins && C.Plugins.Share) || null;
+                if(!sh && typeof C.registerPlugin === 'function'){
+                  sh = C.registerPlugin('Share');
+                }
+
+                if(!fs || typeof fs.writeFile !== 'function'){
+                  throw new Error('Capacitor Filesystem plugin is not available');
+                }
+                if(!sh || typeof sh.share !== 'function'){
+                  throw new Error('Capacitor Share plugin is not available');
+                }
+
+                const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+                let binary = '';
+                const chunk = 0x8000;
+
+                for(let p=0; p<arr.length; p+=chunk){
+                  binary += String.fromCharCode.apply(null, arr.subarray(p,p+chunk));
+                }
+
+                const data = btoa(binary);
+                const safeName = String(filename || 'DENTYAR-report')
+                  .replace(/[\\/:*?"<>|]/g, '_');
+
+                const cachePath = 'DENTYAR/' + safeName;
+
+                await fs.writeFile({
+                  path: cachePath,
+                  data: data,
+                  directory: (C.Directory && C.Directory.Cache) || 'CACHE',
+                  recursive: true
+                });
+
+                const uriResult = await fs.getUri({
+                  path: cachePath,
+                  directory: (C.Directory && C.Directory.Cache) || 'CACHE'
+                });
+
+                const uri = String(uriResult && uriResult.uri || '');
+                if(!uri){
+                  throw new Error('Filesystem did not return a shareable URI');
+                }
+
+                try{
+                  await sh.share({
+                    title: 'DENTYAR',
+                    text: 'فایل دنت‌یار: ' + safeName,
+                    files: [uri],
+                    mimeType: String(mime || 'application/octet-stream'),
+                    dialogTitle: 'ارسال گزارش'
+                  });
+                  return 'shared';
+                }catch(e){
+                  if(e && (e.name === 'AbortError' || /cancel|canceled|cancelled/i.test(String(e.message || e)))){
+                    return 'cancelled';
+                  }
+                  throw e;
+                }
+
+              }catch(e){
+                console.error('DENTYAR Share export failed:', e);
+                throw e;
+              }
+            }
+
+            return __dentyarOriginalDownloadBlob(bytes, filename, mime, options);
+          }
+
+          '''
+          text = text[:start] + replacement + bridge + text[end:]
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: بررسی حضور اجزای گزارش
+        run: |
+          test -s www/index.html
+          grep -q "DENTYAR_NATIVE_REPORT_BRIDGE_V2" www/index.html
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java
+          grep -q "@capacitor/filesystem" package.json
+          grep -q "@capacitor/share" package.json
+          npx cap sync android
 
       - name: نصب Java 21
         uses: actions/setup-java@v4
