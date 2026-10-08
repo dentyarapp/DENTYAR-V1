@@ -1313,28 +1313,15 @@ const XLSXWriter = (function(){
 
 async function v31NativeFile(bytes, filename, mime, options={}){
   /*
-   * V59 — Android report export:
-   * 1) Never use <a download> inside the native Capacitor WebView.
-   * 2) Prefer the native Filesystem plugin and verify the bytes after write.
-   * 3) Keep the file in the durable Documents/DENTYAR folder.
-   * 4) Do not force Share when the caller requests share:false (reports do).
-   *
-   * NOTE: the Android package must contain @capacitor/filesystem. If the
-   * native plugin is missing from the APK, this function deliberately fails
-   * instead of falsely reporting "ready".
+   * V59 Android report export:
+   * Direct = the dedicated DentyarNative MediaStore plugin.
+   * Share = Capacitor Filesystem + Share.
+   * Browser fallback remains unchanged in downloadBlob().
    */
   try{
     const C=window.Capacitor;
     if(!C || typeof C.isNativePlatform!=='function' || !C.isNativePlatform()){
       return {saved:false,shared:false};
-    }
-
-    let fs=(C.Plugins&&C.Plugins.Filesystem)||null;
-    if(!fs && typeof C.registerPlugin==='function'){
-      try{ fs=C.registerPlugin('Filesystem'); }catch(_){}
-    }
-    if(!fs || typeof fs.writeFile!=='function'){
-      throw new Error('Capacitor Filesystem plugin is not included in this APK');
     }
 
     const arr=bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -1345,87 +1332,86 @@ async function v31NativeFile(bytes, filename, mime, options={}){
     }
     const data=btoa(binary);
     const safeName=String(filename||'DENTYAR-report').replace(/[\\/:*?"<>|]/g,'_');
-    const relativePath='DENTYAR/'+safeName;
 
-    const documents=(C.Directory&&C.Directory.Documents)||'DOCUMENTS';
-    const candidates=[documents,'DOCUMENTS'];
-    let savedDirectory=null;
-    let uri='';
-    let lastError=null;
-
-    for(const directory of [...new Set(candidates)]){
-      try{
-        await fs.writeFile({
-          path:relativePath,
-          data:data,
-          directory:directory,
-          recursive:true
-        });
-
-        // Read back the file. This prevents the UI from claiming success
-        // when the WebView/native bridge silently failed.
-        if(typeof fs.readFile==='function'){
-          const check=await fs.readFile({path:relativePath,directory:directory});
-          if(!check || typeof check.data!=='string' || check.data.length<16){
-            throw new Error('Android file verification failed');
-          }
-        }
-
-        if(typeof fs.getUri==='function'){
-          const r=await fs.getUri({path:relativePath,directory:directory});
-          uri=String((r&&(r.uri||r.path))||'');
-        }
-        if(!uri){
-          // A valid write is still a successful save even if getUri is not
-          // exposed by an older Filesystem plugin.
-          uri='';
-        }
-        savedDirectory=directory;
-        break;
-      }catch(e){
-        lastError=e;
-      }
-    }
-
-    if(!savedDirectory){
-      throw (lastError||new Error('Unable to save report on Android'));
-    }
-
-    // Reports call this with share:false: the file is saved, not routed to
-    // WhatsApp or another sharing target.
+    /* DIRECT: use the Android MediaStore plugin created by the APK workflow. */
     if(options.share===false){
-      return {saved:true,shared:false,path:relativePath,uri,directory:savedDirectory};
+      let native=null;
+      try{
+        native = (C.Plugins&&C.Plugins.DentyarNative)||null;
+        if(!native && typeof C.registerPlugin==='function'){
+          native=C.registerPlugin('DentyarNative');
+        }
+      }catch(_){}
+      if(!native || typeof native.saveToDownloads!=='function'){
+        throw new Error('DentyarNative plugin is not available');
+      }
+      const result=await native.saveToDownloads({
+        filename:safeName,
+        mimeType:String(mime||'application/octet-stream'),
+        data:data
+      });
+      if(!result || result.saved!==true){
+        throw new Error('Native direct export did not confirm the file');
+      }
+      return {
+        saved:true,
+        shared:false,
+        path:String(result.path||('Download/DENTYAR/Reports/'+safeName)),
+        uri:String(result.uri||'')
+      };
+    }
+
+    /* SHARE: save a real file first, then pass its URI to the Share plugin. */
+    let fs=(C.Plugins&&C.Plugins.Filesystem)||null;
+    if(!fs && typeof C.registerPlugin==='function'){
+      try{ fs=C.registerPlugin('Filesystem'); }catch(_){}
+    }
+    if(!fs || typeof fs.writeFile!=='function'){
+      throw new Error('Capacitor Filesystem plugin is not included in this APK');
+    }
+
+    const relativePath='DENTYAR/'+safeName;
+    const directory=(C.Directory&&C.Directory.Documents)||'DOCUMENTS';
+    await fs.writeFile({
+      path:relativePath,
+      data:data,
+      directory:directory,
+      recursive:true
+    });
+
+    let uri='';
+    if(typeof fs.getUri==='function'){
+      const r=await fs.getUri({path:relativePath,directory:directory});
+      uri=String((r&&(r.uri||r.path))||'');
     }
 
     let sh=(C.Plugins&&C.Plugins.Share)||null;
     if(!sh && typeof C.registerPlugin==='function'){
       try{ sh=C.registerPlugin('Share'); }catch(_){}
     }
+
     if(sh && typeof sh.share==='function' && uri){
       try{
         await sh.share({
           title:'DENTYAR',
           text:'فایل دنت‌یار: '+safeName,
           files:[uri],
-          mimeType:String(mime||'application/octet-stream'),
-          dialogTitle:'ذخیره یا ارسال فایل'
+          mimeType:String(mime||'application/octet-stream')
         });
-        return {saved:true,shared:true,path:relativePath,uri,directory:savedDirectory};
+        return {saved:true,shared:true,path:relativePath,uri};
       }catch(e){
-        if(e && (e.name==='AbortError'||/cancel|canceled|cancelled/i.test(String(e.message||e)))){
-          return {saved:true,shared:false,cancelled:true,path:relativePath,uri,directory:savedDirectory};
-        }
-        return {saved:true,shared:false,shareError:e,path:relativePath,uri,directory:savedDirectory};
+        if(e && e.name==='AbortError') return {saved:true,shared:false,cancelled:true,path:relativePath,uri};
+        throw e;
       }
     }
 
-    return {saved:true,shared:false,path:relativePath,uri,directory:savedDirectory};
-  }catch(e){
-    console.error('DENTYAR V59 native export failed',e);
-    return {saved:false,shared:false,error:e};
+    throw new Error('Android Share plugin is not available');
+  }catch(error){
+    console.error('DENTYAR Android report export failed:',error);
+    return {saved:false,shared:false,error:error};
   }
 }
-async function downloadBlob(bytes, filename, mime, options={}){
+function downloadBlob(bytes, filename, mime, options={}){
   const native=await v31NativeFile(bytes,filename,mime,options);
   if(native.saved){
     if(native.cancelled) return 'cancelled';
