@@ -18,6 +18,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+        
 
       - name: ساخت پروژه Capacitor
         run: |
@@ -35,9 +36,7 @@ jobs:
             "dependencies": {
               "@capacitor/core": "^7.4.3",
               "@capacitor/android": "^7.4.3",
-              "@capacitor/cli": "^7.4.3",
-              "@capacitor/filesystem": "^7.0.4",
-              "@capacitor/share": "^7.0.4"
+              "@capacitor/cli": "^7.4.3"
             }
           }
           EOF
@@ -46,7 +45,7 @@ jobs:
 
           npx cap init "دنتی‌یار" "com.dentyar.app" --web-dir www
           npx cap add android
-          npx cap sync android
+          npx cap copy android
 
       - name: نصب Java 21
         uses: actions/setup-java@v4
