@@ -18,7 +18,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          # npm cache disabled because package-lock.json is created during the build
 
       - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
         run: |
