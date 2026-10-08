@@ -2657,7 +2657,9 @@ function printReceipt(patientId, visitId){
  font-variant-numeric:lining-nums !important;
 }
 #lockScreen[data-no-fa-digits="true"] .pinPad button{font-feature-settings:"lnum" 1 !important;}
-</style></head><body>
+</style><link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+</head><body>
       <h2>DENTYAR</h2>
       <div class="muted">${esc(STATE.meta.slogan||'')}</div>
       <table>
@@ -2670,7 +2672,8 @@ function printReceipt(patientId, visitId){
       </table>
       <div class="total">مبلغ: ${fmtMoney(v.cost)}</div>
       <div class="footer">${esc(STATE.meta.supportPhone||'')}</div>
-<script>setTimeout(()=>window.print(),350);<\/script></body></html>`;
+<script>setTimeout(()=>window.print(),350);<\/script><script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("DENTYAR PWA service worker:",e);});});}})();</script>
+</body></html>`;
   showDentyarPrintOverlay(html);
 }
 /* نمایش هر پیش‌نمایش چاپی (رسید تکی یا گزارش) به‌صورت یک لایه‌ی داخل همین صفحه، به‌همراه
