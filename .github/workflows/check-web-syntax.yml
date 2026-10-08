@@ -1,0 +1,25 @@
+name: Check DENTYAR web syntax
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check inline JavaScript
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html").read_text(encoding="utf-8")
+          scripts=re.findall(r"<script(?:\\s[^>]*)?>(.*?)</script>",s,re.S|re.I)
+          Path("/tmp/dentyar-inline.js").write_text("\n\n".join(scripts),encoding="utf-8")
+          print("inline scripts:",len(scripts),"bytes:",len(Path("/tmp/dentyar-inline.js").read_text()))
+          PY
+          node --check /tmp/dentyar-inline.js
