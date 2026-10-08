@@ -91,7 +91,7 @@ jobs:
                       return;
                   }
 
-                  fileName = fileName.replaceAll("[\\\\/:*?"<>|]", "_");
+                  fileName = fileName.replaceAll("[\\\\/:*?\\\"<>|]", "_");
 
                   ContentResolver resolver = getContext().getContentResolver();
                   ContentValues values = new ContentValues();
