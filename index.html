@@ -2672,7 +2672,7 @@ function printReceipt(patientId, visitId){
       </table>
       <div class="total">مبلغ: ${fmtMoney(v.cost)}</div>
       <div class="footer">${esc(STATE.meta.supportPhone||'')}</div>
-<script>setTimeout(()=>window.print(),350);<\/script><script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("DENTYAR PWA service worker:",e);});});}})();</script>
+<script>setTimeout(()=>window.print(),350);<\/script><script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("DENTYAR PWA service worker:",e);});});}})();<\/script>
 </body></html>`;
   showDentyarPrintOverlay(html);
 }
