@@ -3276,7 +3276,7 @@ function exportReportPDF(){
   <script>setTimeout(()=>window.print(),350);<\/script></body></html>`;
 
   const nativeCap=window.Capacitor;
-  if(nativeCap && nativeCap.isNativePlatform && nativeCap.isNativePlatform()){
+  if(isDentyarNativeApp()){
     (async()=>{
       const action=await dentyarReportAction();
       if(action==='cancel') return;
