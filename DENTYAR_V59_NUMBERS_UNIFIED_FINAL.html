@@ -3559,8 +3559,11 @@ function renderUpdates(){
 }
 
 function renderSettings(){
+  const passiveBackup=(STATE.backupHistory||[]).find(x=>String(x.note||'').includes('پدافند غیرعامل'));
+  const passiveBackupLabel=passiveBackup?toEnDigits(new Date(passiveBackup.ts).toLocaleString('fa-IR')):'هنوز پشتیبان خودکار ثبت نشده است';
   document.getElementById('pageContent').innerHTML = `
     ${window.DentyarSync ? DentyarSync.settingsCardHtml() : ''}
+    ${dentyarIsManager()?'<div class="card"><h3>پدافند غیرعامل و تداوم خدمت</h3><p style="font-size:12px;line-height:1.9;color:var(--muted)">ثبت اطلاعات به‌صورت محلی ادامه می‌یابد؛ قطع اینترنت نباید مانع ثبت بیمار و نوبت شود. پشتیبان محلی روزانه در همین دستگاه نگهداری می‌شود و فایل پشتیبان مستقل نیز باید به‌طور منظم خارج از دستگاه ذخیره شود.</p><div class="kv"><span>آخرین پشتیبان خودکار</span><b>'+passiveBackupLabel+'</b></div><div class="notice">اگر شبکه دسترسی به سرور همگام‌سازی را مسدود کند، انتقال بین دستگاه‌ها تا برقرار شدن مسیر ارتباطی متوقف می‌ماند؛ پشتیبان محلی برای جلوگیری از توقف ثبت اطلاعات است، نه جایگزین همگام‌سازی.</div><button class="btn btn-primary btn-block" onclick="navigate(\'backup\')">تهیه پشتیبان مستقل / بازیابی</button></div>':''}
     <div class="card">
       <h3>تنظیم شاخص‌های داشبورد</h3>
       <p style="font-size:12px;color:var(--muted);line-height:1.9">همه شاخص‌های استاندارد در برنامه موجودند؛ فقط موارد انتخاب‌شده روی داشبورد نمایش داده می‌شوند.</p>
