@@ -910,7 +910,7 @@ function fmtDateFa(ts){
   try{
     const d=new Date(ts);
     const [y,m,day]=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());
-    return `${String(y).padStart(4,'0')}/${String(m).padStart(2,'0')}/${String(day).padStart(2,'0')}`;
+    return faDigits(`${String(y).padStart(4,'0')}/${String(m).padStart(2,'0')}/${String(day).padStart(2,'0')}`);
   }catch(e){ return ''; }
 }
 function todayISO(){
@@ -954,7 +954,8 @@ function jalaliDateFromISO(iso){ if(!iso) return ''; const d=new Date(iso+'T12:0
 /* ---------- فارسی‌سازی سراسری اعداد و تاریخ‌ها ---------- */
 // V59 SAFE NUMBER POLICY: all visible numerals use ASCII/English digits.
 function faDigits(value){
-  return toEnDigits(String(value ?? ''));
+  const fa='۰۱۲۳۴۵۶۷۸۹';
+  return toEnDigits(String(value ?? '')).replace(/[0-9]/g,d=>fa[Number(d)]);
 }
 function formatAllNumericInputs(){
   document.querySelectorAll('input').forEach(el=>{
@@ -967,8 +968,8 @@ function formatAllNumericInputs(){
       el.setAttribute('dir','ltr');
       el.style.textAlign='left';
     }
-    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]')){
-      if(el.value) el.value=faDigits(toEnDigits(el.value));
+    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]') || el.hasAttribute('data-numeric-only')){
+      if(el.value) el.value = (el===document.activeElement) ? toEnDigits(el.value) : faDigits(toEnDigits(el.value));
       el.setAttribute('dir','ltr');
       el.style.textAlign='left';
     }
@@ -2111,7 +2112,7 @@ function saveRegisterForm(appointmentId){
     const duplicate=checkDuplicateNationalId(enteredNid,null);
     if(duplicate){ modalAlert('ثبت تکراری','این کد ملی قبلاً برای «'+esc(duplicate.name)+'» با شماره پرونده '+esc(duplicate.fileNo)+' ثبت شده است. پرونده جدید ایجاد نشد.'); return; }
   }
-  const registerPhone=toEnDigits(String(document.getElementById('rgPhone').value||'')).replace(/\D/g,'');
+  const registerPhone=toEnDigits(String(document.getElementById('rgPhone').value||'')).replace(/\D  const docNo = String(p.fileNo || '-');
   const samePatient=(STATE.patients||[]).find(p=>String(p.name||'').trim().toLowerCase()===name.toLowerCase() && registerPhone.length>=7 && toEnDigits(String(p.phone||'')).replace(/\D/g,'')===registerPhone);
   if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+'). اطلاعات قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('register').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('rgCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
@@ -2682,7 +2683,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1
 </style></head><body><main class="sheet">
 <header class="head"><img class="logo" src="${esc(logo)}" alt="لوگوی مطب"><div class="clinic"><h1>${esc(clinicName)}</h1>
 <p>${esc(clinic.address||'')}</p><p>${clinicPhone?'تلفن: '+esc(clinicPhone):''}${clinic.licenseNo?' | شماره مجوز: '+esc(clinic.licenseNo):''}</p></div></header>
-<div class="doc"><span><b>${esc(title)}</b></span><span>شماره سند: <b>${esc(docNo)}</b></span><span>تاریخ: <b>${esc(fmtDateFa(v.date))}</b></span></div>
+<div class="doc"><span><b>${esc(title)}</b></span><span>شماره سند / پرونده: <b>${esc(faDigits(docNo))}</b></span><span>تاریخ: <b>${esc(fmtDateFa(v.date))}</b></span></div>
 <div class="section">مشخصات بیمار و درمان</div>
 <table><tbody>
 <tr><td>نام بیمار</td><td>${esc(p.name||'-')}</td><td>شماره پرونده</td><td>${esc(p.fileNo||'-')}</td></tr>
@@ -3067,8 +3068,8 @@ function getReportRowsForExport(){
   const body = rows.map(r=>{
     const f=r.visit?financeOf(r.visit):null;
     return [
-      r.patient.name, r.patient.fileNo, r.patient.nationalId||'', faDigits(r.patient.phone||''), r.patient.baseInsurance||r.patient.insuranceType||'بدون بیمه', r.patient.supplementalInsurance||'ندارد', r.patient.insuranceNumber||'', r.patient.policyNumber||'', r.patient.coverageCeiling||'', r.patient.franchisePercent||0,
-      r.visit? r.visit.date:'', r.visit? r.visit.treatmentType:'',
+      r.patient.name, faDigits(r.patient.fileNo||''), faDigits(r.patient.nationalId||''), faDigits(r.patient.phone||''), r.patient.baseInsurance||r.patient.insuranceType||'بدون بیمه', r.patient.supplementalInsurance||'ندارد', r.patient.insuranceNumber||'', r.patient.policyNumber||'', r.patient.coverageCeiling||'', r.patient.franchisePercent||0,
+      r.visit? fmtDateFa(r.visit.date):'', r.visit? r.visit.treatmentType:'',
       r.visit&&r.visit.dentistId? (STATE.dentists.find(d=>d.id===r.visit.dentistId)||{}).name||'':'',
       r.visit? r.visit.outcome||'':'',
       f?f.gross:'', f?f.discount:'', f?f.insurance:'', f?f.net:'',
@@ -4213,9 +4214,22 @@ function renderAppAdmin(){
   document.getElementById('pageContent').innerHTML=`
     <div class="card"><h3>مدیریت سامانه</h3><div class="notice">این پنل محرمانه است و فقط با کد مستقل مدیریت سامانه قابل دسترسی است.</div></div>
     <div class="card"><h3>کنترل دسترسی پنل سازنده</h3><label><input type="checkbox" ${STATE.meta.appAdminEnabled!==false?'checked':''} onchange="STATE.meta.appAdminEnabled=this.checked;saveState();"> فعال بودن دسترسی سازنده</label><br><label><input type="checkbox" ${STATE.meta.appAdminHidden!==false?'checked':''} onchange="STATE.meta.appAdminHidden=this.checked;saveState();"> مخفی بودن از منو</label><p style="font-size:11px;color:var(--muted)">این دو گزینه فقط وضعیت دسترسی و نمایش را کنترل می‌کنند.</p></div>
+    <div class="card"><h3>اطلاعات «ارتباط با ما»</h3>
+      <p class="notice">این دو مورد فقط از طریق مدیریت سامانه تکمیل و اصلاح می‌شوند.</p>
+      <label>تلفن پشتیبانی سامانه</label><input type="text" id="systemContactPhoneInput" value="${esc(STATE.meta.systemContactPhone||STATE.meta.supportPhone||'')}" inputmode="tel">
+      <label>ایمیل پشتیبانی سامانه</label><input type="text" id="systemContactEmailInput" value="${esc(STATE.meta.systemContactEmail||STATE.meta.supportEmail||'')}">
+      <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="saveSystemContact()">ذخیره اطلاعات ارتباط با ما</button>
+    </div>
     <div class="card"><h3>تغییر رمز سازنده</h3><label>رمز جدید (۸ رقم)</label><input type="password" id="newCreatorPass" maxlength="8" inputmode="numeric"><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changeCreatorPassword()">ذخیره رمز جدید</button></div>
     <div class="card"><h3>مدیریت ساختار فرم‌ها</h3><p style="font-size:12px;color:var(--muted);line-height:1.9">از اینجا نیز می‌توانید ساختار فیلدهای دو فرم اصلی را کنترل کنید؛ تنظیمات عادی همین قابلیت را در اختیار مدیر مطب قرار می‌دهد.</p></div>
     <button class="btn btn-danger btn-block" onclick="lockCreator()">خروج امن از پنل سازنده</button>`;
+}
+function saveSystemContact(){
+  STATE.meta.systemContactPhone=(document.getElementById('systemContactPhoneInput')?.value||'').trim();
+  STATE.meta.systemContactEmail=(document.getElementById('systemContactEmailInput')?.value||'').trim();
+  saveState();
+  toast('اطلاعات ارتباط با ما ذخیره شد');
+  renderPage();
 }
 function changeCreatorPassword(){ const v=toEnDigits((document.getElementById('newCreatorPass')?.value||'').trim()); if(!/^\d{8}$/.test(v)){modalAlert('خطا','رمز سازنده باید دقیقاً ۸ رقم باشد.');return;} STATE.meta.appAdminPassword=v; saveState(); toast('رمز سازنده تغییر کرد'); }
 
@@ -4262,9 +4276,9 @@ function renderContact(){
   document.getElementById('pageContent').innerHTML = `
     <div class="card">
       <h3>ارتباط با پشتیبانی فنی</h3>
-      <div class="kv"><span>تلفن پشتیبانی</span><b>${esc(STATE.meta.supportPhone || 'در انتظار تکمیل توسط مدیر سامانه')}</b></div>
-      <div class="kv"><span>ایمیل</span><b>${esc(STATE.meta.supportEmail || 'در انتظار تکمیل توسط مدیر سامانه')}</b></div>
-      <p style="font-size:11px;color:var(--muted);margin-top:10px">این اطلاعات از بخش «پروفایل» قابل تکمیل و ویرایش است.</p>
+      <div class="kv"><span>تلفن پشتیبانی سامانه</span><b>${esc(STATE.meta.systemContactPhone || 'در انتظار تکمیل توسط مدیر سامانه')}</b></div>
+      <div class="kv"><span>ایمیل پشتیبانی سامانه</span><b>${esc(STATE.meta.systemContactEmail || 'در انتظار تکمیل توسط مدیر سامانه')}</b></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">این اطلاعات فقط از طریق مدیریت سامانه تکمیل و اصلاح می‌شوند.</p>
     </div>
     <div class="card">
       <h3>طراح و مدیر فنی</h3>
@@ -5067,21 +5081,33 @@ startDentyarIDBMirror();
     if(!el || !el.matches) return;
     if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]') || /Nid$/.test(el.id||'')){
       const pos=el.selectionStart;
-      const converted=faDigits(toEnDigits(el.value));
+      const converted=toEnDigits(el.value);
       if(converted!==el.value){ el.value=converted; try{el.setSelectionRange(pos,pos);}catch(_){} }
     }
   },true);
-document.addEventListener('blur',e=>{
+document.addEventListener('focus',e=>{
     const el=e.target;
-    if(el && el.matches && el.matches('input[data-v26-number]') && el.value.trim()) el.value=faDigits(toEnDigits(el.value));
+    if(el && el.matches && el.matches('input[data-numeric-only],input[data-v26-number],input[type=tel],input[inputmode=numeric],input[type=number]') && el.value) el.value=toEnDigits(el.value);
   },true);
+  document.addEventListener('blur',e=>{
+    const el=e.target;
+    if(el && el.matches && el.matches('input[data-numeric-only],input[data-v26-number],input[type=tel],input[inputmode=numeric],input[type=number]') && el.value.trim()) el.value=faDigits(toEnDigits(el.value));
+  },true);
+  function normalizeNumericInputsForAction(){
+    document.querySelectorAll('input[data-numeric-only],input[data-v26-number],input[type=tel],input[inputmode=numeric],input[type=number]').forEach(el=>{
+      if(el.value) el.value=toEnDigits(el.value);
+    });
+    setTimeout(()=>{ formatAllNumericInputs(); toFaTextNodeTree(document.body); },120);
+  }
+  document.addEventListener('click',normalizeNumericInputsForAction,true);
+  document.addEventListener('keydown',e=>{ if(e.key==='Enter') normalizeNumericInputsForAction(); },true);
 })();
 </script>
 <script>
 (function(){
   const SYNC = {};
   let fb=null, dbm=null, fbApp=null, db=null, rootRef=null;
-  let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false;
+  let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false, retryTimer=null, retryCount=0;
   const FB_APP_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
   const PUSHED_KEY='dentyar_sync_pushed_ids';
@@ -5101,16 +5127,24 @@ document.addEventListener('blur',e=>{
     return m;
   }
   async function loadSdk(){
-    if(fb) return;
-    fb = await import(FB_APP_URL);
-    dbm = await import(FB_DB_URL);
+    if(!fb) fb = await import(FB_APP_URL);
+    if(!dbm) dbm = await import(FB_DB_URL);
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
   function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
+  function scheduleReconnect(delay){
+    const cfg=SYNC.cfg();
+    if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig || retryTimer) return;
+    retryCount=Math.min(retryCount+1,6);
+    const wait=Number.isFinite(delay)?delay:Math.min(5000*Math.pow(2,retryCount-1),60000);
+    retryTimer=setTimeout(function(){ retryTimer=null; SYNC.connect(); },wait);
+  }
 
   SYNC.connect = async function(){
     const cfg = SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig){ return; }
+    if(started && connected) return;
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
     try{
       await loadSdk();
       if(fbApp){ try{ await fb.deleteApp(fbApp); }catch(_){} }
@@ -5126,13 +5160,21 @@ document.addEventListener('blur',e=>{
       subscribeValue('meta');
       ['patients','dentists','appointments'].forEach(subscribeTombstones);
       started=true;
+      retryCount=0;
+      if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
       SYNC.renderStatus&&SYNC.renderStatus();
       toast('همگام‌سازی چنددستگاهی فعال شد');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
-    }catch(e){ console.error('DentyarSync connect failed', e); toast('اتصال همگام‌سازی ناموفق بود: '+(e&&e.message||e)); }
+    }catch(e){
+      console.error('DentyarSync connect failed', e);
+      SYNC.renderStatus&&SYNC.renderStatus();
+      toast('اتصال همگام‌سازی ناموفق بود؛ اتصال اینترنت و دسترسی به سرویس همگام‌سازی بررسی شود.');
+      scheduleReconnect();
+    }
   };
 
   SYNC.disconnect = function(){
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
     clearSubs();
     if(db){ try{ dbm.goOffline(db); }catch(_){} }
     if(fbApp){ try{ fb.deleteApp(fbApp); }catch(_){} }
@@ -5304,6 +5346,11 @@ document.addEventListener('blur',e=>{
     modalConfirm('حذف تنظیمات همگام‌سازی','تنظیمات اتصال حذف شود؟ داده‌های محلی این دستگاه دست‌نخورده باقی می‌مانند.', function(){ STATE.meta.sync = { enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }; saveState(); SYNC.disconnect(); toast('تنظیمات همگام‌سازی حذف شد'); renderSettings(); });
   };
 
+  window.addEventListener('online',function(){
+    const cfg=SYNC.cfg();
+    if(cfg&&cfg.enabled&&!connected){ scheduleReconnect(1200); }
+  });
+  window.addEventListener('offline',function(){ connected=false; SYNC.renderStatus&&SYNC.renderStatus(); });
   window.DentyarSync = SYNC;
   function autoStart(){ const c=SYNC.cfg(); if(c&&c.enabled){ SYNC.connect(); } }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoStart, {once:true});
