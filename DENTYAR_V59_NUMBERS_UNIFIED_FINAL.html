@@ -1806,6 +1806,7 @@ const PAGES = [
   {id:'dentists', label:'دندان‌پزشکان', icon:'dentists'},
   {id:'reports', label:'گزارش‌ها', icon:'reports'},
   {id:'backup', label:'پشتیبان‌گیری', icon:'backup'},
+  {id:'updater', label:'بروزرسانی', icon:'settings'},
   {id:'settings', label:'تنظیمات', icon:'settings'},
   {id:'profile', label:'پروفایل', icon:'profile'},
   {id:'guide', label:'راهنما', icon:'guide'},
@@ -1887,6 +1888,7 @@ function renderPage(){
     dentists: renderDentists,
     reports: renderReports,
     backup: renderBackup,
+    updater: renderUpdaterPanel,
     settings: renderSettings,
     profile: renderProfile,
     guide: renderGuide,
@@ -3599,6 +3601,16 @@ function renderSettings(){
     </div>
 
     <div class="card">
+      <h3>🔄 مدیریت و به‌روزرسانی دنت‌یار</h3>
+      <p style="font-size:12px;color:var(--muted);line-height:1.9">بررسی نسخه، دریافت فایل‌های به‌روزرسانی و مدیریت نصب از پنل مستقل انجام می‌شود.</p>
+      <button class="btn btn-primary btn-block" onclick="navigate('updater')">ورود به پنل مستقل به‌روزرسانی</button>
+    </div>
+  `;
+  loadSavedUpdateInfo();
+  updatePlatformUi();
+}
+function renderUpdaterPanel(){
+  document.getElementById('pageContent').innerHTML = `<div class="card">
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
         <div class="updateStatus">
@@ -3636,8 +3648,7 @@ function renderSettings(){
           <div id="savedUpdateInfo" style="font-size:11px;color:var(--muted);margin-top:8px">هنوز فایل بروزرسانی Android ذخیره نشده است.</div>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
@@ -3684,7 +3695,7 @@ function updatePlatformUi(){
 async function checkAndApplyWebUpdate(){
   const badge=document.getElementById('dentyarPlatformBadge');
   if(badge) badge.textContent='در حال بررسی…';
-  const manifestUrl='https://raw.githubusercontent.com/dentyar1349-png/DENTYAR-TEST/main/update.json?ts='+Date.now();
+  const manifestUrl='https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/test/dentyar-comprehensive-fixes-20261009/update.json?ts='+Date.now();
   try{
     const res=await fetch(manifestUrl,{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!res.ok) throw new Error('update manifest '+res.status);
@@ -3774,7 +3785,7 @@ async function checkAndInstallAndroidUpdate(){
   const badge=document.getElementById('updateStateBadge');
   if(badge) badge.textContent='در حال بررسی…';
   try{
-    const r=await fetch('https://raw.githubusercontent.com/dentyar1349-png/DENTYAR-TEST/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch('https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/test/dentyar-comprehensive-fixes-20261009/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
     const m=await r.json();
     const remoteVersion=String(m.version||m.android?.version||'').toUpperCase();
