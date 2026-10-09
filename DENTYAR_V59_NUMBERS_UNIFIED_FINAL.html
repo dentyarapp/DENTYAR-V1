@@ -2647,6 +2647,7 @@ function renderPatientFile(id){
           <span class="costTag">${fmtMoney(financeOf(v).net)}</span>
           <div class="row">
             <button class="btn btn-outline btn-sm" onclick="printReceipt('${p.id}','${v.id}')">چاپ رسید</button>
+            <button class="btn btn-outline btn-sm" onclick="printInvoice('${p.id}','${v.id}')">چاپ فاکتور</button>
             <button class="btn btn-danger btn-sm" onclick="deleteVisit('${p.id}','${v.id}')">حذف</button>
           </div>
         </div>
@@ -2655,123 +2656,36 @@ function renderPatientFile(id){
   `;
   bindFinance('v');
 }
-function printReceipt(patientId, visitId){
-  const p = STATE.patients.find(x=>x.id===patientId);
-  const v = (p.visits||[]).find(x=>x.id===visitId);
-  if(!p || !v) return;
-  const dentistName = v.dentistId? (STATE.dentists.find(d=>d.id===v.dentistId)||{}).name : '-';
-  const html=`
-    <!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>رسید</title>
-    <style>
-      body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#1c2b36;margin:0;}
-      h2{color:#153a63;margin-bottom:2px;}
-      .muted{color:#6b7c88;font-size:13px;margin-bottom:18px;}
-      table{width:100%;border-collapse:collapse;margin-top:14px;}
-      td{padding:8px 4px;border-bottom:1px solid #e1e8ec;font-size:14px;}
-      td:first-child{color:#6b7c88;}
-      .total{font-size:17px;font-weight:bold;color:#1e8f5f;text-align:left;margin-top:16px;}
-      .footer{margin-top:30px;font-size:12px;color:#6b7c88;text-align:center;}
-    </style>
-
-<style id="dentyar-v32-final-fixes">
-/* V32 FINAL — logo/report/update fixes. This layer intentionally comes last. */
-#topHeader .appLogo,
-#topHeader .clinicLogo,
-#lockScreen .lockLogo{
-  background:#fff!important;
-  object-fit:contain!important;
-  padding:0!important;
-  filter:none!important;
-}
-#topHeader .appLogo{border-radius:15px!important;border:2px solid #8ad3cb!important;}
-#topHeader .clinicLogo{border-radius:14px!important;border:2px solid #8ad3cb!important;}
-#lockScreen .lockLogo{border-radius:22%!important;border:2px solid #8ad3cb!important;box-shadow:0 6px 18px rgba(15,118,110,.16)!important;}
-/* Never paint a black backing behind the main logo. */
-#lockScreen .lockLogo{background:#fff!important;}
-/* Reports: keep export buttons compact and clearly distinguish the three outputs. */
-.card button[onclick="exportReportCSV()"],
-.card button[onclick="exportReportXLSX()"],
-.card button[onclick="exportReportPDF()"]{min-height:42px!important;font-weight:800!important;}
-.updateBox{border-color:#bfe3de!important;background:linear-gradient(145deg,#ffffff,#f3fbf9)!important;}
-.updateBadge{font-weight:900!important;}
-</style>
-
-<style id="dentyar-v34-logo-safety">
-/* V34 TEST — only logo rendering safety; application logic/export logic is unchanged. */
-#topHeader .appLogo,#topHeader .clinicLogo,#lockScreen .lockLogo{
-  object-fit:contain!important;
-  object-position:center!important;
-  background:#fff!important;
-  padding:0!important;
-  overflow:hidden!important;
-}
-#topHeader .appLogo{width:56px!important;height:56px!important;border-radius:15px!important;}
-#topHeader .clinicLogo{width:56px!important;height:56px!important;border-radius:14px!important;}
-#lockScreen .lockLogo{width:108px!important;height:108px!important;border-radius:22%!important;}
-</style>
-
-<style id="dentyar-v57-logo-final">
-/* V57 FINAL: preserve the known-good V51 logo asset and prevent legacy CSS from cropping it. */
-#topHeader .appLogo{width:72px!important;height:72px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:0!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-#topHeader .clinicLogo{width:54px!important;height:54px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:2px!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-#lockScreen .lockLogo{width:108px!important;height:108px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:4px!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-@media(max-width:480px){#topHeader .appLogo{width:62px!important;height:62px!important;}#topHeader .clinicLogo{width:50px!important;height:50px!important;}#lockScreen .lockLogo{width:108px!important;height:108px!important;}}
-</style>
-<style id="dentyar-v58-pin-latin">
-/* V58 ROOT FIX: global Persian-digit conversion must not touch the login keypad. */
-#lockScreen[data-no-fa-digits="true"],
-#lockScreen[data-no-fa-digits="true"] .pinPad,
-#lockScreen[data-no-fa-digits="true"] .pinPad button,
-#lockScreen[data-no-fa-digits="true"] #lockHint{
- direction:ltr !important;
- unicode-bidi:isolate !important;
- font-family:Arial,Helvetica,sans-serif !important;
- font-variant-numeric:lining-nums !important;
-}
-#lockScreen[data-no-fa-digits="true"] .pinPad button{font-feature-settings:"lnum" 1 !important;}
-</style><link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#0f766e">
-</head><body>
-      <h2>DENTYAR</h2>
-      <div class="muted">${esc(STATE.meta.slogan||'')}</div>
-      <table>
-        <tr><td>نام بیمار</td><td>${esc(p.name)}</td></tr>
-        <tr><td>شماره پرونده</td><td>${esc(p.fileNo)}</td></tr>
-        <tr><td>تاریخ</td><td>${fmtDateFa(v.date)}</td></tr>
-        <tr><td>نوع درمان</td><td>${esc(v.treatmentType)}</td></tr>
-        <tr><td>دندان‌پزشک</td><td>${esc(dentistName||'-')}</td></tr>
-        <tr><td>نتیجه</td><td>${esc(v.outcome||'-')}</td></tr>
-      </table>
-      <div class="total">مبلغ: ${fmtMoney(v.cost)}</div>
-      <div class="footer">${esc(STATE.meta.supportPhone||'')}</div>
-<script>setTimeout(()=>window.print(),350);<\/script><script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("DENTYAR PWA service worker:",e);});});}})();<\/script>
-</body></html>`;
-  showDentyarPrintOverlay(html);
-}
-/* نمایش هر پیش‌نمایش چاپی (رسید تکی یا گزارش) به‌صورت یک لایه‌ی داخل همین صفحه، به‌همراه
-   دکمه‌ی بازگشت همیشه-کاربردی — مستقل از رفتار window.close() در مرورگر/وب‌ویو نصب‌شده */
-function showDentyarPrintOverlay(html){
-  let overlay=document.getElementById('dentyarPdfOverlay');
-  if(!overlay){
-    overlay=document.createElement('div');
-    overlay.id='dentyarPdfOverlay';
-    overlay.style.cssText='position:fixed;inset:0;z-index:5000;background:#fff;display:flex;flex-direction:column;';
-    const bar=document.createElement('div');
-    bar.style.cssText='flex:0 0 auto;background:#12305e;padding:10px 14px;display:flex;align-items:center;gap:10px;';
-    const backBtn=document.createElement('button');
-    backBtn.textContent='✕ بازگشت';
-    backBtn.style.cssText='background:#fff;color:#12305e;border:none;border-radius:10px;padding:9px 16px;font-family:inherit;font-size:13px;font-weight:700;';
-    backBtn.onclick=function(){ overlay.style.display='none'; };
-    bar.appendChild(backBtn);
-    const iframe=document.createElement('iframe');
-    iframe.id='dentyarPdfFrame';
-    iframe.style.cssText='flex:1 1 auto;border:none;width:100%;';
-    overlay.appendChild(bar);
-    overlay.appendChild(iframe);
-    document.body.appendChild(overlay);
+function printReceipt(patientId, visitId){ return printPatientDocument(patientId,visitId,'receipt'); }
+function printInvoice(patientId, visitId){ return printPatientDocument(patientId,visitId,'invoice'); }
+async function printPatientDocument(patientId, visitId, kind){
+  const p=STATE.patients.find(x=>x.id===patientId);
+  const v=p&&(p.visits||[]).find(x=>x.id===visitId);
+  if(!p||!v){ modalAlert('چاپ سند','اطلاعات بیمار یا درمان پیدا نشد.'); return; }
+  const f=financeOf(v);
+  const dentistName=v.dentistId?((STATE.dentists.find(d=>d.id===v.dentistId)||{}).name||'-'):'-';
+  const cp=STATE.meta.clinicProfile||{};
+  const docTitle=kind==='invoice'?'فاکتور خدمات دندان‌پزشکی':'رسید پرداخت';
+  const docNo=toEnDigits(String(p.fileNo||'')+'-'+String(v.id||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(-8));
+  const clinicAddress=[cp.address,cp.city].filter(Boolean).join('، ');
+  const html='<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+docTitle+'</title>'+
+  '<style>*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;padding:20px;color:#1c2b36;margin:0;background:#fff;font-size:13px}.sheet{max-width:800px;margin:0 auto;border:1px solid #d6e0e5;padding:22px;border-radius:8px}.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #0f766e;padding-bottom:14px;margin-bottom:16px}h1{font-size:21px;color:#12305e;margin:0 0 8px}.clinic{font-size:14px;font-weight:800}.muted{color:#64748b;font-size:11px;line-height:1.8}.badge{border:1px solid #0f766e;color:#0f766e;border-radius:8px;padding:8px 12px;font-weight:800;white-space:nowrap}h2{font-size:14px;margin:18px 0 8px;color:#12305e}.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px}.field{padding:6px 0;border-bottom:1px solid #e5edf0}.field b{display:inline-block;min-width:100px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #d5e0e5;padding:9px 7px;text-align:right;font-size:12px}th{background:#edf6f5;color:#12305e}.totals{margin-top:14px;max-width:420px;margin-right:auto}.totals div{display:flex;justify-content:space-between;padding:7px;border-bottom:1px solid #e5edf0}.totals .net{font-weight:900;color:#0f766e;font-size:15px}.sign{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:42px}.sign div{text-align:center;border-top:1px solid #aab7c0;padding-top:8px;font-size:11px}.foot{margin-top:20px;text-align:center;color:#64748b;font-size:10px}@media print{body{padding:0}.sheet{border:0;border-radius:0;max-width:none;padding:8mm}}</style></head><body><main class="sheet">'+
+  '<header class="head"><div><h1>DENTYAR</h1><div class="clinic">'+esc(STATE.meta.clinicName||'مطب لبخند زیبا')+'</div><div class="muted">'+esc(STATE.meta.slogan||'دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما')+'</div><div class="muted">'+esc(clinicAddress)+(cp.licenseNo?' | شماره پروانه: '+esc(cp.licenseNo):'')+'</div><div class="muted">'+esc(cp.clinicPhone||STATE.meta.supportPhone||'')+'</div></div><div class="badge">'+docTitle+'<br><small>شماره سند: '+esc(docNo)+'</small></div></header>'+
+  '<h2>مشخصات بیمار</h2><div class="grid"><div class="field"><b>نام بیمار:</b> '+esc(p.name)+'</div><div class="field"><b>شماره پرونده:</b> '+esc(p.fileNo)+'</div><div class="field"><b>کد ملی:</b> '+esc(p.nationalId||'—')+'</div><div class="field"><b>شماره تماس:</b> '+esc(p.phone||'—')+'</div><div class="field"><b>تاریخ درمان:</b> '+esc(fmtDateFa(v.date))+'</div><div class="field"><b>تاریخ صدور:</b> '+esc(currentJalaliDateFa())+'</div><div class="field"><b>دندان‌پزشک:</b> '+esc(dentistName)+'</div><div class="field"><b>نتیجه درمان:</b> '+esc(v.outcome||'—')+'</div></div>'+
+  '<h2>شرح خدمات</h2><table><thead><tr><th>شرح خدمت</th><th>مبلغ ناخالص</th><th>تخفیف</th><th>سهم بیمه</th><th>خالص</th></tr></thead><tbody><tr><td>'+esc(v.treatmentType||'خدمات دندان‌پزشکی')+'</td><td>'+fmtMoney(f.gross)+'</td><td>'+fmtMoney(f.discount)+'</td><td>'+fmtMoney(f.insurance)+'</td><td>'+fmtMoney(f.net)+'</td></tr></tbody></table>'+
+  '<div class="totals"><div><span>دریافت نقدی</span><b>'+fmtMoney(f.cash)+'</b></div><div><span>دریافت کارتخوان</span><b>'+fmtMoney(f.card)+'</b></div><div><span>دریافت انتقالی</span><b>'+fmtMoney(f.transfer)+'</b></div><div><span>سایر دریافتی</span><b>'+fmtMoney(f.other)+'</b></div><div><span>استرداد وجه</span><b>'+fmtMoney(f.refund)+'</b></div><div><span>جمع پرداختی خالص</span><b>'+fmtMoney(f.paid)+'</b></div><div class="net"><span>مانده قابل پرداخت</span><b>'+fmtMoney(f.balance)+'</b></div></div>'+
+  (v.note?'<h2>توضیحات</h2><p>'+esc(v.note)+'</p>':'')+
+  '<div class="sign"><div>مهر و امضای دندان‌پزشک<br><br>'+esc(dentistName)+'</div><div>'+(kind==='invoice'?'تأیید و امضای بیمار':'تأیید دریافت وجه')+'</div></div><div class="foot">این سند بر اساس اطلاعات ثبت‌شده در دنت‌یار صادر شده است.</div></main></body></html>';
+  const C=window.Capacitor;
+  if(C && C.isNativePlatform && C.isNativePlatform()){
+    const plugin=(C.Plugins&&C.Plugins.DentyarNative)||(C.registerPlugin?C.registerPlugin('DentyarNative'):null);
+    if(!plugin||typeof plugin.printHtml!=='function'){ modalAlert('چاپ سند','امکان چاپ بومی در این نسخه فعال نیست. تا نصب نسخه دارای پشتیبانی چاپ، از نسخه وب استفاده کنید.'); return; }
+    try{ await plugin.printHtml({html:html,jobName:'DENTYAR-'+(kind==='invoice'?'Invoice':'Receipt')}); toast('پنجره چاپ Android باز شد.'); }
+    catch(e){ console.error('DENTYAR native print failed',e); modalAlert('چاپ سند','چاپ شروع نشد. لطفاً دوباره تلاش کنید.'); }
+    return;
   }
-  overlay.style.display='flex';
-  document.getElementById('dentyarPdfFrame').srcdoc=html;
+  showDentyarPrintOverlay(html);
+  setTimeout(()=>{ const frame=document.getElementById('dentyarPdfFrame'); if(frame&&frame.contentWindow){frame.contentWindow.focus();frame.contentWindow.print();} },500);
 }
 
 function addVisit(patientId){
