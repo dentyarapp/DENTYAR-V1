@@ -3877,6 +3877,7 @@ function changePassword(){
   if(!dentyarIsManager()){ modalAlert('دسترسی محدود','تغییر رمز اصلی فقط برای مدیر مطب مجاز است.'); return; }
   const v = toEnDigits(document.getElementById('newPassInput').value.trim());
   if(v.length!==8 || !/^\d{8}$/.test(v)){ modalAlert('خطا','رمز عبور باید دقیقاً ۸ رقم باشد.'); return; }
+  if((STATE.meta.appUsers||[]).some(u=>toEnDigits(u.pin||'')===v)){ modalAlert('خطا','رمز جدید با رمز یکی از کاربران یکسان است؛ رمز دیگری انتخاب کنید.'); return; }
   modalConfirm('تغییر رمز عبور','آیا از تغییر رمز عبور مطمئن هستید؟', ()=>{
     STATE.meta.password = v; saveState(); toast('رمز عبور تغییر کرد');
   });
@@ -4963,7 +4964,7 @@ document.addEventListener('blur',e=>{
     if(!id){ id='dev_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('dentyar_device_id', id); }
     deviceId = id; return id;
   }
-  function sensitiveKeys(){ return ['password','profilePassword','appAdminPassword','appAdminEnabled','appAdminHidden','sync','_syncUpdatedAt']; }
+  function sensitiveKeys(){ return ['password','profilePassword','appAdminPassword','appAdminEnabled','appAdminHidden','appUsers','sync','_syncUpdatedAt']; }
   function sanitizedMeta(){
     const m = JSON.parse(JSON.stringify(STATE.meta||{}));
     sensitiveKeys().forEach(function(k){ delete m[k]; });
