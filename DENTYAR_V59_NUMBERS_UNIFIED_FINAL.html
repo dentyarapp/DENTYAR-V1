@@ -952,7 +952,7 @@ function currentJalaliYear(){ return gregorianToJalali(new Date().getFullYear(),
 function jalaliDateFromISO(iso){ if(!iso) return ''; const d=new Date(iso+'T12:00:00'); if(Number.isNaN(d.getTime())) return ''; const [jy,jm,jd]=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate()); return faDateString(jy,jm,jd); }
 
 /* ---------- فارسی‌سازی سراسری اعداد و تاریخ‌ها ---------- */
-// V59 SAFE NUMBER POLICY: all visible numerals use ASCII/English digits.
+// DENTYAR TEST: visible numerals use Persian digits; values are normalized before calculations.
 function faDigits(value){
   const fa='۰۱۲۳۴۵۶۷۸۹';
   return toEnDigits(String(value ?? '')).replace(/[0-9]/g,d=>fa[Number(d)]);
