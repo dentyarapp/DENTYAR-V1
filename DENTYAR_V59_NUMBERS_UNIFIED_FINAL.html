@@ -1729,7 +1729,7 @@ function pinSubmit(){
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('app').style.display='block';
     sessionStorage.setItem('lb_unlocked','1');
-    if((currentPage==='reports' && !dentyarCanViewReports()) || (currentPage==='updates' && !dentyarIsManager())) currentPage='dashboard';
+    if((currentPage==='reports' && !dentyarCanViewReports()) || (['updates','security'].includes(currentPage) && !dentyarIsManager())) currentPage='dashboard';
     renderBottomNav(); renderPage();
   } else {
     document.getElementById('lockError').textContent = 'رمز عبور اشتباه است';
@@ -1852,6 +1852,7 @@ const PAGES = [
   {id:'backup', label:'پشتیبان‌گیری', icon:'backup'},
   {id:'settings', label:'تنظیمات', icon:'settings'},
   {id:'updates', label:'به‌روزرسانی', icon:'backup'},
+  {id:'security', label:'پدافند غیرعامل', icon:'settings'},
   {id:'profile', label:'پروفایل', icon:'profile'},
   {id:'guide', label:'راهنما', icon:'guide'},
   {id:'contact', label:'ارتباط با ما', icon:'contact'},
@@ -1892,7 +1893,7 @@ function renderHeader(){
   syncFixedTopHeight();
 }
 function renderBottomNav(){
-  document.getElementById('bottomNav').innerHTML = PAGES.filter(p=>(p.id!=='reports'||dentyarCanViewReports())&&(p.id!=='updates'||dentyarIsManager())).map(p=>`
+  document.getElementById('bottomNav').innerHTML = PAGES.filter(p=>(p.id!=='reports'||dentyarCanViewReports())&&(!['updates','security'].includes(p.id)||dentyarIsManager())).map(p=>`
     <button class="navItem ${currentPage===p.id?'active':''}" onclick="navigate('${p.id}')">
       ${NAV_ICONS[p.icon]}
       <span>${p.label}</span>
@@ -1916,6 +1917,7 @@ function syncFixedTopHeight(){
 function navigate(pageId, params){
   if(pageId==='reports' && !dentyarCanViewReports()){ dentyarReportDenied(); return; }
   if(pageId==='updates' && !dentyarIsManager()){ modalAlert('دسترسی محدود','پنل مستقل به‌روزرسانی فقط برای مدیر مطب در دسترس است.'); return; }
+  if(pageId==='security' && !dentyarIsManager()){ modalAlert('دسترسی محدود','پنل پدافند غیرعامل فقط برای مدیر مطب در دسترس است.'); return; }
   closeModal();
   if(pageId !== 'patients') openPatientId = null;
   currentPage = pageId;
@@ -1936,6 +1938,7 @@ function renderPage(){
     backup: renderBackup,
     settings: renderSettings,
     updates: renderUpdates,
+    security: renderSecurityPanel,
     profile: renderProfile,
     guide: renderGuide,
     contact: renderContact,
@@ -3529,6 +3532,35 @@ function previewNextFileNo(){
   });
   return String(lastAssigned + 1);
 }
+function renderSecurityPanel(){
+  if(!dentyarIsManager()){ document.getElementById('pageContent').innerHTML='<div class="card"><h3>دسترسی محدود</h3><p>پنل پدافند غیرعامل فقط برای مدیر مطب قابل مشاهده است.</p></div>'; return; }
+  document.getElementById('pageContent').innerHTML=`
+    <div class="pageTitle"><h2>🛡️ پدافند غیرعامل و امنیت اطلاعات</h2><p>کنترل‌های پیشگیرانه برای کاهش خطر دستکاری، افشای اطلاعات و اختلال</p></div>
+    <div class="securityPanel"><h4>بررسی اولیه دستگاه</h4><p id="securityLocalStatus">در حال بررسی قابلیت‌های دستگاه…</p><button class="btn btn-outline btn-block" onclick="runDentyarSecurityCheck()">بررسی دوباره</button></div>
+    <div class="securityPanel"><h4>حفاظت و تداوم خدمت</h4><ul>
+      <li>ثبت اطلاعات به‌صورت محلی ادامه می‌یابد؛ اختلال اینترنت نباید مانع ثبت بیمار و نوبت شود.</li>
+      <li>پشتیبان محلی روزانه در همین دستگاه نگهداری می‌شود؛ یک فایل پشتیبان مستقل نیز باید جدا از گوشی/تبلت نگهداری و بازیابی آن آزمایش شود.</li>
+      <li>از رمز قوی و منحصربه‌فرد استفاده شود؛ رمز، کد مطب و فایل پشتیبان در پیام‌رسان‌ها یا کانال‌های عمومی منتشر نشود.</li>
+      <li>به‌روزرسانی فقط از منبع معتبر نصب شود؛ پیش از جایگزینی برنامه، سازگاری نسخه و امضای APK بررسی شود.</li>
+      <li>محدودکردن دکمه‌ها در رابط کاربری به‌تنهایی امنیت کامل ایجاد نمی‌کند؛ قواعد Firebase و احراز هویت سمت سرور باید نیز محدود باشند.</li>
+      <li>در زمان اختلال شبکه، از حذف داده یا بازنشانی برنامه خودداری شود؛ ابتدا نسخه پشتیبان سالم بررسی و سپس بازیابی آزمایش شود.</li>
+      <li>گزارش‌ها و فایل‌های انتقالی ممکن است شامل داده حساس بیمار باشند؛ فقط به اندازه نیاز صادر و در محل امن نگهداری شوند.</li>
+    </ul><div class="row"><button class="btn btn-primary col" onclick="navigate('backup')">پشتیبان‌گیری و بازیابی</button><button class="btn btn-outline col" onclick="navigate('updates')">پنل به‌روزرسانی</button></div></div>
+    <div class="securityPanel"><h4>محدودیت بررسی</h4><p>این صفحه فقط وضعیت‌های پایه دستگاه را نشان می‌دهد و گواهی امنیت یا نفوذناپذیری نیست. رمزگذاری داده‌ها، قواعد Firebase، احراز هویت کاربران و اعتبارسنجی امضای APK باید جداگانه در زیرساخت پیاده‌سازی و با آزمون واقعی تأیید شوند.</p></div>
+  `;
+  runDentyarSecurityCheck();
+}
+function runDentyarSecurityCheck(){
+  const el=document.getElementById('securityLocalStatus');
+  if(!el) return;
+  const checks=[];
+  checks.push((location.protocol==='https:'||location.protocol==='capacitor:')?'بستر اجرا HTTPS یا برنامه بومی است؛ این مورد به‌تنهایی امنیت را تضمین نمی‌کند.':'هشدار: بستر اجرا HTTPS نیست.');
+  checks.push(typeof indexedDB!=='undefined'?'حافظه محلی IndexedDB در دسترس است.':'هشدار: IndexedDB در دسترس نیست.');
+  checks.push(typeof localStorage!=='undefined'?'حافظه محلی برنامه در دسترس است.':'هشدار: حافظه محلی در دسترس نیست.');
+  checks.push(navigator.onLine?'دستگاه اتصال شبکه را گزارش می‌کند؛ امنیت سرور بررسی نشده است.':'دستگاه فعلاً آفلاین است؛ همگام‌سازی شبکه‌ای انجام نمی‌شود.');
+  el.innerHTML=checks.map(x=>'<div>• '+esc(x)+'</div>').join('');
+}
+
 function renderUpdates(){
   if(!dentyarIsManager()){ document.getElementById('pageContent').innerHTML='<div class="card"><h3>دسترسی محدود</h3><p>پنل به‌روزرسانی فقط برای مدیر مطب قابل استفاده است.</p></div>'; return; }
   document.getElementById('pageContent').innerHTML = `
