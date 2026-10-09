@@ -19,6 +19,23 @@ jobs:
           from pathlib import Path
           import re
           s=Path("DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html").read_text(encoding="utf-8")
+          required = {
+              "V60 version": 'const DENTYAR_APP_VERSION = "V60";',
+              "independent updater": "function renderUpdates(){",
+              "passive defense panel": "function renderSecurityPanel(){",
+              "role-based reports": "function dentyarCanViewReports(){",
+              "standard invoice": "function printPatientDocument(",
+              "native report export": "async function v31NativeFile(",
+              "daily local backup": "function maybeCreatePassiveBackup(){",
+              "serial patient numbers": "140501010001",
+              "English time input": 'id="apTime" lang="en" dir="ltr"',
+              "three report choices": "شیر کردن گزارش",
+              "native PDF print": "DENTYAR-Financial-Report",
+              "native folder routing": "folder:String(options.folder||'Reports')",
+          }
+          missing = [name for name, needle in required.items() if needle not in s]
+          if missing:
+              raise SystemExit("Missing required DENTYAR feature(s): " + ", ".join(missing))
           scripts=re.findall(r"<script(?:\\s[^>]*)?>(.*?)</script>",s,re.S|re.I)
           Path("/tmp/dentyar-inline.js").write_text("\n\n".join(scripts),encoding="utf-8")
           print("inline scripts:",len(scripts),"bytes:",len(Path("/tmp/dentyar-inline.js").read_text()))
