@@ -5031,7 +5031,7 @@ document.addEventListener('blur',e=>{
 (function(){
   const SYNC = {};
   let fb=null, dbm=null, fbApp=null, db=null, rootRef=null;
-  let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false;
+  let subs=[], deviceId=null, pushTimer=null, retryTimer=null, merging=false, connected=false, started=false;
   const FB_APP_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
   const PUSHED_KEY='dentyar_sync_pushed_ids';
@@ -5053,9 +5053,9 @@ document.addEventListener('blur',e=>{
     return m;
   }
   async function loadSdk(){
-    if(fb) return;
-    fb = await import(FB_APP_URL);
-    dbm = await import(FB_DB_URL);
+    // Load each module independently so a partial network failure can recover on retry.
+    if(!fb) fb = await import(FB_APP_URL);
+    if(!dbm) dbm = await import(FB_DB_URL);
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
   function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
@@ -5063,12 +5063,14 @@ document.addEventListener('blur',e=>{
   SYNC.connect = async function(){
     const cfg = SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig){ return; }
+    if(started) return;
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
     try{
       await loadSdk();
       if(fbApp){ try{ await fb.deleteApp(fbApp); }catch(_){} }
       fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
       db = dbm.getDatabase(fbApp);
-      try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
+      // Patient records remain local-first in localStorage/IndexedDB; cloud sync is retried separately.
       ensureDeviceId();
       dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() }).catch(function(e){ console.warn('Dentyar device registration failed:',e); });
@@ -5082,10 +5084,16 @@ document.addEventListener('blur',e=>{
       SYNC.renderStatus&&SYNC.renderStatus();
       toast('تنظیمات همگام‌سازی بارگذاری شد؛ وضعیت اتصال واقعی در همین بخش نمایش داده می‌شود.');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
-    }catch(e){ SYNC.lastError=String(e&&e.message||e); console.error('DentyarSync connect failed', e); SYNC.renderStatus&&SYNC.renderStatus(); toast('اتصال همگام‌سازی ناموفق بود: '+(e&&e.message||e)); }
+    }catch(e){
+      SYNC.lastError=String(e&&e.message||e); console.error('DentyarSync connect failed', e); SYNC.renderStatus&&SYNC.renderStatus();
+      if(retryTimer) clearTimeout(retryTimer);
+      retryTimer=setTimeout(function(){ retryTimer=null; const next=SYNC.cfg(); if(next&&next.enabled&&!started) SYNC.connect(); },15000);
+      toast('اتصال همگام‌سازی برقرار نشد؛ اطلاعات محلی حفظ می‌شود و تلاش مجدد خودکار انجام خواهد شد.');
+    }
   };
 
   SYNC.disconnect = function(){
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
     clearSubs();
     if(db){ try{ dbm.goOffline(db); }catch(_){} }
     if(fbApp){ try{ fb.deleteApp(fbApp); }catch(_){} }
