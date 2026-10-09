@@ -106,6 +106,8 @@ jobs:
                   String fileName = call.getString("filename", "DENTYAR-report");
                   String mimeType = call.getString("mimeType", "application/octet-stream");
                   String data = call.getString("data", "");
+                  String folder = call.getString("folder", "Reports");
+                  if (!"Reports".equals(folder) && !"Backups".equals(folder) && !"Transfers".equals(folder) && !"Updates".equals(folder)) { folder = "Reports"; }
 
                   if (data == null || data.isEmpty()) {
                       call.reject("Empty report data");
@@ -120,7 +122,7 @@ jobs:
                   values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
                   values.put(
                       MediaStore.Downloads.RELATIVE_PATH,
-                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/Reports"
+                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/" + folder
                   );
                   values.put(MediaStore.Downloads.IS_PENDING, 1);
 
