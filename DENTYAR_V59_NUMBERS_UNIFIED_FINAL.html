@@ -2643,98 +2643,76 @@ function renderPatientFile(id){
   `;
   bindFinance('v');
 }
-function printReceipt(patientId, visitId){
+async function printReceipt(patientId, visitId){
   const p = STATE.patients.find(x=>x.id===patientId);
-  const v = (p.visits||[]).find(x=>x.id===visitId);
+  const v = (p?.visits||[]).find(x=>x.id===visitId);
   if(!p || !v) return;
-  const dentistName = v.dentistId? (STATE.dentists.find(d=>d.id===v.dentistId)||{}).name : '-';
+  const dentistName = v.dentistId ? (STATE.dentists.find(d=>d.id===v.dentistId)||{}).name : '-';
+  const clinic = STATE.meta.clinicProfile || {};
+  const clinicName = STATE.meta.clinicName || clinic.legalName || 'مطب دندان‌پزشکی';
+  const clinicPhone = clinic.clinicPhone || STATE.meta.supportPhone || '';
+  const f = financeOf(v);
+  const title = f.balance > 0 ? 'صورت‌حساب درمان' : (f.paid > 0 ? 'رسید پرداخت' : 'جزئیات مالی درمان');
+  const insurer = v.insuranceType || v.insurer || v.insuranceCompany || '';
+  const insuranceStatus = v.insuranceStatus || v.insuranceApprovalStatus || '';
+  const logo = clinicLogoSrc();
+  const docNo = String(v.receiptNo || v.invoiceNo || ('DENTYAR-'+String(v.id||patientId).slice(-8))).replace(/[<>&"]/g,'');
   const html=`
-    <!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>رسید</title>
-    <style>
-      body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#1c2b36;margin:0;}
-      h2{color:#153a63;margin-bottom:2px;}
-      .muted{color:#6b7c88;font-size:13px;margin-bottom:18px;}
-      table{width:100%;border-collapse:collapse;margin-top:14px;}
-      td{padding:8px 4px;border-bottom:1px solid #e1e8ec;font-size:14px;}
-      td:first-child{color:#6b7c88;}
-      .total{font-size:17px;font-weight:bold;color:#1e8f5f;text-align:left;margin-top:16px;}
-      .footer{margin-top:30px;font-size:12px;color:#6b7c88;text-align:center;}
-    </style>
-
-<style id="dentyar-v32-final-fixes">
-/* V32 FINAL — logo/report/update fixes. This layer intentionally comes last. */
-#topHeader .appLogo,
-#topHeader .clinicLogo,
-#lockScreen .lockLogo{
-  background:#fff!important;
-  object-fit:contain!important;
-  padding:0!important;
-  filter:none!important;
-}
-#topHeader .appLogo{border-radius:15px!important;border:2px solid #8ad3cb!important;}
-#topHeader .clinicLogo{border-radius:14px!important;border:2px solid #8ad3cb!important;}
-#lockScreen .lockLogo{border-radius:22%!important;border:2px solid #8ad3cb!important;box-shadow:0 6px 18px rgba(15,118,110,.16)!important;}
-/* Never paint a black backing behind the main logo. */
-#lockScreen .lockLogo{background:#fff!important;}
-/* Reports: keep export buttons compact and clearly distinguish the three outputs. */
-.card button[onclick="exportReportCSV()"],
-.card button[onclick="exportReportXLSX()"],
-.card button[onclick="exportReportPDF()"]{min-height:42px!important;font-weight:800!important;}
-.updateBox{border-color:#bfe3de!important;background:linear-gradient(145deg,#ffffff,#f3fbf9)!important;}
-.updateBadge{font-weight:900!important;}
-</style>
-
-<style id="dentyar-v34-logo-safety">
-/* V34 TEST — only logo rendering safety; application logic/export logic is unchanged. */
-#topHeader .appLogo,#topHeader .clinicLogo,#lockScreen .lockLogo{
-  object-fit:contain!important;
-  object-position:center!important;
-  background:#fff!important;
-  padding:0!important;
-  overflow:hidden!important;
-}
-#topHeader .appLogo{width:56px!important;height:56px!important;border-radius:15px!important;}
-#topHeader .clinicLogo{width:56px!important;height:56px!important;border-radius:14px!important;}
-#lockScreen .lockLogo{width:108px!important;height:108px!important;border-radius:22%!important;}
-</style>
-
-<style id="dentyar-v57-logo-final">
-/* V57 FINAL: preserve the known-good V51 logo asset and prevent legacy CSS from cropping it. */
-#topHeader .appLogo{width:72px!important;height:72px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:0!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-#topHeader .clinicLogo{width:54px!important;height:54px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:2px!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-#lockScreen .lockLogo{width:108px!important;height:108px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:4px!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-@media(max-width:480px){#topHeader .appLogo{width:62px!important;height:62px!important;}#topHeader .clinicLogo{width:50px!important;height:50px!important;}#lockScreen .lockLogo{width:108px!important;height:108px!important;}}
-</style>
-<style id="dentyar-v58-pin-latin">
-/* V58 ROOT FIX: global Persian-digit conversion must not touch the login keypad. */
-#lockScreen[data-no-fa-digits="true"],
-#lockScreen[data-no-fa-digits="true"] .pinPad,
-#lockScreen[data-no-fa-digits="true"] .pinPad button,
-#lockScreen[data-no-fa-digits="true"] #lockHint{
- direction:ltr !important;
- unicode-bidi:isolate !important;
- font-family:Arial,Helvetica,sans-serif !important;
- font-variant-numeric:lining-nums !important;
-}
-#lockScreen[data-no-fa-digits="true"] .pinPad button{font-feature-settings:"lnum" 1 !important;}
-</style><link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#0f766e">
-</head><body>
-      <h2>DENTYAR</h2>
-      <div class="muted">${esc(STATE.meta.slogan||'')}</div>
-      <table>
-        <tr><td>نام بیمار</td><td>${esc(p.name)}</td></tr>
-        <tr><td>شماره پرونده</td><td>${esc(p.fileNo)}</td></tr>
-        <tr><td>تاریخ</td><td>${fmtDateFa(v.date)}</td></tr>
-        <tr><td>نوع درمان</td><td>${esc(v.treatmentType)}</td></tr>
-        <tr><td>دندان‌پزشک</td><td>${esc(dentistName||'-')}</td></tr>
-        <tr><td>نتیجه</td><td>${esc(v.outcome||'-')}</td></tr>
-      </table>
-      <div class="total">مبلغ: ${fmtMoney(v.cost)}</div>
-      <div class="footer">${esc(STATE.meta.supportPhone||'')}</div>
-<script>setTimeout(()=>window.print(),350);<\/script><script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("DENTYAR PWA service worker:",e);});});}})();<\/script>
-</body></html>`;
-  showDentyarPrintOverlay(html);
+<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} - ${esc(clinicName)}</title>
+<style>
+*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;padding:24px;color:#20313b;background:#fff}
+.sheet{max-width:820px;margin:auto;border:1px solid #d9e5e5;border-radius:16px;padding:26px}
+.head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #0f766e;padding-bottom:18px}
+.logo{width:76px;height:76px;object-fit:contain;border:1px solid #dce9e7;border-radius:12px;padding:4px}
+.clinic{flex:1}.clinic h1{font-size:21px;margin:0 0 8px;color:#0f4f4f}.clinic p{font-size:12px;line-height:1.9;margin:2px 0;color:#5b6c74}
+.doc{background:#eef8f6;border-radius:12px;padding:14px;margin:18px 0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.doc b{color:#0f4f4f}.section{font-weight:800;color:#0f4f4f;margin:18px 0 8px}
+table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1px solid #e5eded;text-align:right;font-size:13px}th{background:#f3f8f7;color:#36545a}
+.money{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}.total{background:#f1f8f6;font-weight:800}
+.status{padding:12px;border:1px solid #dce8e5;border-radius:10px;font-size:12px;line-height:1.9;margin-top:16px}
+.signs{display:flex;gap:28px;margin-top:44px}.sign{flex:1;border-top:1px solid #aab9b9;padding-top:8px;text-align:center;font-size:12px;color:#617278}
+.footer{margin-top:24px;padding-top:12px;border-top:1px solid #e3ebea;text-align:center;color:#687b80;font-size:10px;line-height:1.8}
+@media print{body{padding:0}.sheet{border:0;border-radius:0;padding:10mm;max-width:none}}
+</style></head><body><main class="sheet">
+<header class="head"><img class="logo" src="${esc(logo)}" alt="لوگوی مطب"><div class="clinic"><h1>${esc(clinicName)}</h1>
+<p>${esc(clinic.address||'')}</p><p>${clinicPhone?'تلفن: '+esc(clinicPhone):''}${clinic.licenseNo?' | شماره مجوز: '+esc(clinic.licenseNo):''}</p></div></header>
+<div class="doc"><span><b>${esc(title)}</b></span><span>شماره سند: <b>${esc(docNo)}</b></span><span>تاریخ: <b>${esc(fmtDateFa(v.date))}</b></span></div>
+<div class="section">مشخصات بیمار و درمان</div>
+<table><tbody>
+<tr><td>نام بیمار</td><td>${esc(p.name||'-')}</td><td>شماره پرونده</td><td>${esc(p.fileNo||'-')}</td></tr>
+<tr><td>کد ملی</td><td>${esc(p.nationalId||'-')}</td><td>تلفن</td><td>${esc(p.phone||'-')}</td></tr>
+<tr><td>نوع درمان</td><td>${esc(v.treatmentType||'-')}</td><td>دندان‌پزشک</td><td>${esc(dentistName||'-')}</td></tr>
+</tbody></table>
+<div class="section">ریز محاسبات مالی</div>
+<table><thead><tr><th>شرح</th><th class="money">مبلغ (تومان)</th></tr></thead><tbody>
+<tr><td>مبلغ خدمات</td><td class="money">${fmtMoney(f.gross)}</td></tr>
+<tr><td>تخفیف ثبت‌شده</td><td class="money">${fmtMoney(f.discount)}</td></tr>
+<tr><td>سهم بیمه ثبت‌شده</td><td class="money">${fmtMoney(f.insurance)}</td></tr>
+<tr class="total"><td>خالص قابل پرداخت بیمار</td><td class="money">${fmtMoney(f.net)}</td></tr>
+<tr><td>مبلغ پرداخت‌شده</td><td class="money">${fmtMoney(f.paid)}</td></tr>
+<tr class="total"><td>مانده بدهی</td><td class="money">${fmtMoney(f.balance)}</td></tr>
+</tbody></table>
+<div class="status"><b>وضعیت تسویه:</b> ${f.balance<=0?'تسویه‌شده بر اساس اطلاعات ثبت‌شده':'دارای مانده بدهی'}<br>
+${insurer?'بیمه ثبت‌شده: '+esc(insurer)+'<br>':''}
+${insuranceStatus?'وضعیت تأیید بیمه: '+esc(insuranceStatus):'وضعیت تأیید/تسویه بیمه در اطلاعات موجود ثبت نشده است'}<br>
+این سند بر پایه اطلاعات ثبت‌شده در دنت‌یار تهیه شده و به‌خودی‌خود ادعای «فاکتور رسمی مالیاتی» ندارد.</div>
+<div class="signs"><div class="sign">مهر و امضای مطب</div><div class="sign">امضای بیمار</div></div>
+<div class="footer">${esc(clinicName)} · ${clinicPhone?'تلفن: '+esc(clinicPhone)+' · ':''}سامانه دنت‌یار</div>
+</main></body></html>`;
+  if(isDentyarNativeApp()){
+    try{
+      const action=await dentyarReportAction();
+      if(action==='cancel') return;
+      const bytes=new TextEncoder().encode(html);
+      const result=await downloadBlob(bytes,'صورت‌حساب-'+String(p.fileNo||patientId)+'-'+todayJalaliCompact()+'.html','text/html;charset=utf-8',{share:action==='share'});
+      if(result==='saved') toast('سند در Download/DENTYAR/Reports ذخیره شد');
+      else if(result==='shared') toast('سند برای اشتراک‌گذاری آماده شد');
+      else if(result==='downloaded') toast('سند آماده دریافت است');
+    }catch(e){console.error('Receipt export failed',e);modalAlert('صدور سند','ذخیره یا اشتراک سند انجام نشد.');}
+  }else{
+    showDentyarPrintOverlay(html);
+  }
 }
 /* نمایش هر پیش‌نمایش چاپی (رسید تکی یا گزارش) به‌صورت یک لایه‌ی داخل همین صفحه، به‌همراه
    دکمه‌ی بازگشت همیشه-کاربردی — مستقل از رفتار window.close() در مرورگر/وب‌ویو نصب‌شده */
