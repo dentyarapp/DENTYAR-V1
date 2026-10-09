@@ -1395,7 +1395,8 @@ async function v31NativeFile(bytes, filename, mime, options={}){
       const result=await nativePlugin.saveToDownloads({
         filename:safeName,
         mimeType:String(mime||'application/octet-stream'),
-        data:data
+        data:data,
+        folder:String(options.folder||'Reports')
       });
 
       if(!result || result.saved!==true){
@@ -1405,7 +1406,7 @@ async function v31NativeFile(bytes, filename, mime, options={}){
       return {
         saved:true,
         shared:false,
-        path:String(result.path||'Download/DENTYAR/Reports/'+safeName),
+        path:String(result.path||'Download/DENTYAR/'+String(options.folder||'Reports')+'/'+safeName),
         uri:String(result.uri||'')
       };
     }
@@ -3396,9 +3397,13 @@ async function createBackup(){
   const snap = snapshotData();
   const json = JSON.stringify(snap);
   storeBackupSnapshot(json, `${STATE.patients.length} بیمار`);
-  const result=await downloadBlob(new TextEncoder().encode(json), `پشتیبان-DENTYAR-${todayJalaliCompact()}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}${String(new Date().getSeconds()).padStart(2,'0')}.json`, 'application/json', {share:false});
-  toast(result==='shared'?'پشتیبان آماده ذخیره یا ارسال شد':result==='cancelled'?'ارسال لغو شد':'فایل پشتیبان آماده دریافت است');
-  renderBackup();
+  try{
+    const result=await downloadBlob(new TextEncoder().encode(json), `پشتیبان-DENTYAR-${todayJalaliCompact()}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}${String(new Date().getSeconds()).padStart(2,'0')}.json`, 'application/json', {share:false,folder:'Backups'});
+    if(result==='saved') toast('پشتیبان در Download/DENTYAR/Backups ذخیره شد');
+    else if(result==='cancelled') toast('ذخیره یا ارسال پشتیبان لغو شد');
+    else toast('فایل پشتیبان آماده دریافت است');
+    renderBackup();
+  }catch(e){ console.error('DENTYAR backup export failed',e); modalAlert('تهیه پشتیبان','فایل پشتیبان ساخته یا ذخیره نشد. فضای خالی دستگاه و مجوزهای برنامه را بررسی کنید.'); }
 }
 
 function restoreFromHistory(id, mode){
