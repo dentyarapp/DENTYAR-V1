@@ -268,7 +268,7 @@
   h1{font-size:22px!important;} h2{font-size:19px!important;} h3{font-size:17px!important;} h4{font-size:16px!important;}
   .clinicName{font-size:21px!important;font-weight:900!important;color:#123b5d!important;}
   .brandEn{font-family:var(--font-en)!important;font-size:14px!important;font-weight:700!important;letter-spacing:.35px;}
-  .brandFa{font-size:15px!important;font-weight:900!important;color:#0f766e!important;}
+  .brandFa{font-size:15px!important;font-weight:900!important;color:#0f6f78!important;}
   #topHeader .clinicSlogan .brandEn{font-size:13px!important;font-weight:700!important;}
   input,select,textarea{font-family:var(--font-fa)!important;font-size:17px!important;font-weight:600!important;color:#163446!important;background:#fff;}
   input::placeholder,textarea::placeholder{color:#71838c!important;opacity:1!important;font-weight:500!important;}
@@ -786,30 +786,33 @@ function saveState(){
 function uid(prefix){ return (prefix||'id') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 function nextFileNo(){
-  // فرمت استاندارد: تاریخ شمسی روز جاری + سریال چهاررقمی؛ مثال ۱۴۰۵۰۶۲۴۰۰۰۱.
-  // سریال به‌صورت پیش‌فرض بین روزها ادامه پیدا می‌کند. مدیر مطب می‌تواند در تنظیمات
-  // «ریست ابتدای هر سال» را فعال کند یا از هر تاریخی «ریست از امروز» انجام دهد.
-  const dateStr = todayJalaliCompact();
-  const yearStr = dateStr.slice(0,4);
-  if(STATE.meta.fileNoResetDate && dateStr >= STATE.meta.fileNoResetDate && (STATE.meta.fileNoSeq||0)>0){
-    // پس از ریست دستی، سریال از همان روز ادامه می‌یابد.
-  }
-  if(STATE.meta.fileNoMode === 'yearly' && STATE.meta.fileNoYear && STATE.meta.fileNoYear !== yearStr){
-    STATE.meta.fileNoSeq = 0;
-  }
-  STATE.meta.fileNoYear = yearStr;
-  STATE.meta.fileNoDate = dateStr;
-  STATE.meta.fileNoSeq = (STATE.meta.fileNoSeq||0) + 1;
+  // شماره‌گذاری سریالی پیوسته؛ پرونده‌های قدیمی هرگز بازشماری یا تغییر نمی‌شوند.
+  // اولین شماره برای نصب تازه: 140501010001.
+  const firstNumber = 140501010001;
+  let lastAssigned = firstNumber - 1;
+  const stored = Number(STATE.meta.fileNoLastAssigned || 0);
+  if(Number.isSafeInteger(stored) && stored >= firstNumber) lastAssigned = Math.max(lastAssigned, stored);
+  (STATE.patients || []).forEach(p => {
+    const n = Number(toEnDigits(String(p.fileNo || '')).replace(/\D/g,''));
+    if(Number.isSafeInteger(n) && n >= firstNumber) lastAssigned = Math.max(lastAssigned, n);
+  });
+  const next = lastAssigned + 1;
+  STATE.meta.fileNoLastAssigned = next;
+  STATE.meta.fileNoSeq = next;
+  STATE.meta.fileNoMode = 'continuous';
   saveState();
-  return dateStr + String(STATE.meta.fileNoSeq).padStart(4,'0');
+  return String(next);
 }
 function resetFileSerialFromToday(){
-  STATE.meta.fileNoSeq=0;
-  STATE.meta.fileNoResetDate=todayJalaliCompact();
-  STATE.meta.fileNoDate=STATE.meta.fileNoResetDate;
-  STATE.meta.fileNoYear=STATE.meta.fileNoResetDate.slice(0,4);
+  const existingMax = (STATE.patients||[]).reduce((max,p)=>{
+    const n=Number(toEnDigits(String(p.fileNo||'')).replace(/\D/g,''));
+    return Number.isSafeInteger(n) ? Math.max(max,n) : max;
+  }, 140501010000);
+  STATE.meta.fileNoLastAssigned = Math.max(Number(STATE.meta.fileNoLastAssigned)||0, existingMax);
+  STATE.meta.fileNoSeq = STATE.meta.fileNoLastAssigned;
+  STATE.meta.fileNoMode='continuous';
   saveState();
-  toast('سریال شماره پرونده از امروز ریست شد');
+  toast('شماره‌گذاری سریالی پیوسته است؛ شماره پرونده‌های قبلی حفظ شدند');
   renderSettings();
 }
 function setFileNoMode(mode){
@@ -954,10 +957,21 @@ function faDigits(value){
   return toEnDigits(String(value ?? ''));
 }
 function formatAllNumericInputs(){
-  document.querySelectorAll('input[type=tel],input[inputmode=numeric],input[type=number]').forEach(el=>{
-    if(el.value) el.value=faDigits(toEnDigits(el.value));
-    el.setAttribute('dir','rtl');
-    el.style.textAlign='right';
+  document.querySelectorAll('input').forEach(el=>{
+    const id=el.id||'';
+    const numericOnly=/(Nid|Phone|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|national|postal|economic|License|EmergencyPhone|Mobile|pin|Pass)/i.test(id);
+    if(numericOnly && el.type!=='date' && el.type!=='time' && el.type!=='file'){
+      el.setAttribute('inputmode', /Phone|Mobile/i.test(id) ? 'tel' : 'numeric');
+      el.setAttribute('autocomplete','off');
+      el.setAttribute('data-numeric-only','true');
+      el.setAttribute('dir','ltr');
+      el.style.textAlign='left';
+    }
+    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]')){
+      if(el.value) el.value=faDigits(toEnDigits(el.value));
+      el.setAttribute('dir','ltr');
+      el.style.textAlign='left';
+    }
   });
 }
 function toFaTextNodeTree(root=document.body){
@@ -1689,6 +1703,28 @@ function pinClear(){
   updatePinDots();
   document.getElementById('lockError').textContent='';
 }
+// پشتیبانی از صفحه‌کلید واقعی لپ‌تاپ؛ کلیک ماوس روی اعداد صفحه نیز مثل قبل فعال می‌ماند.
+document.addEventListener('keydown', function(e){
+  const lock=document.getElementById('lockScreen');
+  const app=document.getElementById('app');
+  if(!lock || lock.style.display==='none' || (app && app.style.display==='block')) return;
+  if(e.ctrlKey || e.altKey || e.metaKey) return;
+  if(/^[0-9]$/.test(e.key)){
+    e.preventDefault();
+    pinPress(e.key);
+  } else if(e.key==='Backspace'){
+    e.preventDefault();
+    pinBuffer=pinBuffer.slice(0,-1);
+    updatePinDots();
+    const err=document.getElementById('lockError'); if(err) err.textContent='';
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    pinSubmit();
+  } else if(e.key==='Escape'){
+    e.preventDefault();
+    pinClear();
+  }
+});
 function lockApp(){
   showModal(`
     <h3>خروج از برنامه</h3>
@@ -2062,6 +2098,14 @@ function openRegisterForm(appointmentId){
 function saveRegisterForm(appointmentId){
   const name = document.getElementById('rgName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
+  const enteredNid=toEnDigits(document.getElementById('rgNid').value||'').trim();
+  if(enteredNid){
+    const duplicate=checkDuplicateNationalId(enteredNid,null);
+    if(duplicate){ modalAlert('ثبت تکراری','این کد ملی قبلاً برای «'+esc(duplicate.name)+'» با شماره پرونده '+esc(duplicate.fileNo)+' ثبت شده است. پرونده جدید ایجاد نشد.'); return; }
+  }
+  const registerPhone=toEnDigits(String(document.getElementById('rgPhone').value||'')).replace(/\D/g,'');
+  const samePatient=(STATE.patients||[]).find(p=>String(p.name||'').trim().toLowerCase()===name.toLowerCase() && registerPhone.length>=7 && toEnDigits(String(p.phone||'')).replace(/\D/g,'')===registerPhone);
+  if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+'). اطلاعات قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('register').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('rgCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
   if(missingCustom){ modalAlert('خطا',`فیلد «${esc(missingCustom.label)}» الزامی است.`); return; }
   const patient = {
@@ -2246,6 +2290,11 @@ function renderAppointments(){
 function saveAppointment(){
   const name = document.getElementById('apName').value.trim();
   if(!name){ modalAlert('خطا','نام الزامی است.'); return; }
+  const appointmentPhone=toEnDigits(String(document.getElementById('apPhone').value||'')).replace(/\D/g,'');
+  const appointmentDate=document.getElementById('apDate').value || todayISO();
+  const appointmentTime=document.getElementById('apTime').value || '';
+  const duplicateAppointment=(STATE.appointments||[]).find(a=>a.status!=='ثبت‌شده' && String(a.name||'').trim().toLowerCase()===name.toLowerCase() && toEnDigits(String(a.phone||'')).replace(/\D/g,'')===appointmentPhone && (a.date||'')===appointmentDate && (a.time||'')===appointmentTime && appointmentPhone.length>=7);
+  if(duplicateAppointment){ modalAlert('نوبت تکراری','برای همین بیمار در همین تاریخ و ساعت، نوبت ثبت شده است. نوبت قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('appointment').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('appointmentCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
   if(missingCustom){ modalAlert('خطا',`فیلد «${esc(missingCustom.label)}» الزامی است.`); return; }
   STATE.appointments.push({
@@ -2419,6 +2468,14 @@ function openPatientForm(patientId, prefill){
 function savePatientForm(editingId){
   const name = document.getElementById('pfName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
+  const enteredNid=toEnDigits(document.getElementById('pfNid').value||'').trim();
+  if(enteredNid){
+    const duplicate=checkDuplicateNationalId(enteredNid,editingId);
+    if(duplicate){ modalAlert('ثبت تکراری','این کد ملی قبلاً برای «'+esc(duplicate.name)+'» با شماره پرونده '+esc(duplicate.fileNo)+' ثبت شده است.'); return; }
+  }
+  const enteredPhone=toEnDigits(String(document.getElementById('pfPhone').value||'')).replace(/\D/g,'');
+  const samePatient=(STATE.patients||[]).find(p=>p.id!==editingId && String(p.name||'').trim().toLowerCase()===name.toLowerCase() && enteredPhone.length>=7 && toEnDigits(String(p.phone||'')).replace(/\D/g,'')===enteredPhone);
+  if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+').'); return; }
   const data = {
     name,
     nationalId: document.getElementById('pfNid').value.trim(),
@@ -3875,10 +3932,7 @@ function isProfileUnlocked(){
   return sessionStorage.getItem('lb_profile_unlocked') === '1';
 }
 function renderProfile(){
-  if(!isProfileUnlocked()){
-    renderProfileGate();
-    return;
-  }
+  // پروفایل عادی متعلق به مطب است؛ مدیریت محرمانه سامانه همچنان با کد مستقل محافظت می‌شود.
   document.getElementById('pageContent').innerHTML = `
     <div class="card">
       <h3>لوگوی کلینیک</h3>
@@ -3935,14 +3989,15 @@ function renderProfile(){
     </div>
 
     <div class="card">
-      <h3>رمز دسترسی به پروفایل</h3>
-      <p style="font-size:11px;color:var(--muted)">این رمز جدا از رمز ورود روزمره است و فقط برای ورود به همین صفحه استفاده می‌شود.</p>
-      <label>رمز جدید (۸ رقم)</label>
-      <input type="text" id="newProfilePassInput" maxlength="8" placeholder="********">
-      <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changeProfilePassword()">ذخیره‌ی رمز جدید</button>
+      <h3>ارسال دنت‌یار به دستگاه دیگر</h3>
+      <p style="font-size:12px;color:var(--muted);line-height:1.8">برای انتقال به دستگاه دیگر، فقط در صورت نیاز و با انتخاب آگاهانه، اطلاعات مطب را نیز همراه برنامه ارسال کنید.</p>
+      <div class="grid2">
+        <button class="btn btn-outline" onclick="shareAppTransfer(false)">ارسال برنامه بدون اطلاعات</button>
+        <button class="btn btn-primary" onclick="shareAppTransfer(true)">ارسال برنامه همراه اطلاعات</button>
+      </div>
     </div>
 
-    <button class="btn btn-outline btn-block" onclick="lockProfile()">خروج از پروفایل</button>
+    <button class="btn btn-outline btn-block" onclick="lockProfile()">بازگشت</button>
   `;
 }
 function renderProfileGate(){
@@ -4046,7 +4101,7 @@ function creatorLogoTap(){
 }
 function isCreatorUnlocked(){ return sessionStorage.getItem('dentyar_creator_unlocked')==='1'; }
 function showCreatorGate(){
-  showModal(`<h3>ورود به مدیریت اپلیکیشن</h3><p class="notice">این بخش محرمانه و خارج از منوی عمومی است.</p><label>رمز سازنده (۸ رقم)</label><input type="password" id="creatorPassInput" maxlength="8" inputmode="numeric" style="text-align:center;letter-spacing:4px"><div id="creatorPassError" style="color:var(--danger);font-size:12px;height:18px;margin-top:7px"></div><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="submitCreatorGate()">ورود سازنده</button>`);
+  showModal(`<h3>ورود به مدیریت سامانه</h3><p class="notice">این بخش ویژه تیم فنی و پشتیبانی است و خارج از منوی عمومی قرار دارد.</p><label>رمز سازنده (۸ رقم)</label><input type="password" id="creatorPassInput" maxlength="8" inputmode="numeric" style="text-align:center;letter-spacing:4px"><div id="creatorPassError" style="color:var(--danger);font-size:12px;height:18px;margin-top:7px"></div><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="submitCreatorGate()">ورود سازنده</button>`);
   setTimeout(()=>document.getElementById('creatorPassInput')?.focus(),100);
 }
 function submitCreatorGate(){
@@ -4058,7 +4113,7 @@ function lockCreator(){ sessionStorage.removeItem('dentyar_creator_unlocked'); n
 function renderAppAdmin(){
   if(!isCreatorUnlocked()){ showCreatorGate(); return; }
   document.getElementById('pageContent').innerHTML=`
-    <div class="card"><h3>مدیریت محرمانه اپلیکیشن</h3><div class="notice">این پنل در ناوبری عمومی وجود ندارد و فقط با رمز مستقل سازنده قابل دسترسی است.</div></div>
+    <div class="card"><h3>مدیریت سامانه</h3><div class="notice">این پنل محرمانه است و فقط با کد مستقل مدیریت سامانه قابل دسترسی است.</div></div>
     <div class="card"><h3>کنترل دسترسی پنل سازنده</h3><label><input type="checkbox" ${STATE.meta.appAdminEnabled!==false?'checked':''} onchange="STATE.meta.appAdminEnabled=this.checked;saveState();"> فعال بودن دسترسی سازنده</label><br><label><input type="checkbox" ${STATE.meta.appAdminHidden!==false?'checked':''} onchange="STATE.meta.appAdminHidden=this.checked;saveState();"> مخفی بودن از منو</label><p style="font-size:11px;color:var(--muted)">این دو گزینه فقط وضعیت دسترسی و نمایش را کنترل می‌کنند.</p></div>
     <div class="card"><h3>تغییر رمز سازنده</h3><label>رمز جدید (۸ رقم)</label><input type="password" id="newCreatorPass" maxlength="8" inputmode="numeric"><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changeCreatorPassword()">ذخیره رمز جدید</button></div>
     <div class="card"><h3>مدیریت ساختار فرم‌ها</h3><p style="font-size:12px;color:var(--muted);line-height:1.9">از اینجا نیز می‌توانید ساختار فیلدهای دو فرم اصلی را کنترل کنید؛ تنظیمات عادی همین قابلیت را در اختیار مدیر مطب قرار می‌دهد.</p></div>
