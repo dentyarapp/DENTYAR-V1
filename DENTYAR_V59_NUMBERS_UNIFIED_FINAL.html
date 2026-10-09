@@ -1728,7 +1728,7 @@ function pinSubmit(){
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('app').style.display='block';
     sessionStorage.setItem('lb_unlocked','1');
-    if(currentPage==='reports' && !dentyarCanViewReports()) currentPage='dashboard';
+    if((currentPage==='reports' && !dentyarCanViewReports()) || (currentPage==='updates' && !dentyarIsManager())) currentPage='dashboard';
     renderBottomNav(); renderPage();
   } else {
     document.getElementById('lockError').textContent = 'رمز عبور اشتباه است';
