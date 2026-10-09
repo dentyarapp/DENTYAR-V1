@@ -3849,7 +3849,7 @@ function saveSmsTemplates(){
 function showStaffManager(){
   if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
   const users=STATE.meta.appUsers||[];
-  const list=users.map(u=>'<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span>'+esc(u.name)+' — '+(u.role==='dentist'?'دندان‌پزشک':'منشی')+'</span><button class="btn btn-danger btn-sm" onclick="deleteStaffUser(\\''+esc(u.id)+'\\')">حذف</button></div>').join('')||'<div class="empty">کاربر جداگانه‌ای تعریف نشده است.</div>';
+  const list=users.map(u=>'<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span>'+esc(u.name)+' — '+(u.role==='dentist'?'دندان‌پزشک':'منشی')+'</span><button class="btn btn-danger btn-sm" onclick="deleteStaffUser(\''+esc(u.id)+'\')">حذف</button></div>').join('')||'<div class="empty">کاربر جداگانه‌ای تعریف نشده است.</div>';
   showModal('<h3>مدیریت دسترسی کاربران</h3><label>نام کاربر</label><input id="staffUserName" placeholder="مثلاً منشی مطب"><label>رمز ورود ۸ رقمی</label><input id="staffUserPin" type="password" inputmode="numeric" maxlength="8" placeholder="۸ رقم"><label>نقش کاربر</label><select id="staffUserRole"><option value="receptionist">منشی — بدون دسترسی به گزارش‌ها</option><option value="dentist">دندان‌پزشک — دسترسی به گزارش‌ها</option></select><button class="btn btn-primary btn-block" style="margin-top:10px" onclick="saveStaffUser()">ذخیره کاربر</button><div style="margin-top:12px">'+list+'</div>');
 }
 function saveStaffUser(){
