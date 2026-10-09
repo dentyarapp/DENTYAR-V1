@@ -3505,7 +3505,7 @@ async function exportAppTransfer(withData){
     finalHtml = finalHtml.slice(0,lastIdx) + declReplacement + finalHtml.slice(lastIdx+declPrefix.length);
   }
   const bytes = new TextEncoder().encode(finalHtml);
-  const result=await downloadBlob(bytes, withData? 'DENTYAR-انتقال-با-اطلاعات.html' : 'DENTYAR-انتقال-خالی.html', 'text/html;charset=utf-8', {share:false});
+  const result=await downloadBlob(bytes, withData? 'DENTYAR-انتقال-با-اطلاعات.html' : 'DENTYAR-انتقال-خالی.html', 'text/html;charset=utf-8', {share:false,folder:'Transfers'});
   toast(result==='shared'?'فایل انتقالی آماده ذخیره یا ارسال شد':result==='cancelled'?'ارسال لغو شد':'فایل انتقالی آماده دریافت است');
 }
 function DEFAULT_STATE_MERGE(){
