@@ -73,7 +73,13 @@ jobs:
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
+          import android.content.Context;
           import android.content.Intent;
+          import android.print.PrintManager;
+          import android.print.PrintAttributes;
+          import android.print.PrintDocumentAdapter;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
           import android.provider.Settings;
           import androidx.core.content.FileProvider;
           import android.net.Uri;
@@ -210,6 +216,40 @@ jobs:
                   } catch (Exception e) {
                       call.reject("Could not open Android package installer: " + e.getMessage(), e);
                   }
+
+              @PluginMethod
+              public void printHtml(PluginCall call) {
+                  String html = call.getString("html", "");
+                  String jobName = call.getString("jobName", "DENTYAR document");
+                  if (html == null || html.trim().isEmpty()) {
+                      call.reject("Empty print document");
+                      return;
+                  }
+                  getActivity().runOnUiThread(() -> {
+                      try {
+                          PrintManager printManager = (PrintManager) getContext().getSystemService(Context.PRINT_SERVICE);
+                          if (printManager == null) throw new Exception("Android PrintManager unavailable");
+                          WebView printWebView = new WebView(getContext());
+                          printWebView.setWebViewClient(new WebViewClient() {
+                              @Override
+                              public void onPageFinished(WebView view, String url) {
+                                  try {
+                                      PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
+                                      printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
+                                      JSObject result = new JSObject();
+                                      result.put("opened", true);
+                                      result.put("jobName", jobName);
+                                      call.resolve(result);
+                                  } catch (Exception e) {
+                                      call.reject("Could not start Android print job: " + e.getMessage(), e);
+                                  }
+                              }
+                          });
+                          printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+                      } catch (Exception e) {
+                          call.reject("Could not prepare Android print document: " + e.getMessage(), e);
+                      }
+                  });
               }
           }
           EOF
@@ -268,6 +308,7 @@ jobs:
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "printHtml" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           npx cap sync android
 
