@@ -2112,7 +2112,7 @@ function saveRegisterForm(appointmentId){
     const duplicate=checkDuplicateNationalId(enteredNid,null);
     if(duplicate){ modalAlert('ثبت تکراری','این کد ملی قبلاً برای «'+esc(duplicate.name)+'» با شماره پرونده '+esc(duplicate.fileNo)+' ثبت شده است. پرونده جدید ایجاد نشد.'); return; }
   }
-  const registerPhone=toEnDigits(String(document.getElementById('rgPhone').value||'')).replace(/\D  const docNo = String(p.fileNo || '-');
+  const registerPhone=toEnDigits(String(document.getElementById('rgPhone').value||'')).replace(/\D/g,'');
   const samePatient=(STATE.patients||[]).find(p=>String(p.name||'').trim().toLowerCase()===name.toLowerCase() && registerPhone.length>=7 && toEnDigits(String(p.phone||'')).replace(/\D/g,'')===registerPhone);
   if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+'). اطلاعات قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('register').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('rgCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
@@ -2662,7 +2662,7 @@ async function printReceipt(patientId, visitId){
   const insurer = v.insuranceType || v.insurer || v.insuranceCompany || '';
   const insuranceStatus = v.insuranceStatus || v.insuranceApprovalStatus || '';
   const logo = clinicLogoSrc();
-  const docNo = String(v.receiptNo || v.invoiceNo || ('DENTYAR-'+String(v.id||patientId).slice(-8))).replace(/[<>&"]/g,'');
+  const docNo = String(p.fileNo || '-');
   const html=`
 <!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} - ${esc(clinicName)}</title>
