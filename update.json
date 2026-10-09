@@ -1,0 +1,13 @@
+{
+  "version": "V59",
+  "notes": "نسخه آزمایشی پنل مستقل به‌روزرسانی دنت‌یار. این manifest فقط برای آزمون بررسی نسخه است.",
+  "android": {
+    "version": "V59",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/latest/download/DENTYAR-TEST.apk",
+    "fileName": "DENTYAR-TEST.apk"
+  },
+  "web": {
+    "version": "V59",
+    "url": "https://github.com/dentyarapp/DENTYAR-V1"
+  }
+}
