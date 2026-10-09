@@ -51,6 +51,20 @@ jobs:
           npx cap add android
           npx cap sync android
 
+          # Allow Android's system package installer to handle a user-confirmed APK update.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          permission = '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          if permission not in s:
+              marker = '    <application'
+              if marker not in s:
+                  raise SystemExit("AndroidManifest.xml application marker not found")
+              s = s.replace(marker, permission + "\\n" + marker, 1)
+              p.write_text(s)
+          PY
+
       - name: ایجاد Native Direct Export Plugin
         run: |
           mkdir -p android/app/src/main/java/com/dentyar/testapp
