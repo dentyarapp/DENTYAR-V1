@@ -1429,8 +1429,9 @@ async function v31NativeFile(bytes, filename, mime, options={}){
 }
 async function downloadBlob(bytes, filename, mime, options={}){
   const native=await v31NativeFile(bytes,filename,mime,options);
+  // Cancellation is a normal user choice, not an export failure.
+  if(native && native.cancelled) return 'cancelled';
   if(native.saved){
-    if(native.cancelled) return 'cancelled';
     return native.shared ? 'shared' : 'saved';
   }
   const C=window.Capacitor;
@@ -2920,6 +2921,11 @@ function lockFinanceReports(){
   if(currentPage==='reports') renderReports();
 }
 function renderReportsUnlocked(){
+  // Guard direct calls as well as normal navigation. This is a UI guard, not server-side authorization.
+  if(sessionStorage.getItem('dentyar_finance_reports_unlocked') !== '1'){
+    renderReports();
+    return;
+  }
   if(pageParams && Object.keys(pageParams).length){
     reportFilters = {...pageParams};
     pageParams = {};
@@ -3226,7 +3232,7 @@ function exportReportPDF(){
   const rows=getReportRowsForExport();
   const header=rows[0]||[];
   const dataRows=rows.slice(1);
-  const title='گزارش رسمی دنت‌یار';
+  const title='گزارش مالی مطب';
   const clinicName=esc(STATE.meta.clinicName||'مطب لبخند زیبا');
   const clinicPhone=esc(STATE.meta.supportPhone||'');
   const logoSrc=clinicLogoSrc();
@@ -3293,7 +3299,7 @@ function exportReportPDF(){
         <div class="line">مهر و امضای مسئول مطب</div>
       </div>
     </div>
-    <div class="footer-note">${clinicName} — سند این گزارش به‌صورت رسمی و بر اساس اطلاعات ثبت‌شده در سامانه دنت‌یار صادر شده است.</div>
+    <div class="footer-note">${clinicName} — این گزارش بر اساس اطلاعات ثبت‌شده در سامانه دنت‌یار تهیه شده است و به‌خودی‌خود فاکتور رسمی مالیاتی محسوب نمی‌شود.</div>
   <script>setTimeout(()=>window.print(),350);<\/script></body></html>`;
 
   // در نسخه‌ی نصبی (APK/WebView) دستور window.print() هیچ رابط چاپی ندارد و بی‌اثر است؛
@@ -5234,7 +5240,7 @@ document.addEventListener('blur',e=>{
   SYNC.settingsCardHtml = function(){
     const cfg = SYNC.cfg()||{ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null };
     const fbCfg = cfg.firebaseConfig||{};
-    const ls = cfg.lastSyncAt ? new Date(cfg.lastSyncAt).toLocaleString('fa-IR') : '—';
+    const ls = cfg.lastSyncAt ? new Date(cfg.lastSyncAt).toLocaleString('en-GB',{numberingSystem:'latn'}) : '—';
     const ready = SYNC.isReady();
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
