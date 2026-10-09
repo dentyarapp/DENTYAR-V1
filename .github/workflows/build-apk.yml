@@ -46,16 +46,16 @@ jobs:
 
           npm install
 
-          npx cap init "دنتی‌یار" "com.dentyar.app" --web-dir www
+          npx cap init "دنتی‌یار آزمایشی" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/app
+          mkdir -p android/app/src/main/java/com/dentyar/testapp
 
-          cat > android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.app;
+          cat > android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.testapp;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -150,8 +150,8 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/app/MainActivity.java <<'EOF'
-          package com.dentyar.app;
+          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
+          package com.dentyar.testapp;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -169,7 +169,7 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           npx cap sync android
