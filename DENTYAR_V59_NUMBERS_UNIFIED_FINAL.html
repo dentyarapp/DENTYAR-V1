@@ -439,7 +439,12 @@ input[data-v26-jalali-display]{font-variant-numeric:tabular-nums;letter-spacing:
 
   .editPencil{width:34px;height:34px!important;min-width:34px!important;border:1px solid var(--border);border-radius:50%;background:#fff;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:19px!important;line-height:1;padding:0!important;box-shadow:0 2px 7px rgba(15,79,79,.10);position:relative;z-index:5;}
   .editPencil:active{transform:scale(.94);}
-  .patientCard{cursor:pointer;}
+   .patientCard{cursor:pointer;}
+.securityPanel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(18,59,93,.05)}
+.securityPanel h4{margin:0 0 8px;color:var(--navy);font-size:15px}
+.securityPanel p,.securityPanel li{font-size:12px;line-height:1.9;color:var(--text)}
+.securityPanel ul{padding-right:20px;margin:8px 0 12px}
+
 </style>
 <script>
 /* ===================== DENTYAR — هسته‌ی برنامه ===================== */
@@ -1364,7 +1369,7 @@ async function v31NativeFile(bytes, filename, mime, options={}){
    */
   try{
     const C=window.Capacitor;
-    if(!C || typeof C.isNativePlatform!=='function' || !C.isNativePlatform()){
+    if(!C || !isDentyarNativeApp()){
       return {saved:false,shared:false};
     }
 
@@ -1464,7 +1469,7 @@ async function downloadBlob(bytes, filename, mime, options={}){
     return native.shared ? 'shared' : 'saved';
   }
   const C=window.Capacitor;
-  if(C && C.isNativePlatform && C.isNativePlatform()){
+  if(isDentyarNativeApp()){
     const detail=native && native.error ? String(native.error.message||native.error) : 'native export unavailable';
     console.error('DENTYAR Android export failed:', detail);
     throw new Error('Android export failed: '+detail);
@@ -3702,9 +3707,17 @@ function refreshDentyarWeb(){
   try{ if('caches' in window){ caches.keys().then(keys=>Promise.all(keys.filter(k=>/^dentyar-/i.test(k)).map(k=>caches.delete(k)))).finally(()=>location.replace(location.href.split('#')[0]+'?v='+Date.now())); return; } }catch(e){}
   location.replace(location.href.split('#')[0]+'?v='+Date.now());
 }
+function isDentyarNativeApp(){
+  try{
+    const C=window.Capacitor;
+    if(C && typeof C.isNativePlatform==='function' && C.isNativePlatform()) return true;
+    if(C && typeof C.getPlatform==='function' && String(C.getPlatform()).toLowerCase()==='android') return true;
+  }catch(e){}
+  return false;
+}
 function getDentyarPlatform(){
   try{
-    if(window.Capacitor && typeof window.Capacitor.isNativePlatform==='function' && window.Capacitor.isNativePlatform()){
+    if(isDentyarNativeApp()){
       return String(window.Capacitor.getPlatform?.()||'android').toLowerCase();
     }
   }catch(e){}
