@@ -973,7 +973,7 @@ function formatAllNumericInputs(){
       el.style.textAlign='left';
     }
     if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]')){
-      if(el.value) el.value=faDigits(toEnDigits(el.value));
+      if(el.value) el.value=toEnDigits(el.value);
       el.setAttribute('dir','ltr');
       el.style.textAlign='left';
     }
