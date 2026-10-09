@@ -776,6 +776,11 @@ function loadState(){
   return STATE;
 }
 function saveState(){
+  // Mark local edits before scheduling cloud sync; incoming remote merges are not re-marked.
+  if(window.DentyarSync && !(window.DentyarSync.isMerging && window.DentyarSync.isMerging())){
+    const changedAt=Date.now();
+    ['patients','dentists','appointments'].forEach(coll=>(STATE[coll]||[]).forEach(rec=>{rec._updatedAt=changedAt;}));
+  }
   localStorage.setItem(APP_KEY, JSON.stringify(STATE));
   // آینه‌سازی غیرهمزمان؛ اگر IndexedDB در دسترس نباشد، localStorage همچنان منبع اصلی است.
   if (typeof indexedDB !== 'undefined' && location.protocol !== 'content:') {
@@ -4958,6 +4963,8 @@ document.addEventListener('blur',e=>{
 
   SYNC.cfg = function(){ return (STATE && STATE.meta && STATE.meta.sync) ? STATE.meta.sync : null; };
   SYNC.isReady = function(){ return started && connected; };
+  SYNC.isMerging = function(){ return merging; };
+  SYNC.lastError = '';
 
   function ensureDeviceId(){
     let id = localStorage.getItem('dentyar_device_id');
@@ -4990,7 +4997,8 @@ document.addEventListener('blur',e=>{
       ensureDeviceId();
       await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
-      subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); SYNC.renderStatus&&SYNC.renderStatus(); }));
+      subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){ SYNC.lastError=''; SYNC.schedulePush(true); } SYNC.renderStatus&&SYNC.renderStatus(); }));
+      setTimeout(function(){ if(!SYNC.isReady()){ SYNC.lastError='اتصال Firebase برقرار نشد؛ شبکه، VPN و تنظیمات اتصال را بررسی کنید.'; SYNC.renderStatus&&SYNC.renderStatus(); } },12000);
       ['patients','dentists','appointments'].forEach(subscribeCollection);
       ['lists','formFields','treatmentPrices'].forEach(subscribeValue);
       subscribeValue('meta');
@@ -4999,7 +5007,7 @@ document.addEventListener('blur',e=>{
       SYNC.renderStatus&&SYNC.renderStatus();
       toast('تنظیمات همگام‌سازی بارگذاری شد؛ وضعیت اتصال واقعی در همین بخش نمایش داده می‌شود.');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
-    }catch(e){ console.error('DentyarSync connect failed', e); toast('اتصال همگام‌سازی ناموفق بود: '+(e&&e.message||e)); }
+    }catch(e){ SYNC.lastError=String(e&&e.message||e); console.error('DentyarSync connect failed', e); SYNC.renderStatus&&SYNC.renderStatus(); toast('اتصال همگام‌سازی ناموفق بود: '+(e&&e.message||e)); }
   };
 
   SYNC.disconnect = function(){
@@ -5124,7 +5132,7 @@ document.addEventListener('blur',e=>{
 
   SYNC.renderStatus = function(){
     const b=document.getElementById('syncStatusBadge');
-    if(b){ b.textContent = SYNC.isReady() ? 'متصل' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال'); }
+    if(b){ b.textContent = SYNC.isReady() ? 'متصل' : (SYNC.lastError ? 'خطا در اتصال' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در انتظار اتصال…' : 'غیرفعال')); if(SYNC.lastError) b.title=SYNC.lastError; else b.removeAttribute('title'); }
   };
 
   SYNC.settingsCardHtml = function(){
