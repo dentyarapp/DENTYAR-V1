@@ -5125,7 +5125,7 @@ document.addEventListener('blur',e=>{
       dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() }).catch(function(e){ console.warn('Dentyar device registration failed:',e); });
       subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){ SYNC.lastError=''; SYNC.schedulePush(true); } SYNC.renderStatus&&SYNC.renderStatus(); }));
-      setTimeout(function(){ if(!SYNC.isReady()){ SYNC.lastError='اتصال Firebase برقرار نشد؛ شبکه، VPN و تنظیمات اتصال را بررسی کنید.'; SYNC.renderStatus&&SYNC.renderStatus(); } },12000);
+      setTimeout(function(){ if(!SYNC.isReady()){ SYNC.lastError='اتصال به سرور همگام‌سازی برقرار نشد؛ شبکه و تنظیمات سرور را بررسی کنید. داده‌های محلی حفظ می‌شوند و تلاش مجدد خودکار ادامه دارد.'; SYNC.renderStatus&&SYNC.renderStatus(); } },12000);
       ['patients','dentists','appointments'].forEach(subscribeCollection);
       ['lists','formFields','treatmentPrices'].forEach(subscribeValue);
       subscribeValue('meta');
