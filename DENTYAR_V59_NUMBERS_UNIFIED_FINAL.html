@@ -3489,6 +3489,17 @@ const LIST_LABELS = {
 let settingsActiveList = 'treatmentTypes';
 let settingsSelectedListItems = [];
 
+function previewNextFileNo(){
+  const firstNumber = 140501010001;
+  let lastAssigned = firstNumber - 1;
+  const stored = Number(STATE?.meta?.fileNoLastAssigned || 0);
+  if(Number.isSafeInteger(stored) && stored >= firstNumber) lastAssigned = Math.max(lastAssigned, stored);
+  (STATE?.patients || []).forEach(p => {
+    const n = Number(toEnDigits(String(p.fileNo || '')).replace(/\\D/g,''));
+    if(Number.isSafeInteger(n) && n >= firstNumber) lastAssigned = Math.max(lastAssigned, n);
+  });
+  return String(lastAssigned + 1);
+}
 function renderSettings(){
   document.getElementById('pageContent').innerHTML = `
     ${window.DentyarSync ? DentyarSync.settingsCardHtml() : ''}
@@ -3511,15 +3522,9 @@ function renderSettings(){
 
     <div class="card">
       <h3>شماره‌گذاری استاندارد پرونده</h3>
-      <p style="font-size:12px;color:var(--muted);line-height:1.9">شماره پرونده به‌صورت <b>تاریخ شمسی روز + سریال چهاررقمی</b> ساخته می‌شود؛ نمونه: ۱۴۰۵۰۶۲۴۰۰۰۱. حالت پیش‌فرض ادامه سریال بین روزهاست.</p>
-      <div class="grid2">
-        <label class="switchLabel"><input type="radio" name="fileNoMode" ${STATE.meta.fileNoMode!=='yearly'?'checked':''} onchange="setFileNoMode('continuous')"><span>ادامه سریال تا همیشه</span></label>
-        <label class="switchLabel"><input type="radio" name="fileNoMode" ${STATE.meta.fileNoMode==='yearly'?'checked':''} onchange="setFileNoMode('yearly')"><span>ریست در ابتدای هر سال</span></label>
-      </div>
-      <div class="notice">تاریخ روز همیشه در ابتدای شماره پرونده درج می‌شود. در صورت ریست دستی، از همان روز سریال از ۰۰۰۱ آغاز خواهد شد.</div>
-      <button class="btn btn-danger btn-block" onclick="modalConfirm('ریست سریال پرونده','از امروز شماره پرونده بعدی با سریال ۰۰۰۱ ساخته می‌شود. ادامه می‌دهید؟',resetFileSerialFromToday)">ریست سریال از امروز</button>
+      <p style="font-size:12px;color:var(--muted);line-height:1.9">شماره پرونده‌ها به‌صورت سریالی و پیوسته تولید می‌شوند. شماره شروع برای نصب تازه <b>۱۴۰۵۰۱۰۱۰۰۰۱</b> است. شماره پرونده‌های موجود تغییر نمی‌کند و ریست سالانه یا دستی انجام نمی‌شود.</p>
+      <div class="notice">شماره بعدی بر اساس آخرین شماره ثبت‌شده محاسبه می‌شود: <b dir="ltr">${faDigits(previewNextFileNo())}</b></div>
     </div>
-
     <div class="card">
       <h3>مدیریت فیلدهای فرم‌ها</h3>
       <p style="font-size:12px;color:var(--muted);line-height:1.9">همه اطلاعات استاندارد دو فرم «ثبت نوبت» و «ثبت بیمار» قابل نمایش/عدم نمایش و تعیین وضعیت الزامی هستند. فیلدهای سفارشی نیز می‌توانند اضافه یا حذف شوند.</p>
@@ -3586,16 +3591,16 @@ function renderSettings(){
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
         <div class="updateStatus">
-          <span>نسخه نصب‌شده: <b id="currentAppVersion">V۵۷</b></span>
+          <span>نسخه نصب‌شده: <b id="currentAppVersion">V59</b></span>
           <span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span>
         </div>
         <div class="updateHint" id="platformUpdateHint">
-          نسخه‌های جدید DENTYAR از همین بخش «تنظیمات» مدیریت می‌شوند؛ اطلاعات Firebase و داده‌های محلی حفظ می‌شوند. اطلاعات بیماران، نوبت‌ها، تنظیمات و پایگاه داده محلی هنگام بروزرسانی حفظ می‌شوند.
+          پیش از هر به‌روزرسانی، از اطلاعات نسخه پشتیبان تهیه کنید. حفظ اطلاعات به سازگاری نسخه، نشانی برنامه و امضای APK بستگی دارد؛ تا زمان تأیید این موارد، نصب نسخه جدید روی دستگاه اصلی توصیه نمی‌شود.
         </div>
         <div class="card" id="htmlFileUpdateCard" style="margin-top:10px;margin-bottom:0;padding:10px!important;background:#f9fcfb!important">
           <h3 style="font-size:15px!important">به‌روزرسانی فایل اصلی DENTYAR (index.html)</h3>
           <p style="font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 8px">
-            اگر یک نسخه‌ی اصلاح‌شده از فایل برنامه (index.html) دارید، می‌توانید همان فایل را از همین‌جا انتخاب و جایگزین نسخه‌ی فعلی کنید. اطلاعات بیماران، نوبت‌ها، تنظیمات و پایگاه‌داده محلی (localStorage/IndexedDB) کاملاً حفظ می‌شوند چون این اطلاعات به آدرس برنامه وابسته‌اند، نه به خود فایل.
+            این گزینه فقط برای نسخه وب/PWA است. پیش از اعمال فایل جدید حتماً از اطلاعات پشتیبان بگیرید و سازگاری ساختار داده‌ها را بررسی کنید؛ حفظ اطلاعات در همه نسخه‌ها تضمین‌شده نیست.
           </p>
           <input type="file" id="htmlUpdateFileInput" accept=".html,text/html">
           <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="applyHtmlFileUpdate()">اعمال نسخه جدید DENTYAR</button>
@@ -3607,7 +3612,7 @@ function renderSettings(){
             این بخش مخصوص نسخه Android است. فایل APK نسخه جدید را به‌صورت دستی انتخاب کنید تا ذخیره و برای نصب آماده شود؛ iPhone/iPad فایل APK را نصب نمی‌کند و از نسخه وب/PWA استفاده می‌کند.
           </p>
           <div class="grid2">
-            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V57"></div>
+            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V60"></div>
             <div><label>عنوان تغییرات</label><input id="updateNoteInput" placeholder="مثلاً بهبود سازگاری دستگاه‌ها"></div>
           </div>
           <label style="margin-top:8px">فایل APK نسخه جدید</label>
@@ -3660,8 +3665,8 @@ function updatePlatformUi(){
   if(badge) badge.textContent=names[p]||'مرورگر وب';
   if(hint){
     hint.textContent = p==='android'
-      ? 'این نسخه Android است. جایگزینی فایل برنامه و نصب APK هر دو به‌صورت دستی از همین بخش تنظیمات انجام می‌شوند؛ اطلاعات محلی DENTYAR حفظ می‌شود.'
-      : 'جایگزینی فایل برنامه (index.html) به‌صورت دستی از همین بخش تنظیمات انجام می‌شود. در iPhone/iPad و رایانه‌ها APK نصب نمی‌شود و نسخه وب/PWA مسیر استاندارد اجرا و بروزرسانی است.';
+      ? 'این نسخه Android است. پیش از نصب APK جدید، نسخه پشتیبان بگیرید و سازگاری امضای برنامه را تأیید کنید؛ حفظ داده‌ها تا انجام این بررسی تضمین‌شده نیست.'
+      : 'در نسخه وب/PWA، پیش از اعمال فایل جدید نسخه پشتیبان تهیه کنید. در iPhone/iPad و رایانه‌ها APK نصب نمی‌شود؛ مسیر وب باید جداگانه آزمایش شود.';
   }
   if(android) android.style.display = p==='android' ? '' : 'none';
 }
