@@ -1806,7 +1806,7 @@ const PAGES = [
   {id:'dentists', label:'دندان‌پزشکان', icon:'dentists'},
   {id:'reports', label:'گزارش‌ها', icon:'reports'},
   {id:'backup', label:'پشتیبان‌گیری', icon:'backup'},
-  {id:'updater', label:'بروزرسانی', icon:'settings'},
+  {id:'updater', label:'مدیریت بروزرسانی', icon:'settings'},
   {id:'settings', label:'تنظیمات', icon:'settings'},
   {id:'profile', label:'پروفایل', icon:'profile'},
   {id:'guide', label:'راهنما', icon:'guide'},
@@ -3283,7 +3283,7 @@ function exportReportPDF(){
   // در این حالت فایل گزارش را به‌صورت HTML ذخیره/اشتراک می‌گذاریم تا کاربر آن را در
   // مرورگر خارجی (Chrome) باز و از همان‌جا چاپ یا ذخیره‌ی PDF کند.
   // در مرورگر معمولی (قبل از نصب) رفتار قبلی حفظ می‌شود: نمایش مستقیم + پنجره‌ی چاپ.
-  const isInstalledApp = getDentyarPlatform()!=='android-web' && getDentyarPlatform()!=='windows' && getDentyarPlatform()!=='macos' && getDentyarPlatform()!=='linux';
+  const isInstalledApp = isDentyarNativeApp();
   if(isInstalledApp){
     (async()=>{
       try{
@@ -3627,6 +3627,7 @@ function renderUpdaterPanel(){
           </p>
           <input type="file" id="htmlUpdateFileInput" accept=".html,text/html">
           <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="applyHtmlFileUpdate()">اعمال نسخه جدید DENTYAR</button>
+          <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="checkAndApplyWebUpdate()">بررسی به‌روزرسانی نسخه وب</button>
           <div id="htmlUpdateStateBadge" class="updateBadge" style="margin-top:8px">آماده</div>
         </div>
         <div class="card" id="androidUpdateCard" style="margin-top:10px;margin-bottom:0;padding:10px!important;background:#f9fcfb!important">
@@ -3641,7 +3642,8 @@ function renderUpdaterPanel(){
           <label style="margin-top:8px">فایل APK نسخه جدید</label>
           <input type="file" id="updateApkInput" accept=".apk,application/vnd.android.package-archive">
           <div class="updateActions">
-            <button class="btn btn-outline" onclick="saveAppUpdatePackage()">ذخیره APK</button>
+            <button class="btn btn-outline" onclick="checkAndInstallAndroidUpdate()">بررسی نسخه جدید</button>
+            <button class="btn btn-outline" onclick="saveAppUpdatePackage()">ذخیره APK انتخاب‌شده</button>
             <button class="btn btn-outline" onclick="executeSavedAppUpdate()">اجرای نصب Android</button>
           </div>
           <div id="updateStateBadge" class="updateBadge" style="margin-top:8px">آماده</div>
@@ -3664,9 +3666,17 @@ function refreshDentyarWeb(){
   try{ if('caches' in window){ caches.keys().then(keys=>Promise.all(keys.filter(k=>/^dentyar-/i.test(k)).map(k=>caches.delete(k)))).finally(()=>location.replace(location.href.split('#')[0]+'?v='+Date.now())); return; } }catch(e){}
   location.replace(location.href.split('#')[0]+'?v='+Date.now());
 }
+function isDentyarNativeApp(){
+  try{
+    const C=window.Capacitor;
+    if(C && typeof C.isNativePlatform==='function' && C.isNativePlatform()) return true;
+    if(C && typeof C.getPlatform==='function' && String(C.getPlatform()).toLowerCase()==='android') return true;
+  }catch(e){}
+  return false;
+}
 function getDentyarPlatform(){
   try{
-    if(window.Capacitor && typeof window.Capacitor.isNativePlatform==='function' && window.Capacitor.isNativePlatform()){
+    if(isDentyarNativeApp()){
       return String(window.Capacitor.getPlatform?.()||'android').toLowerCase();
     }
   }catch(e){}
@@ -3739,7 +3749,7 @@ async function applyHtmlFileUpdate(){
   const file=input?.files?.[0];
 
   const C=window.Capacitor;
-  if(C && C.isNativePlatform && C.isNativePlatform()){
+  if(isDentyarNativeApp()){
     modalAlert('آپلود فایل اصلاح‌شده','در نسخه نصب‌شده Android، فایل برنامه از داخل بسته APK اجرا می‌شود و از طریق تنظیمات قابل جایگزینی نیست. برای این نسخه از بخش «بسته Android (APK)» استفاده کنید؛ آپلود فایل index.html فقط برای نسخه وب/PWA کار می‌کند.');
     return;
   }
