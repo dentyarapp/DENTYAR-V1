@@ -1677,7 +1677,7 @@ function renderLock(){
       <button class="unlockBtn" onclick="pinSubmit()">${ICON_UNLOCK}</button>
     </div>
     <div id="lockError"></div>
-    <div id="lockHint">رمز پیش‌فرض: 12345678 — از بخش تنظیمات قابل تغییر است</div>
+    <div id="lockHint">رمز ورود اختصاصی ۸ رقمی را وارد کنید.</div>
   `;
 }
 function updatePinDots(){
@@ -3863,6 +3863,7 @@ function saveStaffUser(){
   const pin=toEnDigits((document.getElementById('staffUserPin')?.value||'').trim());
   const role=document.getElementById('staffUserRole')?.value||'receptionist';
   if(!name){ modalAlert('خطا','نام کاربر را وارد کنید.'); return; }
+  if(toEnDigits(STATE.meta.password||'')==='12345678'){ modalAlert('ابتدا رمز مدیر را تغییر دهید','برای جلوگیری از ورود منشی با رمز پیش‌فرض، ابتدا رمز اصلی مدیر را در تنظیمات تغییر دهید؛ سپس حساب منشی را بسازید.'); return; }
   if(!/^\d{8}$/.test(pin)){ modalAlert('خطا','رمز کاربر باید دقیقاً ۸ رقم باشد.'); return; }
   if(pin===toEnDigits(STATE.meta.password||'')){ modalAlert('خطا','رمز کاربر نباید با رمز اصلی مدیر یکسان باشد.'); return; }
   if(!['dentist','receptionist'].includes(role)){ modalAlert('خطا','نقش انتخاب‌شده معتبر نیست.'); return; }
