@@ -60,7 +60,7 @@ jobs:
               marker = '    <application'
               if marker not in s:
                   raise SystemExit("AndroidManifest.xml application marker not found")
-              s = s.replace(marker, permission + "\\n" + marker, 1)
+              s = s.replace(marker, permission + "\n" + marker, 1)
               p.write_text(s)
           PY
 
@@ -256,7 +256,7 @@ jobs:
               marker = "    </application>"
               if marker not in s:
                   raise SystemExit("AndroidManifest.xml application close marker not found")
-              s = s.replace(marker, provider + "\\n" + marker, 1)
+              s = s.replace(marker, provider + "\n" + marker, 1)
               p.write_text(s)
           PY
 
