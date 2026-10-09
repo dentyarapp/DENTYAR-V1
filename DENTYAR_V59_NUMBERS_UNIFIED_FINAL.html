@@ -1729,6 +1729,7 @@ document.addEventListener('keydown', function(e){
   }
 });
 function lockApp(){
+  sessionStorage.removeItem('dentyar_finance_reports_unlocked');
   showModal(`
     <h3>خروج از برنامه</h3>
     <div style="font-size:14px;line-height:1.8;">آیا می‌خواهید قبل از خروج، اطلاعات ذخیره شود؟<br><span style="color:var(--muted);font-size:12px;">در صورت انتخاب «بله»، اطلاعات هم داخل برنامه ذخیره می‌شود و هم یک نسخه پشتیبان در حافظه گوشی قرار می‌گیرد.</span></div>
@@ -1906,6 +1907,7 @@ function renderPage(){
 /* ===================== داشبورد ===================== */
 function renderDashboard(){
   const patients=STATE.patients||[];
+  const canViewFinance=sessionStorage.getItem('dentyar_finance_reports_unlocked')==='1';
   const today=todayISO(), jy=currentJalaliYear();
   const visits=patients.flatMap(p=>(p.visits||[]).map(v=>({p,v})));
   const todayVisits=visits.filter(x=>x.v.date===today).length;
@@ -1944,7 +1946,7 @@ function renderDashboard(){
     ['خالص قابل پرداخت',totals.net,'net'],['دریافت نقدی',totals.cash,'cash'],['دریافت غیرنقدی',totals.nonCash,'nonCash'],
     ['استرداد وجه',totals.refund,'refund'],['کل دریافتی',totals.paid,'paid'],['مطالبات / باقیمانده',totals.balance,'balance']
   ];
-  const financeHtml=financeItems.map(([label,val,key])=>`<div class="financeItem finance-${key}"><span>${esc(label)}</span><b>${esc(fmtMoney(val))}</b></div>`).join('');
+  const financeHtml=canViewFinance ? financeItems.map(([label,val,key])=>`<div class="financeItem finance-${key}"><span>${esc(label)}</span><b>${esc(fmtMoney(val))}</b></div>`).join('') : '';
   const servicesHtml=typeRows.length
     ? typeRows.slice(0,8).map(([name,count])=>`<div class="serviceRow"><span>${esc(name)}</span><b>${esc(faDigits(count))}</b></div>`).join('')
     : '<div class="empty">هنوز خدمتی ثبت نشده است</div>';
@@ -1955,8 +1957,7 @@ function renderDashboard(){
     </section>
     <div class="sectionTitle">شاخص‌های کلیدی</div>
     <section class="statGrid dashboardStats">${statHtml}</section>
-    <div class="sectionTitle">خلاصه مالی</div>
-    <section class="card financeCard"><div class="financeGrid">${financeHtml}</div></section>
+    ${canViewFinance ? '<div class="sectionTitle">خلاصه مالی</div><section class="card financeCard"><div class="financeGrid">'+financeHtml+'</div></section>' : '<div class="notice">برای مشاهده خلاصه مالی، ورود مجاز به بخش گزارش‌ها لازم است.</div>'}
     <div class="sectionTitle">خدمات پرتکرار</div>
     <section class="card servicesCard"><div class="servicesList">${servicesHtml}</div></section>
   `;
