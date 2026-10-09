@@ -4996,8 +4996,8 @@ document.addEventListener('blur',e=>{
       db = dbm.getDatabase(fbApp);
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       ensureDeviceId();
-      await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
-        { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
+      dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
+        { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() }).catch(function(e){ console.warn('Dentyar device registration failed:',e); });
       subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){ SYNC.lastError=''; SYNC.schedulePush(true); } SYNC.renderStatus&&SYNC.renderStatus(); }));
       setTimeout(function(){ if(!SYNC.isReady()){ SYNC.lastError='اتصال Firebase برقرار نشد؛ شبکه، VPN و تنظیمات اتصال را بررسی کنید.'; SYNC.renderStatus&&SYNC.renderStatus(); } },12000);
       ['patients','dentists','appointments'].forEach(subscribeCollection);
