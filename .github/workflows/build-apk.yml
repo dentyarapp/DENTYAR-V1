@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - fix/v59-safe-numeric-serial-20261009
 
 jobs:
   build-apk:
@@ -45,19 +46,53 @@ jobs:
 
           npm install
 
-          npx cap init "دنتی‌یار" "com.dentyar.app" --web-dir www
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            APP_NAME="دنتی‌یار"
+            APP_ID="com.dentyar.app"
+          else
+            APP_NAME="دنتی‌یار آزمایشی"
+            APP_ID="com.dentyar.testapp"
+          fi
+          PACKAGE_PATH=$(printf "%s" "$APP_ID" | tr "." "/")
+          echo "APP_NAME=$APP_NAME" >> "$GITHUB_ENV"
+          echo "APP_ID=$APP_ID" >> "$GITHUB_ENV"
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+          npx cap init "$APP_NAME" "$APP_ID" --web-dir www
           npx cap add android
           npx cap sync android
 
+          # Allow Android's system package installer to handle a user-confirmed APK update.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          permission = '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          if permission not in s:
+              marker = '    <application'
+              if marker not in s:
+                  raise SystemExit("AndroidManifest.xml application marker not found")
+              s = s.replace(marker, permission + "\n" + marker, 1)
+              p.write_text(s)
+          PY
+
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/app
+          mkdir -p "android/app/src/main/java/$PACKAGE_PATH"
 
-          cat > android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.app;
+          cat > "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java" <<'EOF'
+          package com.dentyar.testapp;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.print.PrintManager;
+          import android.print.PrintAttributes;
+          import android.print.PrintDocumentAdapter;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.provider.Settings;
+          import androidx.core.content.FileProvider;
           import android.net.Uri;
           import android.os.Build;
           import android.os.Environment;
@@ -71,6 +106,8 @@ jobs:
           import com.getcapacitor.annotation.CapacitorPlugin;
 
           import java.io.OutputStream;
+          import java.io.File;
+          import java.io.FileOutputStream;
 
           @CapacitorPlugin(name = "DentyarNative")
           public class DentyarNativePlugin extends Plugin {
@@ -85,6 +122,8 @@ jobs:
                   String fileName = call.getString("filename", "DENTYAR-report");
                   String mimeType = call.getString("mimeType", "application/octet-stream");
                   String data = call.getString("data", "");
+                  String folder = call.getString("folder", "Reports");
+                  if (!"Reports".equals(folder) && !"Backups".equals(folder) && !"Transfers".equals(folder) && !"Updates".equals(folder)) { folder = "Reports"; }
 
                   if (data == null || data.isEmpty()) {
                       call.reject("Empty report data");
@@ -99,7 +138,7 @@ jobs:
                   values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
                   values.put(
                       MediaStore.Downloads.RELATIVE_PATH,
-                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/Reports"
+                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/" + folder
                   );
                   values.put(MediaStore.Downloads.IS_PENDING, 1);
 
@@ -132,7 +171,7 @@ jobs:
                       JSObject result = new JSObject();
                       result.put("saved", true);
                       result.put("uri", uri.toString());
-                      result.put("path", "Download/DENTYAR/Reports/" + fileName);
+                      result.put("path", "Download/DENTYAR/" + folder + "/" + fileName);
                       call.resolve(result);
 
                   } catch (Exception e) {
@@ -144,13 +183,96 @@ jobs:
                       call.reject("Direct export failed: " + e.getMessage(), e);
                   }
               }
+
+              @PluginMethod
+              public void installApk(PluginCall call) {
+                  String fileName = call.getString("filename", "DENTYAR-update.apk");
+                  String data = call.getString("data", "");
+                  fileName = fileName.replaceAll("[\\\\/:*?\\\"<>|]", "_");
+                  if (!fileName.toLowerCase().endsWith(".apk")) {
+                      fileName = fileName + ".apk";
+                  }
+                  if (data == null || data.isEmpty()) {
+                      call.reject("Empty APK data");
+                      return;
+                  }
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                          !getContext().getPackageManager().canRequestPackageInstalls()) {
+                          Intent settings = new Intent(
+                              Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                              Uri.parse("package:" + getContext().getPackageName())
+                          );
+                          settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          getContext().startActivity(settings);
+                          call.reject("اجازه نصب برنامه از این منبع را فعال کنید و دوباره تلاش کنید.");
+                          return;
+                      }
+                      File apk = new File(getContext().getCacheDir(), fileName);
+                      try (FileOutputStream out = new FileOutputStream(apk)) {
+                          out.write(Base64.decode(data, Base64.DEFAULT));
+                          out.flush();
+                      }
+                      Uri apkUri = FileProvider.getUriForFile(
+                          getContext(),
+                          getContext().getPackageName() + ".fileprovider",
+                          apk
+                      );
+                      Intent intent = new Intent(Intent.ACTION_VIEW);
+                      intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                      getContext().startActivity(intent);
+                      JSObject result = new JSObject();
+                      result.put("opened", true);
+                      result.put("fileName", fileName);
+                      call.resolve(result);
+                  } catch (Exception e) {
+                      call.reject("Could not open Android package installer: " + e.getMessage(), e);
+                  }
+              }
+
+              @PluginMethod
+              public void printHtml(PluginCall call) {
+                  String html = call.getString("html", "");
+                  String jobName = call.getString("jobName", "DENTYAR document");
+                  if (html == null || html.trim().isEmpty()) {
+                      call.reject("Empty print document");
+                      return;
+                  }
+                  getActivity().runOnUiThread(() -> {
+                      try {
+                          PrintManager printManager = (PrintManager) getContext().getSystemService(Context.PRINT_SERVICE);
+                          if (printManager == null) throw new Exception("Android PrintManager unavailable");
+                          WebView printWebView = new WebView(getContext());
+                          printWebView.setWebViewClient(new WebViewClient() {
+                              @Override
+                              public void onPageFinished(WebView view, String url) {
+                                  try {
+                                      PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
+                                      printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
+                                      JSObject result = new JSObject();
+                                      result.put("opened", true);
+                                      result.put("jobName", jobName);
+                                      call.resolve(result);
+                                  } catch (Exception e) {
+                                      call.reject("Could not start Android print job: " + e.getMessage(), e);
+                                  }
+                              }
+                          });
+                          printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+                      } catch (Exception e) {
+                          call.reject("Could not prepare Android print document: " + e.getMessage(), e);
+                      }
+                  });
+              }
           }
           EOF
+          sed -i "s/^package com\\.dentyar\\.testapp;/package ${APP_ID};/" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/app/MainActivity.java <<'EOF'
-          package com.dentyar.app;
+          cat > "android/app/src/main/java/$PACKAGE_PATH/MainActivity.java" <<'EOF'
+          package com.dentyar.testapp;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -163,14 +285,48 @@ jobs:
               }
           }
           EOF
+          sed -i "s/^package com\\.dentyar\\.testapp;/package ${APP_ID};/" "android/app/src/main/java/$PACKAGE_PATH/MainActivity.java"
+
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="apk_updates" path="." />
+          </paths>
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          provider = '''        <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>'''
+          if "androidx.core.content.FileProvider" not in s:
+              marker = "    </application>"
+              if marker not in s:
+                  raise SystemExit("AndroidManifest.xml application close marker not found")
+              s = s.replace(marker, provider + "\n" + marker, 1)
+              p.write_text(s)
+          PY
 
       - name: بررسی حضور اجزای گزارش
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/app/DentyarNativePlugin.java
+          grep -q "DentyarNative" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
+          grep -q "installApk" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
+          grep -q "printHtml" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
+          grep -q "Download/DENTYAR/" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
+          test -s android/app/src/main/res/xml/file_paths.xml
           npx cap sync android
 
       - name: نصب Java 21

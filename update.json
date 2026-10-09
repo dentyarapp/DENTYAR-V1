@@ -1,0 +1,8 @@
+{
+  "version": "V59",
+  "notes": "DENTYAR V59. برای دریافت نسخه Android، فایل انتشار رسمی باید در بخش Releases مخزن قرار گیرد.",
+  "android": {
+    "version": "V59",
+    "fileName": "DENTYAR-update.apk"
+  }
+}

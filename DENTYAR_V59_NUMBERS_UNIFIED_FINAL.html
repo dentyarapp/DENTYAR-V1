@@ -439,7 +439,12 @@ input[data-v26-jalali-display]{font-variant-numeric:tabular-nums;letter-spacing:
 
   .editPencil{width:34px;height:34px!important;min-width:34px!important;border:1px solid var(--border);border-radius:50%;background:#fff;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:19px!important;line-height:1;padding:0!important;box-shadow:0 2px 7px rgba(15,79,79,.10);position:relative;z-index:5;}
   .editPencil:active{transform:scale(.94);}
-  .patientCard{cursor:pointer;}
+   .patientCard{cursor:pointer;}
+.securityPanel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 2px 8px rgba(18,59,93,.05)}
+.securityPanel h4{margin:0 0 8px;color:var(--navy);font-size:15px}
+.securityPanel p,.securityPanel li{font-size:12px;line-height:1.9;color:var(--text)}
+.securityPanel ul{padding-right:20px;margin:8px 0 12px}
+
 </style>
 <script>
 /* ===================== DENTYAR — هسته‌ی برنامه ===================== */
@@ -454,7 +459,7 @@ const DEFAULT_STATE = () => ({
       legalName:'', managerName:'', medicalDirector:'', clinicPhone:'', clinicMobile:'', clinicEmail:'', website:'',
       address:'', city:'', postalCode:'', licenseNo:'', nationalIdentifier:'', economicCode:'', workingHours:'', emergencyPhone:'', notes:''
     },
-    appAdminPassword:'49944994', appAdminEnabled:true, appAdminHidden:true,
+    appAdminPassword:'49944994', appAdminEnabled:true, appAdminHidden:true, appUsers:[],
     sync:{ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }
   },
   formFields: { appointment: [], register: [] },
@@ -775,8 +780,38 @@ function loadState(){
   ensureFormFieldSettings();
   return STATE;
 }
+function maybeCreatePassiveBackup(){
+  // پشتیبان محلی خودکار حداکثر روزی یک‌بار؛ بدون شبکه و بدون فراخوانی saveState مجدد.
+  try{
+    const now=Date.now(), key='dentyar_passive_backup_at';
+    const last=Number(localStorage.getItem(key)||0);
+    if(last && now-last<24*60*60*1000) return;
+    if(typeof snapshotData!=='function' || typeof BACKUP_STORE_PREFIX==='undefined') return;
+    const json=JSON.stringify(snapshotData());
+    const id=uid('auto');
+    localStorage.setItem(BACKUP_STORE_PREFIX+id,json);
+    STATE.backupHistory=STATE.backupHistory||[];
+    STATE.backupHistory.push({id,ts:now,note:'پشتیبان خودکار پدافند غیرعامل',snapshotSize:json.length});
+    if(STATE.backupHistory.length>20){
+      const removed=STATE.backupHistory.splice(0,STATE.backupHistory.length-20);
+      removed.forEach(r=>{try{localStorage.removeItem(BACKUP_STORE_PREFIX+r.id);}catch(_){}});
+    }
+    localStorage.setItem(key,String(now));
+    localStorage.setItem(APP_KEY,JSON.stringify(STATE));
+  }catch(e){
+    // پشتیبان‌گیری نباید ثبت بیمار را متوقف کند؛ خطا در کنسول باقی می‌ماند.
+    console.warn('DENTYAR passive-defense backup failed:',e);
+  }
+}
+
 function saveState(){
+  // Mark local edits before scheduling cloud sync; incoming remote merges are not re-marked.
+  if(window.DentyarSync && !(window.DentyarSync.isMerging && window.DentyarSync.isMerging())){
+    const changedAt=Date.now();
+    ['patients','dentists','appointments'].forEach(coll=>(STATE[coll]||[]).forEach(rec=>{rec._updatedAt=changedAt;}));
+  }
   localStorage.setItem(APP_KEY, JSON.stringify(STATE));
+  maybeCreatePassiveBackup();
   // آینه‌سازی غیرهمزمان؛ اگر IndexedDB در دسترس نباشد، localStorage همچنان منبع اصلی است.
   if (typeof indexedDB !== 'undefined' && location.protocol !== 'content:') {
     idbPutAll(STATE).catch(err=>console.warn('IndexedDB mirror save failed:', err));
@@ -786,30 +821,33 @@ function saveState(){
 function uid(prefix){ return (prefix||'id') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 function nextFileNo(){
-  // فرمت استاندارد: تاریخ شمسی روز جاری + سریال چهاررقمی؛ مثال ۱۴۰۵۰۶۲۴۰۰۰۱.
-  // سریال به‌صورت پیش‌فرض بین روزها ادامه پیدا می‌کند. مدیر مطب می‌تواند در تنظیمات
-  // «ریست ابتدای هر سال» را فعال کند یا از هر تاریخی «ریست از امروز» انجام دهد.
-  const dateStr = todayJalaliCompact();
-  const yearStr = dateStr.slice(0,4);
-  if(STATE.meta.fileNoResetDate && dateStr >= STATE.meta.fileNoResetDate && (STATE.meta.fileNoSeq||0)>0){
-    // پس از ریست دستی، سریال از همان روز ادامه می‌یابد.
-  }
-  if(STATE.meta.fileNoMode === 'yearly' && STATE.meta.fileNoYear && STATE.meta.fileNoYear !== yearStr){
-    STATE.meta.fileNoSeq = 0;
-  }
-  STATE.meta.fileNoYear = yearStr;
-  STATE.meta.fileNoDate = dateStr;
-  STATE.meta.fileNoSeq = (STATE.meta.fileNoSeq||0) + 1;
+  // شماره‌گذاری سریالی پیوسته؛ پرونده‌های قدیمی هرگز بازشماری یا تغییر نمی‌شوند.
+  // اولین شماره برای نصب تازه: 140501010001.
+  const firstNumber = 140501010001;
+  let lastAssigned = firstNumber - 1;
+  const stored = Number(STATE.meta.fileNoLastAssigned || 0);
+  if(Number.isSafeInteger(stored) && stored >= firstNumber) lastAssigned = Math.max(lastAssigned, stored);
+  (STATE.patients || []).forEach(p => {
+    const n = Number(toEnDigits(String(p.fileNo || '')).replace(/\D/g,''));
+    if(Number.isSafeInteger(n) && n >= firstNumber) lastAssigned = Math.max(lastAssigned, n);
+  });
+  const next = lastAssigned + 1;
+  STATE.meta.fileNoLastAssigned = next;
+  STATE.meta.fileNoSeq = next;
+  STATE.meta.fileNoMode = 'continuous';
   saveState();
-  return dateStr + String(STATE.meta.fileNoSeq).padStart(4,'0');
+  return String(next);
 }
 function resetFileSerialFromToday(){
-  STATE.meta.fileNoSeq=0;
-  STATE.meta.fileNoResetDate=todayJalaliCompact();
-  STATE.meta.fileNoDate=STATE.meta.fileNoResetDate;
-  STATE.meta.fileNoYear=STATE.meta.fileNoResetDate.slice(0,4);
+  const existingMax = (STATE.patients||[]).reduce((max,p)=>{
+    const n=Number(toEnDigits(String(p.fileNo||'')).replace(/\D/g,''));
+    return Number.isSafeInteger(n) ? Math.max(max,n) : max;
+  }, 140501010000);
+  STATE.meta.fileNoLastAssigned = Math.max(Number(STATE.meta.fileNoLastAssigned)||0, existingMax);
+  STATE.meta.fileNoSeq = STATE.meta.fileNoLastAssigned;
+  STATE.meta.fileNoMode='continuous';
   saveState();
-  toast('سریال شماره پرونده از امروز ریست شد');
+  toast('شماره‌گذاری سریالی پیوسته است؛ شماره پرونده‌های قبلی حفظ شدند');
   renderSettings();
 }
 function setFileNoMode(mode){
@@ -954,10 +992,21 @@ function faDigits(value){
   return toEnDigits(String(value ?? ''));
 }
 function formatAllNumericInputs(){
-  document.querySelectorAll('input[type=tel],input[inputmode=numeric],input[type=number]').forEach(el=>{
-    if(el.value) el.value=faDigits(toEnDigits(el.value));
-    el.setAttribute('dir','rtl');
-    el.style.textAlign='right';
+  document.querySelectorAll('input').forEach(el=>{
+    const id=el.id||'';
+    const numericOnly=/(Nid|Phone|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|national|postal|economic|License|EmergencyPhone|Mobile|pin|Pass)/i.test(id);
+    if(numericOnly && el.type!=='date' && el.type!=='time' && el.type!=='file'){
+      el.setAttribute('inputmode', /Phone|Mobile/i.test(id) ? 'tel' : 'numeric');
+      el.setAttribute('autocomplete','off');
+      el.setAttribute('data-numeric-only','true');
+      el.setAttribute('dir','ltr');
+      el.style.textAlign='left';
+    }
+    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]')){
+      if(el.value) el.value=toEnDigits(el.value);
+      el.setAttribute('dir','ltr');
+      el.style.textAlign='left';
+    }
   });
 }
 function toFaTextNodeTree(root=document.body){
@@ -1320,7 +1369,7 @@ async function v31NativeFile(bytes, filename, mime, options={}){
    */
   try{
     const C=window.Capacitor;
-    if(!C || typeof C.isNativePlatform!=='function' || !C.isNativePlatform()){
+    if(!C || !isDentyarNativeApp()){
       return {saved:false,shared:false};
     }
 
@@ -1351,7 +1400,8 @@ async function v31NativeFile(bytes, filename, mime, options={}){
       const result=await nativePlugin.saveToDownloads({
         filename:safeName,
         mimeType:String(mime||'application/octet-stream'),
-        data:data
+        data:data,
+        folder:String(options.folder||'Reports')
       });
 
       if(!result || result.saved!==true){
@@ -1361,7 +1411,7 @@ async function v31NativeFile(bytes, filename, mime, options={}){
       return {
         saved:true,
         shared:false,
-        path:String(result.path||'Download/DENTYAR/Reports/'+safeName),
+        path:String(result.path||'Download/DENTYAR/'+String(options.folder||'Reports')+'/'+safeName),
         uri:String(result.uri||'')
       };
     }
@@ -1419,7 +1469,7 @@ async function downloadBlob(bytes, filename, mime, options={}){
     return native.shared ? 'shared' : 'saved';
   }
   const C=window.Capacitor;
-  if(C && C.isNativePlatform && C.isNativePlatform()){
+  if(isDentyarNativeApp()){
     const detail=native && native.error ? String(native.error.message||native.error) : 'native export unavailable';
     console.error('DENTYAR Android export failed:', detail);
     throw new Error('Android export failed: '+detail);
@@ -1513,7 +1563,7 @@ function dentyarReportAction(){
 
     const share =
       makeButton(
-        'Share کردن گزارش',
+        'شیر کردن گزارش',
         'btn-gold'
       );
 
@@ -1658,7 +1708,7 @@ function renderLock(){
       <button class="unlockBtn" onclick="pinSubmit()">${ICON_UNLOCK}</button>
     </div>
     <div id="lockError"></div>
-    <div id="lockHint">رمز پیش‌فرض: 12345678 — از بخش تنظیمات قابل تغییر است</div>
+    <div id="lockHint">رمز ورود اختصاصی ۸ رقمی را وارد کنید.</div>
   `;
 }
 function updatePinDots(){
@@ -1675,10 +1725,17 @@ function pinPress(d){
   }
 }
 function pinSubmit(){
-  if(toEnDigits(pinBuffer) === toEnDigits(STATE.meta.password) && pinBuffer.length===8){
+  const enteredPin=toEnDigits(pinBuffer);
+  const staff=(STATE.meta.appUsers||[]).find(u=>u && u.active!==false && toEnDigits(u.pin||'')===enteredPin);
+  const role=staff ? staff.role : (enteredPin===toEnDigits(STATE.meta.password||'')?'manager':null);
+  if(role && pinBuffer.length===8 && ['manager','dentist','receptionist'].includes(role)){
+    sessionStorage.setItem('dentyar_role',role);
+    sessionStorage.setItem('dentyar_user_name',staff?String(staff.name||'کاربر'):'مدیر مطب');
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('app').style.display='block';
     sessionStorage.setItem('lb_unlocked','1');
+    if((currentPage==='reports' && !dentyarCanViewReports()) || (['updates','security'].includes(currentPage) && !dentyarIsManager())) currentPage='dashboard';
+    renderBottomNav(); renderPage();
   } else {
     document.getElementById('lockError').textContent = 'رمز عبور اشتباه است';
     setTimeout(()=>{ pinBuffer=''; updatePinDots(); }, 400);
@@ -1689,6 +1746,29 @@ function pinClear(){
   updatePinDots();
   document.getElementById('lockError').textContent='';
 }
+// پشتیبانی از صفحه‌کلید واقعی لپ‌تاپ؛ کلیک ماوس روی اعداد صفحه نیز مثل قبل فعال می‌ماند.
+document.addEventListener('keydown', function(e){
+  const lock=document.getElementById('lockScreen');
+  const app=document.getElementById('app');
+  if(!lock || lock.style.display==='none' || (app && app.style.display==='block')) return;
+  if(e.ctrlKey || e.altKey || e.metaKey) return;
+  const keyDigit=/^[0-9]$/.test(e.key)?e.key:(/^Numpad[0-9]$/.test(e.code||'')?(e.code||'').slice(-1):null);
+  if(keyDigit!==null){
+    e.preventDefault();
+    pinPress(keyDigit);
+  } else if(e.key==='Backspace'){
+    e.preventDefault();
+    pinBuffer=pinBuffer.slice(0,-1);
+    updatePinDots();
+    const err=document.getElementById('lockError'); if(err) err.textContent='';
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    pinSubmit();
+  } else if(e.key==='Escape'){
+    e.preventDefault();
+    pinClear();
+  }
+});
 function lockApp(){
   showModal(`
     <h3>خروج از برنامه</h3>
@@ -1703,6 +1783,8 @@ function lockApp(){
 function finishLockApp(){
   sessionStorage.removeItem('lb_unlocked');
   sessionStorage.removeItem('lb_profile_unlocked');
+  sessionStorage.removeItem('dentyar_role');
+  sessionStorage.removeItem('dentyar_user_name');
   pinBuffer='';
   renderLock();
   document.getElementById('lockScreen').style.display='flex';
@@ -1761,6 +1843,10 @@ const NAV_ICONS = {
 };
 
 /* ===================== ناوبری ===================== */
+function dentyarCurrentRole(){ return sessionStorage.getItem('dentyar_role') || 'receptionist'; }
+function dentyarCanViewReports(){ return ['manager','dentist'].includes(dentyarCurrentRole()); }
+function dentyarIsManager(){ return dentyarCurrentRole()==='manager'; }
+function dentyarReportDenied(){ modalAlert('دسترسی محدود','مشاهده گزارش‌های مالی فقط برای دندان‌پزشک یا مدیر مطب مجاز است.'); }
 const PAGES = [
   {id:'dashboard', label:'داشبورد', icon:'dashboard'},
   {id:'appointments', label:'نوبت‌دهی', icon:'appointments'},
@@ -1770,6 +1856,8 @@ const PAGES = [
   {id:'reports', label:'گزارش‌ها', icon:'reports'},
   {id:'backup', label:'پشتیبان‌گیری', icon:'backup'},
   {id:'settings', label:'تنظیمات', icon:'settings'},
+  {id:'updates', label:'به‌روزرسانی', icon:'backup'},
+  {id:'security', label:'پدافند غیرعامل', icon:'settings'},
   {id:'profile', label:'پروفایل', icon:'profile'},
   {id:'guide', label:'راهنما', icon:'guide'},
   {id:'contact', label:'ارتباط با ما', icon:'contact'},
@@ -1810,7 +1898,7 @@ function renderHeader(){
   syncFixedTopHeight();
 }
 function renderBottomNav(){
-  document.getElementById('bottomNav').innerHTML = PAGES.map(p=>`
+  document.getElementById('bottomNav').innerHTML = PAGES.filter(p=>(p.id!=='reports'||dentyarCanViewReports())&&(!['updates','security'].includes(p.id)||dentyarIsManager())).map(p=>`
     <button class="navItem ${currentPage===p.id?'active':''}" onclick="navigate('${p.id}')">
       ${NAV_ICONS[p.icon]}
       <span>${p.label}</span>
@@ -1832,6 +1920,9 @@ function syncFixedTopHeight(){
   });
 }
 function navigate(pageId, params){
+  if(pageId==='reports' && !dentyarCanViewReports()){ dentyarReportDenied(); return; }
+  if(pageId==='updates' && !dentyarIsManager()){ modalAlert('دسترسی محدود','پنل مستقل به‌روزرسانی فقط برای مدیر مطب در دسترس است.'); return; }
+  if(pageId==='security' && !dentyarIsManager()){ modalAlert('دسترسی محدود','پنل پدافند غیرعامل فقط برای مدیر مطب در دسترس است.'); return; }
   closeModal();
   if(pageId !== 'patients') openPatientId = null;
   currentPage = pageId;
@@ -1851,6 +1942,8 @@ function renderPage(){
     reports: renderReports,
     backup: renderBackup,
     settings: renderSettings,
+    updates: renderUpdates,
+    security: renderSecurityPanel,
     profile: renderProfile,
     guide: renderGuide,
     contact: renderContact,
@@ -1894,13 +1987,14 @@ function renderDashboard(){
   let saved=(STATE.meta.dashboardMetrics||[]).filter(k=>metricDefs[k]);
   // Prevent legacy/broken metric sets from resurrecting stale dashboard labels.
   if(saved.length<4 || saved.some(k=>['completed','levels','surfaces'].includes(k))){ saved=curated; }
-  const keys=saved.slice(0,10);
-  const statHtml=keys.map(k=>{const d=metricDefs[k];const nav=d[2]==='reports'?"navigate('reports')":`navigate('${d[2]}')`;return `<button type="button" class="statCard ${d[4]} clickable" onclick="${nav}" aria-label="${esc(d[0])}"><span class="iconBadge">${d[3]}</span><span class="num">${esc(faDigits(d[1]))}</span><span class="lbl">${esc(d[0])}</span></button>`}).join('');
-  const financeItems=[
+  const financialMetricKeys=['revenue','received','debts','insurance','discounts','cash','nonCash','refunds'];
+  const keys=(dentyarCanViewReports()?saved:saved.filter(k=>!financialMetricKeys.includes(k))).slice(0,10);
+  const statHtml=keys.map(k=>{const d=metricDefs[k];const nav=d[2]==='reports'?(dentyarCanViewReports()?"navigate('reports')":"navigate('patients')"):`navigate('${d[2]}')`;return `<button type="button" class="statCard ${d[4]} clickable" onclick="${nav}" aria-label="${esc(d[0])}"><span class="iconBadge">${d[3]}</span><span class="num">${esc(faDigits(d[1]))}</span><span class="lbl">${esc(d[0])}</span></button>`}).join('');
+  const financeItems=dentyarCanViewReports() ? [
     ['مبلغ ناخالص خدمات',totals.gross,'gross'],['تخفیف',totals.discount,'discount'],['سهم بیمه',totals.insurance,'insurance'],
     ['خالص قابل پرداخت',totals.net,'net'],['دریافت نقدی',totals.cash,'cash'],['دریافت غیرنقدی',totals.nonCash,'nonCash'],
     ['استرداد وجه',totals.refund,'refund'],['کل دریافتی',totals.paid,'paid'],['مطالبات / باقیمانده',totals.balance,'balance']
-  ];
+  ] : [];
   const financeHtml=financeItems.map(([label,val,key])=>`<div class="financeItem finance-${key}"><span>${esc(label)}</span><b>${esc(fmtMoney(val))}</b></div>`).join('');
   const servicesHtml=typeRows.length
     ? typeRows.slice(0,8).map(([name,count])=>`<div class="serviceRow"><span>${esc(name)}</span><b>${esc(faDigits(count))}</b></div>`).join('')
@@ -1912,8 +2006,7 @@ function renderDashboard(){
     </section>
     <div class="sectionTitle">شاخص‌های کلیدی</div>
     <section class="statGrid dashboardStats">${statHtml}</section>
-    <div class="sectionTitle">خلاصه مالی</div>
-    <section class="card financeCard"><div class="financeGrid">${financeHtml}</div></section>
+    ${dentyarCanViewReports()?'<div class="sectionTitle">خلاصه مالی</div><section class="card financeCard"><div class="financeGrid">'+financeHtml+'</div></section>':''}
     <div class="sectionTitle">خدمات پرتکرار</div>
     <section class="card servicesCard"><div class="servicesList">${servicesHtml}</div></section>
   `;
@@ -2062,6 +2155,14 @@ function openRegisterForm(appointmentId){
 function saveRegisterForm(appointmentId){
   const name = document.getElementById('rgName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
+  const enteredNid=toEnDigits(document.getElementById('rgNid').value||'').trim();
+  if(enteredNid){
+    const duplicate=checkDuplicateNationalId(enteredNid,null);
+    if(duplicate){ modalAlert('ثبت تکراری','این کد ملی قبلاً برای «'+esc(duplicate.name)+'» با شماره پرونده '+esc(duplicate.fileNo)+' ثبت شده است. پرونده جدید ایجاد نشد.'); return; }
+  }
+  const registerPhone=toEnDigits(String(document.getElementById('rgPhone').value||'')).replace(/\D/g,'');
+  const samePatient=(STATE.patients||[]).find(p=>String(p.name||'').trim().toLowerCase()===name.toLowerCase() && registerPhone.length>=7 && toEnDigits(String(p.phone||'')).replace(/\D/g,'')===registerPhone);
+  if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+'). اطلاعات قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('register').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('rgCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
   if(missingCustom){ modalAlert('خطا',`فیلد «${esc(missingCustom.label)}» الزامی است.`); return; }
   const patient = {
@@ -2204,7 +2305,7 @@ function renderAppointments(){
       <div class="grid2"><div><label>فرانشیز (%)</label><input type="number" id="apFranchise" min="0" max="100"></div><div><label>نحوه / منبع معرفی</label><input type="text" id="apReferral"></div></div><input type="text" id="apReferral">
       <div class="grid2">
         <div><label>تاریخ</label><input type="date" id="apDate" value="${todayISO()}"></div>
-        <div><label>ساعت</label><input type="time" id="apTime"></div>
+        <div><label>ساعت</label><input type="time" id="apTime" lang="en" dir="ltr" inputmode="numeric" style="direction:ltr;text-align:left;font-variant-numeric:lining-nums tabular-nums"></div>
       </div>
       <label>دندان‌پزشک مدنظر (بر اساس تخصص)</label>
       <select id="apDentist">
@@ -2246,6 +2347,11 @@ function renderAppointments(){
 function saveAppointment(){
   const name = document.getElementById('apName').value.trim();
   if(!name){ modalAlert('خطا','نام الزامی است.'); return; }
+  const appointmentPhone=toEnDigits(String(document.getElementById('apPhone').value||'')).replace(/\D/g,'');
+  const appointmentDate=document.getElementById('apDate').value || todayISO();
+  const appointmentTime=document.getElementById('apTime').value || '';
+  const duplicateAppointment=(STATE.appointments||[]).find(a=>!['لغو شده','لغوشده','لغو‌شده','حذف شده','حذف‌شده'].includes(String(a.status||'').trim()) && String(a.name||'').trim().toLowerCase()===name.toLowerCase() && toEnDigits(String(a.phone||'')).replace(/\D/g,'')===appointmentPhone && (a.date||'')===appointmentDate && (a.time||'')===appointmentTime && appointmentPhone.length>=7);
+  if(duplicateAppointment){ modalAlert('نوبت تکراری','برای همین بیمار در همین تاریخ و ساعت، نوبت ثبت شده است. نوبت قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('appointment').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('appointmentCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
   if(missingCustom){ modalAlert('خطا',`فیلد «${esc(missingCustom.label)}» الزامی است.`); return; }
   STATE.appointments.push({
@@ -2419,6 +2525,14 @@ function openPatientForm(patientId, prefill){
 function savePatientForm(editingId){
   const name = document.getElementById('pfName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
+  const enteredNid=toEnDigits(document.getElementById('pfNid').value||'').trim();
+  if(enteredNid){
+    const duplicate=checkDuplicateNationalId(enteredNid,editingId);
+    if(duplicate){ modalAlert('ثبت تکراری','این کد ملی قبلاً برای «'+esc(duplicate.name)+'» با شماره پرونده '+esc(duplicate.fileNo)+' ثبت شده است.'); return; }
+  }
+  const enteredPhone=toEnDigits(String(document.getElementById('pfPhone').value||'')).replace(/\D/g,'');
+  const samePatient=(STATE.patients||[]).find(p=>p.id!==editingId && String(p.name||'').trim().toLowerCase()===name.toLowerCase() && enteredPhone.length>=7 && toEnDigits(String(p.phone||'')).replace(/\D/g,'')===enteredPhone);
+  if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+').'); return; }
   const data = {
     name,
     nationalId: document.getElementById('pfNid').value.trim(),
@@ -2575,6 +2689,8 @@ function renderPatientFile(id){
           <span class="costTag">${fmtMoney(financeOf(v).net)}</span>
           <div class="row">
             <button class="btn btn-outline btn-sm" onclick="printReceipt('${p.id}','${v.id}')">چاپ رسید</button>
+            <button class="btn btn-outline btn-sm" onclick="printInvoice('${p.id}','${v.id}')">چاپ فاکتور استاندارد</button>
+            <button class="btn btn-outline btn-sm" onclick="printInvoice('${p.id}','${v.id}')">چاپ فاکتور</button>
             <button class="btn btn-danger btn-sm" onclick="deleteVisit('${p.id}','${v.id}')">حذف</button>
           </div>
         </div>
@@ -2583,123 +2699,60 @@ function renderPatientFile(id){
   `;
   bindFinance('v');
 }
-function printReceipt(patientId, visitId){
-  const p = STATE.patients.find(x=>x.id===patientId);
-  const v = (p.visits||[]).find(x=>x.id===visitId);
-  if(!p || !v) return;
-  const dentistName = v.dentistId? (STATE.dentists.find(d=>d.id===v.dentistId)||{}).name : '-';
-  const html=`
-    <!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>رسید</title>
-    <style>
-      body{font-family:Tahoma,Arial,sans-serif;padding:24px;color:#1c2b36;margin:0;}
-      h2{color:#153a63;margin-bottom:2px;}
-      .muted{color:#6b7c88;font-size:13px;margin-bottom:18px;}
-      table{width:100%;border-collapse:collapse;margin-top:14px;}
-      td{padding:8px 4px;border-bottom:1px solid #e1e8ec;font-size:14px;}
-      td:first-child{color:#6b7c88;}
-      .total{font-size:17px;font-weight:bold;color:#1e8f5f;text-align:left;margin-top:16px;}
-      .footer{margin-top:30px;font-size:12px;color:#6b7c88;text-align:center;}
-    </style>
-
-<style id="dentyar-v32-final-fixes">
-/* V32 FINAL — logo/report/update fixes. This layer intentionally comes last. */
-#topHeader .appLogo,
-#topHeader .clinicLogo,
-#lockScreen .lockLogo{
-  background:#fff!important;
-  object-fit:contain!important;
-  padding:0!important;
-  filter:none!important;
-}
-#topHeader .appLogo{border-radius:15px!important;border:2px solid #8ad3cb!important;}
-#topHeader .clinicLogo{border-radius:14px!important;border:2px solid #8ad3cb!important;}
-#lockScreen .lockLogo{border-radius:22%!important;border:2px solid #8ad3cb!important;box-shadow:0 6px 18px rgba(15,118,110,.16)!important;}
-/* Never paint a black backing behind the main logo. */
-#lockScreen .lockLogo{background:#fff!important;}
-/* Reports: keep export buttons compact and clearly distinguish the three outputs. */
-.card button[onclick="exportReportCSV()"],
-.card button[onclick="exportReportXLSX()"],
-.card button[onclick="exportReportPDF()"]{min-height:42px!important;font-weight:800!important;}
-.updateBox{border-color:#bfe3de!important;background:linear-gradient(145deg,#ffffff,#f3fbf9)!important;}
-.updateBadge{font-weight:900!important;}
-</style>
-
-<style id="dentyar-v34-logo-safety">
-/* V34 TEST — only logo rendering safety; application logic/export logic is unchanged. */
-#topHeader .appLogo,#topHeader .clinicLogo,#lockScreen .lockLogo{
-  object-fit:contain!important;
-  object-position:center!important;
-  background:#fff!important;
-  padding:0!important;
-  overflow:hidden!important;
-}
-#topHeader .appLogo{width:56px!important;height:56px!important;border-radius:15px!important;}
-#topHeader .clinicLogo{width:56px!important;height:56px!important;border-radius:14px!important;}
-#lockScreen .lockLogo{width:108px!important;height:108px!important;border-radius:22%!important;}
-</style>
-
-<style id="dentyar-v57-logo-final">
-/* V57 FINAL: preserve the known-good V51 logo asset and prevent legacy CSS from cropping it. */
-#topHeader .appLogo{width:72px!important;height:72px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:0!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-#topHeader .clinicLogo{width:54px!important;height:54px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:2px!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-#lockScreen .lockLogo{width:108px!important;height:108px!important;object-fit:contain!important;object-position:center!important;border-radius:50%!important;padding:4px!important;background:#fff!important;display:block!important;box-sizing:border-box!important;}
-@media(max-width:480px){#topHeader .appLogo{width:62px!important;height:62px!important;}#topHeader .clinicLogo{width:50px!important;height:50px!important;}#lockScreen .lockLogo{width:108px!important;height:108px!important;}}
-</style>
-<style id="dentyar-v58-pin-latin">
-/* V58 ROOT FIX: global Persian-digit conversion must not touch the login keypad. */
-#lockScreen[data-no-fa-digits="true"],
-#lockScreen[data-no-fa-digits="true"] .pinPad,
-#lockScreen[data-no-fa-digits="true"] .pinPad button,
-#lockScreen[data-no-fa-digits="true"] #lockHint{
- direction:ltr !important;
- unicode-bidi:isolate !important;
- font-family:Arial,Helvetica,sans-serif !important;
- font-variant-numeric:lining-nums !important;
-}
-#lockScreen[data-no-fa-digits="true"] .pinPad button{font-feature-settings:"lnum" 1 !important;}
-</style><link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#0f766e">
-</head><body>
-      <h2>DENTYAR</h2>
-      <div class="muted">${esc(STATE.meta.slogan||'')}</div>
-      <table>
-        <tr><td>نام بیمار</td><td>${esc(p.name)}</td></tr>
-        <tr><td>شماره پرونده</td><td>${esc(p.fileNo)}</td></tr>
-        <tr><td>تاریخ</td><td>${fmtDateFa(v.date)}</td></tr>
-        <tr><td>نوع درمان</td><td>${esc(v.treatmentType)}</td></tr>
-        <tr><td>دندان‌پزشک</td><td>${esc(dentistName||'-')}</td></tr>
-        <tr><td>نتیجه</td><td>${esc(v.outcome||'-')}</td></tr>
-      </table>
-      <div class="total">مبلغ: ${fmtMoney(v.cost)}</div>
-      <div class="footer">${esc(STATE.meta.supportPhone||'')}</div>
-<script>setTimeout(()=>window.print(),350);<\/script><script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("DENTYAR PWA service worker:",e);});});}})();<\/script>
-</body></html>`;
-  showDentyarPrintOverlay(html);
-}
-/* نمایش هر پیش‌نمایش چاپی (رسید تکی یا گزارش) به‌صورت یک لایه‌ی داخل همین صفحه، به‌همراه
-   دکمه‌ی بازگشت همیشه-کاربردی — مستقل از رفتار window.close() در مرورگر/وب‌ویو نصب‌شده */
-function showDentyarPrintOverlay(html){
-  let overlay=document.getElementById('dentyarPdfOverlay');
-  if(!overlay){
-    overlay=document.createElement('div');
-    overlay.id='dentyarPdfOverlay';
-    overlay.style.cssText='position:fixed;inset:0;z-index:5000;background:#fff;display:flex;flex-direction:column;';
-    const bar=document.createElement('div');
-    bar.style.cssText='flex:0 0 auto;background:#12305e;padding:10px 14px;display:flex;align-items:center;gap:10px;';
-    const backBtn=document.createElement('button');
-    backBtn.textContent='✕ بازگشت';
-    backBtn.style.cssText='background:#fff;color:#12305e;border:none;border-radius:10px;padding:9px 16px;font-family:inherit;font-size:13px;font-weight:700;';
-    backBtn.onclick=function(){ overlay.style.display='none'; };
-    bar.appendChild(backBtn);
-    const iframe=document.createElement('iframe');
-    iframe.id='dentyarPdfFrame';
-    iframe.style.cssText='flex:1 1 auto;border:none;width:100%;';
-    overlay.appendChild(bar);
-    overlay.appendChild(iframe);
-    document.body.appendChild(overlay);
+function printReceipt(patientId, visitId){ return printPatientDocument(patientId,visitId,'receipt'); }
+function printInvoice(patientId, visitId){ return printPatientDocument(patientId,visitId,'invoice'); }
+async function printPatientDocument(patientId, visitId, kind){
+  const p=STATE.patients.find(x=>x.id===patientId);
+  const v=p&&(p.visits||[]).find(x=>x.id===visitId);
+  if(!p||!v){ modalAlert('چاپ سند','اطلاعات بیمار یا درمان پیدا نشد.'); return; }
+  const f=financeOf(v), cp=STATE.meta.clinicProfile||{};
+  const dentistName=v.dentistId?((STATE.dentists.find(d=>d.id===v.dentistId)||{}).name||'-'):'-';
+  const docTitle=kind==='invoice'?'فاکتور استاندارد خدمات دندان‌پزشکی':'رسید پرداخت';
+  const docNo=toEnDigits(String(p.fileNo||'')+'-'+String(v.id||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(-8));
+  const clinicName=STATE.meta.clinicName||'مطب لبخند زیبا';
+  const clinicAddress=[cp.address,cp.city,cp.postalCode?'کدپستی: '+cp.postalCode:''].filter(Boolean).join('، ');
+  const clinicPhone=cp.clinicPhone||STATE.meta.supportPhone||'', clinicMobile=cp.clinicMobile||'', clinicEmail=cp.clinicEmail||STATE.meta.supportEmail||'';
+  const logo=clinicLogoSrc(), money=n=>esc(toEnDigits(fmtMoney(Number(n)||0))), val=x=>esc(toEnDigits(String(x==null||x===''?'—':x)));
+  const html=`<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${docTitle}</title>
+<style>
+*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;padding:14px;color:#1c2b36;margin:0;background:#fff;font-size:12px;line-height:1.7}.sheet{max-width:850px;margin:0 auto;border:1px solid #cbd9df;padding:18px;border-radius:7px}.head{display:grid;grid-template-columns:86px 1fr 140px;align-items:center;gap:12px;border-bottom:3px solid #0f766e;padding-bottom:12px;margin-bottom:12px}.clinicLogo{width:78px;height:78px;object-fit:contain;border:1px solid #d6e0e5;border-radius:8px;padding:3px}.clinicName{font-size:17px;font-weight:900;color:#12305e}.muted{color:#526579;font-size:10px;line-height:1.8}.docBadge{border:1px solid #0f766e;color:#0f766e;border-radius:7px;padding:8px;text-align:center;font-weight:800;font-size:12px}.docBadge small{font-size:10px}.section{font-weight:900;color:#0f766e;margin:13px 0 5px;border-bottom:1px solid #d8e5e8;padding-bottom:3px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}.field{padding:4px 0;border-bottom:1px dotted #dce5e8;overflow-wrap:anywhere}.field b{display:inline-block;min-width:108px;color:#334155}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #cbd9df;padding:7px 5px;text-align:right;font-size:10.5px}th{background:#edf6f5;color:#12305e}.totals{margin-top:10px;max-width:430px;margin-right:auto}.totals div{display:flex;justify-content:space-between;gap:12px;padding:5px 7px;border-bottom:1px solid #e1e8eb}.totals .net{font-weight:900;color:#0f766e;font-size:13px;background:#f0faf8}.note{border:1px solid #e1e8eb;border-radius:5px;padding:8px;white-space:pre-wrap}.sign{display:grid;grid-template-columns:1fr 1fr;gap:25px;margin-top:28px}.sign div{text-align:center;border-top:1px solid #9baab3;padding-top:6px;font-size:10px}.footer{display:flex;align-items:center;justify-content:center;gap:8px;border-top:1px solid #dce5e8;margin-top:18px;padding-top:9px;color:#526579;font-size:9px}.footer img{width:28px;height:28px;object-fit:contain}@media print{body{padding:0}.sheet{border:0;border-radius:0;max-width:none;padding:7mm}.noPrint{display:none}}
+</style></head><body><main class="sheet">
+<header class="head"><img class="clinicLogo" src="${logo}" alt="لوگوی مطب"><div><div class="clinicName">${esc(clinicName)}</div><div class="muted">${esc(STATE.meta.slogan||'دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما')}</div><div class="muted">${esc(cp.legalName||'')}${cp.managerName?' | مدیر: '+esc(cp.managerName):''}${cp.medicalDirector?' | مسئول فنی: '+esc(cp.medicalDirector):''}</div><div class="muted">${esc(clinicAddress)}${clinicAddress&&clinicPhone?' | ':''}${esc(clinicPhone)}${clinicMobile?' | همراه: '+esc(clinicMobile):''}</div><div class="muted">${esc(clinicEmail)}${cp.website?' | '+esc(cp.website):''}</div><div class="muted">${cp.licenseNo?'پروانه: '+esc(cp.licenseNo)+' | ':''}${cp.nationalIdentifier?'شناسه ملی: '+esc(cp.nationalIdentifier)+' | ':''}${cp.economicCode?'کد اقتصادی: '+esc(cp.economicCode):''}</div></div><div class="docBadge">${docTitle}<br><small>شماره سند: ${esc(docNo)}</small><br><small>شماره پرونده: ${val(p.fileNo)}</small><br><small>تاریخ صدور: ${val(currentJalaliDateFa())}</small></div></header>
+<div class="section">مشخصات کامل بیمار</div><div class="grid">
+<div class="field"><b>نام و نام خانوادگی:</b> ${val(p.name)}</div><div class="field"><b>شماره پرونده:</b> ${val(p.fileNo)}</div>
+<div class="field"><b>کد ملی:</b> ${val(p.nationalId)}</div><div class="field"><b>تلفن همراه:</b> ${val(p.phone)}</div>
+<div class="field"><b>جنسیت:</b> ${val(p.gender)}</div><div class="field"><b>سال تولد:</b> ${val(p.birthYear)}</div>
+<div class="field"><b>نشانی بیمار:</b> ${val(p.address)}</div><div class="field"><b>نوع مراجعه:</b> ${val(p.visitType)}</div>
+</div>
+<div class="section">اطلاعات بیمه‌ای</div><div class="grid">
+<div class="field"><b>بیمه پایه:</b> ${val(p.baseInsurance||p.insuranceType)}</div><div class="field"><b>بیمه تکمیلی:</b> ${val(p.supplementalInsurance||'ندارد')}</div>
+<div class="field"><b>شماره بیمه / بیمه‌شده:</b> ${val(p.insuranceNumber)}</div><div class="field"><b>شماره بیمه‌نامه / قرارداد:</b> ${val(p.policyNumber)}</div>
+<div class="field"><b>سقف تعهد بیمه:</b> ${p.coverageCeiling?money(p.coverageCeiling):'—'}</div><div class="field"><b>فرانشیز:</b> ${p.franchisePercent?val(p.franchisePercent)+'٪':'—'}</div>
+</div>
+<div class="section">شرح خدمات و وضعیت درمان</div><div class="grid">
+<div class="field"><b>تاریخ درمان:</b> ${val(toEnDigits(fmtDateFa(v.date)))}</div><div class="field"><b>دندان‌پزشک:</b> ${val(dentistName)}</div>
+<div class="field"><b>نوع خدمت:</b> ${val(v.treatmentType||'خدمات دندان‌پزشکی')}</div><div class="field"><b>نتیجه / وضعیت:</b> ${val(v.outcome)}</div>
+<div class="field"><b>نوع پرداخت:</b> ${val(v.paymentType)}</div><div class="field"><b>شماره پرونده مرجع:</b> ${val(p.fileNo)}</div>
+</div>
+<table><thead><tr><th>شرح</th><th>مبلغ ناخالص</th><th>تخفیف</th><th>سهم بیمه</th><th>خالص بیمار</th></tr></thead><tbody><tr><td>${val(v.treatmentType||'خدمات دندان‌پزشکی')}</td><td>${money(f.gross)}</td><td>${money(f.discount)}</td><td>${money(f.insurance)}</td><td>${money(f.net)}</td></tr></tbody></table>
+<div class="section">جزئیات مالی و پرداخت</div><div class="totals">
+<div><span>پرداخت نقدی</span><b>${money(f.cash)}</b></div><div><span>پرداخت کارتخوان</span><b>${money(f.card)}</b></div><div><span>انتقال بانکی</span><b>${money(f.transfer)}</b></div><div><span>سایر پرداخت‌ها</span><b>${money(f.other)}</b></div><div><span>جمع دریافتی پیش از استرداد</span><b>${money(f.totalReceived)}</b></div><div><span>استرداد وجه</span><b>${money(f.refund)}</b></div><div><span>جمع پرداختی خالص</span><b>${money(f.paid)}</b></div><div class="net"><span>مانده قابل پرداخت</span><b>${money(f.balance)}</b></div>
+</div>
+${p.notes?'<div class="section">یادداشت پرونده بیمار</div><div class="note">'+esc(p.notes)+'</div>':''}
+${v.note?'<div class="section">توضیحات درمان</div><div class="note">'+esc(v.note)+'</div>':''}
+<div class="sign"><div>مهر و امضای دندان‌پزشک<br><br>${esc(dentistName)}</div><div>${kind==='invoice'?'امضا و تأیید بیمار':'تأیید دریافت وجه / امضای بیمار'}</div></div>
+<footer class="footer"><img src="${DENTYAR_LOGO_DATA}" alt="لوگوی دنت‌یار"><span>تهیه‌شده با سامانه دنت‌یار — دستیار هوشمند دندان‌پزشکی | ${esc(clinicName)}</span></footer>
+</main></body></html>`;
+  const C=window.Capacitor;
+  if(isDentyarNativeApp()){
+    const plugin=(C.Plugins&&C.Plugins.DentyarNative)||(C.registerPlugin?C.registerPlugin('DentyarNative'):null);
+    if(!plugin||typeof plugin.printHtml!=='function'){ modalAlert('چاپ سند','پشتیبانی چاپ Android در این نسخه فعال نیست.'); return; }
+    try{ await plugin.printHtml({html:html,jobName:'DENTYAR-'+(kind==='invoice'?'Invoice':'Receipt')}); }
+    catch(e){ console.error('DENTYAR native print failed',e); modalAlert('چاپ سند','پنجره چاپ باز نشد؛ دوباره تلاش کنید.'); }
+    return;
   }
-  overlay.style.display='flex';
-  document.getElementById('dentyarPdfFrame').srcdoc=html;
+  showDentyarPrintOverlay(html);
+  setTimeout(()=>{ const frame=document.getElementById('dentyarPdfFrame'); if(frame&&frame.contentWindow){frame.contentWindow.focus();frame.contentWindow.print();} },500);
 }
 
 function addVisit(patientId){
@@ -2843,6 +2896,7 @@ function deleteDentist(id){
 /* ===================== گزارش‌ها ===================== */
 let reportFilters = {};
 function renderReports(){
+  if(!dentyarCanViewReports()){ document.getElementById('pageContent').innerHTML='<div class="card"><h3>دسترسی محدود</h3><p>گزارش‌های مالی فقط برای دندان‌پزشک یا مدیر مطب قابل مشاهده است.</p></div>'; return; }
   if(pageParams && Object.keys(pageParams).length){
     reportFilters = {...pageParams};
     pageParams = {};
@@ -2958,6 +3012,7 @@ function applyReportFilters(){
   renderReports();
 }
 function getReportRowsForExport(){
+  if(!dentyarCanViewReports()) return [[]];
   const f = reportFilters;
   let rows = [];
   STATE.patients.forEach(p=>{
@@ -2995,7 +3050,7 @@ function getReportRowsForExport(){
   return [header, ...body];
 }
 async function exportReportCSV(){
-
+  if(!dentyarCanViewReports()){ dentyarReportDenied(); return; }
   try{
 
     const action =
@@ -3071,7 +3126,7 @@ async function exportReportCSV(){
 
 
 async function exportReportXLSX(){
-
+  if(!dentyarCanViewReports()){ dentyarReportDenied(); return; }
   try{
 
     const action =
@@ -3146,6 +3201,7 @@ async function exportReportXLSX(){
 
 }
 function exportReportPDF(){
+  if(!dentyarCanViewReports()){ dentyarReportDenied(); return; }
   const rows=getReportRowsForExport();
   const header=rows[0]||[];
   const dataRows=rows.slice(1);
@@ -3219,20 +3275,54 @@ function exportReportPDF(){
     <div class="footer-note">${clinicName} — سند این گزارش به‌صورت رسمی و بر اساس اطلاعات ثبت‌شده در سامانه دنت‌یار صادر شده است.</div>
   <script>setTimeout(()=>window.print(),350);<\/script></body></html>`;
 
+  const nativeCap=window.Capacitor;
+  if(isDentyarNativeApp()){
+    (async()=>{
+      const action=await dentyarReportAction();
+      if(action==='cancel') return;
+      if(action==='direct'){
+        try{
+          const plugin=(nativeCap.Plugins&&nativeCap.Plugins.DentyarNative)||(nativeCap.registerPlugin?nativeCap.registerPlugin('DentyarNative'):null);
+          if(!plugin||typeof plugin.printHtml!=='function') throw new Error('Native print plugin unavailable');
+          await plugin.printHtml({html,jobName:'DENTYAR-Financial-Report'});
+          toast('پنجره چاپ Android باز شد؛ برای فایل PDF گزینه «ذخیره به‌صورت PDF» را انتخاب کنید.');
+        }catch(e){ console.error('DENTYAR report print failed',e); modalAlert('چاپ گزارش','پنجره چاپ Android باز نشد.'); }
+      }else{
+        try{
+          const result=await downloadBlob(new TextEncoder().encode(html),'گزارش-'+todayJalaliCompact()+'.html','text/html',{share:true});
+          if(result==='shared') toast('گزارش برای اشتراک‌گذاری آماده شد.');
+          else if(result==='cancelled') return;
+          else toast('فایل گزارش ذخیره شد.');
+        }catch(e){ modalAlert('اشتراک گزارش','اشتراک‌گذاری گزارش انجام نشد.'); }
+      }
+    })();
+    return;
+  }
+
   // در نسخه‌ی نصبی (APK/WebView) دستور window.print() هیچ رابط چاپی ندارد و بی‌اثر است؛
   // در این حالت فایل گزارش را به‌صورت HTML ذخیره/اشتراک می‌گذاریم تا کاربر آن را در
   // مرورگر خارجی (Chrome) باز و از همان‌جا چاپ یا ذخیره‌ی PDF کند.
   // در مرورگر معمولی (قبل از نصب) رفتار قبلی حفظ می‌شود: نمایش مستقیم + پنجره‌ی چاپ.
   const isInstalledApp = getDentyarPlatform()!=='android-web' && getDentyarPlatform()!=='windows' && getDentyarPlatform()!=='macos' && getDentyarPlatform()!=='linux';
   if(isInstalledApp){
-    const bytes = new TextEncoder().encode(html);
-    downloadBlob(bytes, `گزارش-${todayJalaliCompact()}.html`, 'text/html', {share:false}).then(result=>{
-      toast(result==='shared'?'فایل گزارش آماده شد':result==='cancelled'?'ذخیره لغو شد':'فایل گزارش مستقیم ذخیره شد؛ برای PDF آن را با مرورگر/چاپ باز کنید');
-    });
+    (async()=>{
+      try{
+        const action=await dentyarReportAction();
+        if(action==='cancel') return;
+        const bytes=new TextEncoder().encode(html);
+        const result=await downloadBlob(bytes,`گزارش-${todayJalaliCompact()}.html`,'text/html',{share:action==='share'});
+        if(result==='cancelled') return;
+        if(result==='saved') toast('گزارش مستقیماً ذخیره شد؛ برای تبدیل به PDF آن را در مرورگر باز کنید.');
+        else if(result==='shared') toast('فایل گزارش برای اشتراک‌گذاری آماده شد.');
+      }catch(e){
+        console.error('DENTYAR PDF/HTML report export failed',e);
+        toast('ساخت یا دریافت گزارش ناموفق بود؛ دوباره تلاش کنید.');
+      }
+    })();
     return;
   }
   showDentyarPrintOverlay(html);
-  toast('گزارش PDF آماده است؛ در پنجره چاپ گزینه «ذخیره به‌صورت PDF» را انتخاب کنید');
+  toast('گزارش آماده است؛ در پنجره چاپ گزینه «ذخیره به‌صورت PDF» را انتخاب کنید');
 }
 
 /* ===================== پشتیبان‌گیری ===================== */
@@ -3315,9 +3405,13 @@ async function createBackup(){
   const snap = snapshotData();
   const json = JSON.stringify(snap);
   storeBackupSnapshot(json, `${STATE.patients.length} بیمار`);
-  const result=await downloadBlob(new TextEncoder().encode(json), `پشتیبان-DENTYAR-${todayJalaliCompact()}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}${String(new Date().getSeconds()).padStart(2,'0')}.json`, 'application/json', {share:false});
-  toast(result==='shared'?'پشتیبان آماده ذخیره یا ارسال شد':result==='cancelled'?'ارسال لغو شد':'فایل پشتیبان آماده دریافت است');
-  renderBackup();
+  try{
+    const result=await downloadBlob(new TextEncoder().encode(json), `پشتیبان-DENTYAR-${todayJalaliCompact()}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}${String(new Date().getSeconds()).padStart(2,'0')}.json`, 'application/json', {share:false,folder:'Backups'});
+    if(result==='saved') toast('پشتیبان در Download/DENTYAR/Backups ذخیره شد');
+    else if(result==='cancelled') toast('ذخیره یا ارسال پشتیبان لغو شد');
+    else toast('فایل پشتیبان آماده دریافت است');
+    renderBackup();
+  }catch(e){ console.error('DENTYAR backup export failed',e); modalAlert('تهیه پشتیبان','فایل پشتیبان ساخته یا ذخیره نشد. فضای خالی دستگاه و مجوزهای برنامه را بررسی کنید.'); }
 }
 
 function restoreFromHistory(id, mode){
@@ -3419,7 +3513,7 @@ async function exportAppTransfer(withData){
     finalHtml = finalHtml.slice(0,lastIdx) + declReplacement + finalHtml.slice(lastIdx+declPrefix.length);
   }
   const bytes = new TextEncoder().encode(finalHtml);
-  const result=await downloadBlob(bytes, withData? 'DENTYAR-انتقال-با-اطلاعات.html' : 'DENTYAR-انتقال-خالی.html', 'text/html;charset=utf-8', {share:false});
+  const result=await downloadBlob(bytes, withData? 'DENTYAR-انتقال-با-اطلاعات.html' : 'DENTYAR-انتقال-خالی.html', 'text/html;charset=utf-8', {share:false,folder:'Transfers'});
   toast(result==='shared'?'فایل انتقالی آماده ذخیره یا ارسال شد':result==='cancelled'?'ارسال لغو شد':'فایل انتقالی آماده دریافت است');
 }
 function DEFAULT_STATE_MERGE(){
@@ -3432,9 +3526,86 @@ const LIST_LABELS = {
 let settingsActiveList = 'treatmentTypes';
 let settingsSelectedListItems = [];
 
+function previewNextFileNo(){
+  const firstNumber = 140501010001;
+  let lastAssigned = firstNumber - 1;
+  const stored = Number(STATE?.meta?.fileNoLastAssigned || 0);
+  if(Number.isSafeInteger(stored) && stored >= firstNumber) lastAssigned = Math.max(lastAssigned, stored);
+  (STATE?.patients || []).forEach(p => {
+    const n = Number(toEnDigits(String(p.fileNo || '')).replace(/\D/g,''));
+    if(Number.isSafeInteger(n) && n >= firstNumber) lastAssigned = Math.max(lastAssigned, n);
+  });
+  return String(lastAssigned + 1);
+}
+function renderSecurityPanel(){
+  if(!dentyarIsManager()){ document.getElementById('pageContent').innerHTML='<div class="card"><h3>دسترسی محدود</h3><p>پنل پدافند غیرعامل فقط برای مدیر مطب قابل مشاهده است.</p></div>'; return; }
+  document.getElementById('pageContent').innerHTML=`
+    <div class="pageTitle"><h2>🛡️ پدافند غیرعامل و امنیت اطلاعات</h2><p>کنترل‌های پیشگیرانه برای کاهش خطر دستکاری، افشای اطلاعات و اختلال</p></div>
+    <div class="securityPanel"><h4>بررسی اولیه دستگاه</h4><p id="securityLocalStatus">در حال بررسی قابلیت‌های دستگاه…</p><button class="btn btn-outline btn-block" onclick="runDentyarSecurityCheck()">بررسی دوباره</button></div>
+    <div class="securityPanel"><h4>حفاظت و تداوم خدمت</h4><ul>
+      <li>ثبت اطلاعات به‌صورت محلی ادامه می‌یابد؛ اختلال اینترنت نباید مانع ثبت بیمار و نوبت شود.</li>
+      <li>پشتیبان محلی روزانه در همین دستگاه نگهداری می‌شود؛ یک فایل پشتیبان مستقل نیز باید جدا از گوشی/تبلت نگهداری و بازیابی آن آزمایش شود.</li>
+      <li>از رمز قوی و منحصربه‌فرد استفاده شود؛ رمز، کد مطب و فایل پشتیبان در پیام‌رسان‌ها یا کانال‌های عمومی منتشر نشود.</li>
+      <li>به‌روزرسانی فقط از منبع معتبر نصب شود؛ پیش از جایگزینی برنامه، سازگاری نسخه و امضای APK بررسی شود.</li>
+      <li>محدودکردن دکمه‌ها در رابط کاربری به‌تنهایی امنیت کامل ایجاد نمی‌کند؛ قواعد Firebase و احراز هویت سمت سرور باید نیز محدود باشند.</li>
+      <li>در زمان اختلال شبکه، از حذف داده یا بازنشانی برنامه خودداری شود؛ ابتدا نسخه پشتیبان سالم بررسی و سپس بازیابی آزمایش شود.</li>
+      <li>گزارش‌ها و فایل‌های انتقالی ممکن است شامل داده حساس بیمار باشند؛ فقط به اندازه نیاز صادر و در محل امن نگهداری شوند.</li>
+    </ul><div class="row"><button class="btn btn-primary col" onclick="navigate('backup')">پشتیبان‌گیری و بازیابی</button><button class="btn btn-outline col" onclick="navigate('updates')">پنل به‌روزرسانی</button></div></div>
+    <div class="securityPanel"><h4>محدودیت بررسی</h4><p>این صفحه فقط وضعیت‌های پایه دستگاه را نشان می‌دهد و گواهی امنیت یا نفوذناپذیری نیست. رمزگذاری داده‌ها، قواعد Firebase، احراز هویت کاربران و اعتبارسنجی امضای APK باید جداگانه در زیرساخت پیاده‌سازی و با آزمون واقعی تأیید شوند.</p></div>
+  `;
+  runDentyarSecurityCheck();
+}
+function runDentyarSecurityCheck(){
+  const el=document.getElementById('securityLocalStatus');
+  if(!el) return;
+  const checks=[];
+  checks.push((location.protocol==='https:'||location.protocol==='capacitor:')?'بستر اجرا HTTPS یا برنامه بومی است؛ این مورد به‌تنهایی امنیت را تضمین نمی‌کند.':'هشدار: بستر اجرا HTTPS نیست.');
+  checks.push(typeof indexedDB!=='undefined'?'حافظه محلی IndexedDB در دسترس است.':'هشدار: IndexedDB در دسترس نیست.');
+  checks.push(typeof localStorage!=='undefined'?'حافظه محلی برنامه در دسترس است.':'هشدار: حافظه محلی در دسترس نیست.');
+  checks.push(navigator.onLine?'دستگاه اتصال شبکه را گزارش می‌کند؛ امنیت سرور بررسی نشده است.':'دستگاه فعلاً آفلاین است؛ همگام‌سازی شبکه‌ای انجام نمی‌شود.');
+  el.innerHTML=checks.map(x=>'<div>• '+esc(x)+'</div>').join('');
+}
+
+function renderUpdates(){
+  if(!dentyarIsManager()){ document.getElementById('pageContent').innerHTML='<div class="card"><h3>دسترسی محدود</h3><p>پنل به‌روزرسانی فقط برای مدیر مطب قابل استفاده است.</p></div>'; return; }
+  document.getElementById('pageContent').innerHTML = `
+    <div class="card">
+      <h3>پنل مستقل به‌روزرسانی دنت‌یار</h3>
+      <p style="font-size:12px;color:var(--muted);line-height:1.9">همه بررسی‌ها و اعمال نسخه‌های جدید از این پنل انجام می‌شود. پیش از نصب نسخه جدید، نسخه پشتیبان بگیرید. نصب Android فقط با تأیید خود Android انجام می‌شود.</p>
+      <div class="updateBox">
+        <div class="updateStatus"><span>نسخه نصب‌شده: <b id="currentAppVersion">V59</b></span><span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span></div>
+        <div class="updateHint" id="platformUpdateHint">در حال شناسایی دستگاه و بررسی مسیر به‌روزرسانی…</div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="checkAndApplyWebUpdate()">بررسی به‌روزرسانی وب / PWA</button>
+        <div class="card" id="htmlFileUpdateCard" style="margin-top:10px;margin-bottom:0;padding:10px!important;background:#f9fcfb!important">
+          <h3 style="font-size:15px!important">اعمال فایل اصلاح‌شده وب (index.html)</h3>
+          <p style="font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 8px">فقط برای نسخه وب/PWA. برای نسخه APK از بخش Android استفاده کنید.</p>
+          <input type="file" id="htmlUpdateFileInput" accept=".html,text/html">
+          <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="applyHtmlFileUpdate()">اعمال فایل وب</button>
+          <div id="htmlUpdateStateBadge" class="updateBadge" style="margin-top:8px">آماده</div>
+        </div>
+        <div class="card" id="androidUpdateCard" style="margin-top:10px;margin-bottom:0;padding:10px!important;background:#f9fcfb!important">
+          <h3 style="font-size:15px!important">به‌روزرسانی برنامه Android</h3>
+          <p style="font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 8px">در این بخش نسخه منتشرشده بررسی و دریافت می‌شود. برای نصب، Android تأیید کاربر را می‌خواهد؛ نسخه آزمایشی با شناسه جداگانه نباید جای برنامه اصلی را بگیرد.</p>
+          <button class="btn btn-primary btn-block" onclick="checkAndInstallAndroidUpdate()">بررسی، دریافت و درخواست نصب نسخه Android</button>
+          <div class="grid2" style="margin-top:10px"><div><label>شماره نسخه APK دستی</label><input id="updateVersionInput" placeholder="مثلاً V60"></div><div><label>شرح تغییرات</label><input id="updateNoteInput" placeholder="شرح کوتاه اصلاحات"></div></div>
+          <label style="margin-top:8px">فایل APK</label><input type="file" id="updateApkInput" accept=".apk,application/vnd.android.package-archive">
+          <div class="updateActions"><button class="btn btn-outline" onclick="saveAppUpdatePackage()">ذخیره APK دستی</button><button class="btn btn-outline" onclick="executeSavedAppUpdate()">درخواست نصب APK ذخیره‌شده</button><button class="btn btn-outline" onclick="downloadSavedAppUpdate()">دریافت فایل APK</button></div>
+          <div id="updateStateBadge" class="updateBadge" style="margin-top:8px">آماده</div><div id="savedUpdateInfo" style="font-size:11px;color:var(--muted);margin-top:8px">هنوز فایل به‌روزرسانی ذخیره نشده است.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card"><h3>وضعیت اجرای به‌روزرسانی</h3><p style="font-size:12px;line-height:1.9;color:var(--muted)">سبز شدن ساخت GitHub به‌تنهایی به معنی نصب یا آزمایش موفق همه قابلیت‌ها نیست. پس از انتشار رسمی، نسخه باید در دستگاه آزمایشی جداگانه بررسی شود.</p><button class="btn btn-outline btn-block" onclick="navigate('backup')">تهیه پشتیبان پیش از به‌روزرسانی</button></div>
+  `;
+  loadSavedUpdateInfo();
+  updatePlatformUi();
+}
+
 function renderSettings(){
+  const passiveBackup=(STATE.backupHistory||[]).find(x=>String(x.note||'').includes('پدافند غیرعامل'));
+  const passiveBackupLabel=passiveBackup?toEnDigits(new Date(passiveBackup.ts).toLocaleString('fa-IR')):'هنوز پشتیبان خودکار ثبت نشده است';
   document.getElementById('pageContent').innerHTML = `
     ${window.DentyarSync ? DentyarSync.settingsCardHtml() : ''}
+    ${dentyarIsManager()?'<div class="card"><h3>پدافند غیرعامل و تداوم خدمت</h3><p style="font-size:12px;line-height:1.9;color:var(--muted)">ثبت اطلاعات به‌صورت محلی ادامه می‌یابد؛ قطع اینترنت نباید مانع ثبت بیمار و نوبت شود. پشتیبان محلی روزانه در همین دستگاه نگهداری می‌شود و فایل پشتیبان مستقل نیز باید به‌طور منظم خارج از دستگاه ذخیره شود.</p><div class="kv"><span>آخرین پشتیبان خودکار</span><b>'+passiveBackupLabel+'</b></div><div class="notice">اگر شبکه دسترسی به سرور همگام‌سازی را مسدود کند، انتقال بین دستگاه‌ها تا برقرار شدن مسیر ارتباطی متوقف می‌ماند؛ پشتیبان محلی برای جلوگیری از توقف ثبت اطلاعات است، نه جایگزین همگام‌سازی.</div><button class="btn btn-primary btn-block" onclick="navigate(\'backup\')">تهیه پشتیبان مستقل / بازیابی</button></div>':''}
     <div class="card">
       <h3>تنظیم شاخص‌های داشبورد</h3>
       <p style="font-size:12px;color:var(--muted);line-height:1.9">همه شاخص‌های استاندارد در برنامه موجودند؛ فقط موارد انتخاب‌شده روی داشبورد نمایش داده می‌شوند.</p>
@@ -3454,15 +3625,9 @@ function renderSettings(){
 
     <div class="card">
       <h3>شماره‌گذاری استاندارد پرونده</h3>
-      <p style="font-size:12px;color:var(--muted);line-height:1.9">شماره پرونده به‌صورت <b>تاریخ شمسی روز + سریال چهاررقمی</b> ساخته می‌شود؛ نمونه: ۱۴۰۵۰۶۲۴۰۰۰۱. حالت پیش‌فرض ادامه سریال بین روزهاست.</p>
-      <div class="grid2">
-        <label class="switchLabel"><input type="radio" name="fileNoMode" ${STATE.meta.fileNoMode!=='yearly'?'checked':''} onchange="setFileNoMode('continuous')"><span>ادامه سریال تا همیشه</span></label>
-        <label class="switchLabel"><input type="radio" name="fileNoMode" ${STATE.meta.fileNoMode==='yearly'?'checked':''} onchange="setFileNoMode('yearly')"><span>ریست در ابتدای هر سال</span></label>
-      </div>
-      <div class="notice">تاریخ روز همیشه در ابتدای شماره پرونده درج می‌شود. در صورت ریست دستی، از همان روز سریال از ۰۰۰۱ آغاز خواهد شد.</div>
-      <button class="btn btn-danger btn-block" onclick="modalConfirm('ریست سریال پرونده','از امروز شماره پرونده بعدی با سریال ۰۰۰۱ ساخته می‌شود. ادامه می‌دهید؟',resetFileSerialFromToday)">ریست سریال از امروز</button>
+      <p style="font-size:12px;color:var(--muted);line-height:1.9">شماره پرونده‌ها به‌صورت سریالی و پیوسته تولید می‌شوند. شماره شروع برای نصب تازه <b>۱۴۰۵۰۱۰۱۰۰۰۱</b> است. شماره پرونده‌های موجود تغییر نمی‌کند و ریست سالانه یا دستی انجام نمی‌شود.</p>
+      <div class="notice">شماره بعدی بر اساس آخرین شماره ثبت‌شده محاسبه می‌شود: <b dir="ltr">${toEnDigits(previewNextFileNo())}</b></div>
     </div>
-
     <div class="card">
       <h3>مدیریت فیلدهای فرم‌ها</h3>
       <p style="font-size:12px;color:var(--muted);line-height:1.9">همه اطلاعات استاندارد دو فرم «ثبت نوبت» و «ثبت بیمار» قابل نمایش/عدم نمایش و تعیین وضعیت الزامی هستند. فیلدهای سفارشی نیز می‌توانند اضافه یا حذف شوند.</p>
@@ -3525,48 +3690,10 @@ function renderSettings(){
       <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changePassword()">ذخیره‌ی رمز جدید</button>
     </div>
 
-    <div class="card">
-      <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
-      <div class="updateBox">
-        <div class="updateStatus">
-          <span>نسخه نصب‌شده: <b id="currentAppVersion">V۵۷</b></span>
-          <span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span>
-        </div>
-        <div class="updateHint" id="platformUpdateHint">
-          نسخه‌های جدید DENTYAR از همین بخش «تنظیمات» مدیریت می‌شوند؛ اطلاعات Firebase و داده‌های محلی حفظ می‌شوند. اطلاعات بیماران، نوبت‌ها، تنظیمات و پایگاه داده محلی هنگام بروزرسانی حفظ می‌شوند.
-        </div>
-        <div class="card" id="htmlFileUpdateCard" style="margin-top:10px;margin-bottom:0;padding:10px!important;background:#f9fcfb!important">
-          <h3 style="font-size:15px!important">به‌روزرسانی فایل اصلی DENTYAR (index.html)</h3>
-          <p style="font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 8px">
-            اگر یک نسخه‌ی اصلاح‌شده از فایل برنامه (index.html) دارید، می‌توانید همان فایل را از همین‌جا انتخاب و جایگزین نسخه‌ی فعلی کنید. اطلاعات بیماران، نوبت‌ها، تنظیمات و پایگاه‌داده محلی (localStorage/IndexedDB) کاملاً حفظ می‌شوند چون این اطلاعات به آدرس برنامه وابسته‌اند، نه به خود فایل.
-          </p>
-          <input type="file" id="htmlUpdateFileInput" accept=".html,text/html">
-          <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="applyHtmlFileUpdate()">اعمال نسخه جدید DENTYAR</button>
-          <div id="htmlUpdateStateBadge" class="updateBadge" style="margin-top:8px">آماده</div>
-        </div>
-        <div class="card" id="androidUpdateCard" style="margin-top:10px;margin-bottom:0;padding:10px!important;background:#f9fcfb!important">
-          <h3 style="font-size:15px!important">بسته Android (APK)</h3>
-          <p style="font-size:12px;color:var(--muted);line-height:1.9;margin:4px 0 8px">
-            این بخش مخصوص نسخه Android است. فایل APK نسخه جدید را به‌صورت دستی انتخاب کنید تا ذخیره و برای نصب آماده شود؛ iPhone/iPad فایل APK را نصب نمی‌کند و از نسخه وب/PWA استفاده می‌کند.
-          </p>
-          <div class="grid2">
-            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V57"></div>
-            <div><label>عنوان تغییرات</label><input id="updateNoteInput" placeholder="مثلاً بهبود سازگاری دستگاه‌ها"></div>
-          </div>
-          <label style="margin-top:8px">فایل APK نسخه جدید</label>
-          <input type="file" id="updateApkInput" accept=".apk,application/vnd.android.package-archive">
-          <div class="updateActions">
-            <button class="btn btn-outline" onclick="saveAppUpdatePackage()">ذخیره APK</button>
-            <button class="btn btn-outline" onclick="executeSavedAppUpdate()">اجرای نصب Android</button>
-          </div>
-          <div id="updateStateBadge" class="updateBadge" style="margin-top:8px">آماده</div>
-          <div id="savedUpdateInfo" style="font-size:11px;color:var(--muted);margin-top:8px">هنوز فایل بروزرسانی Android ذخیره نشده است.</div>
-        </div>
-      </div>
-    </div>
+
+    ${dentyarIsManager()?'<div class="card"><h3>مدیریت دسترسی کاربران</h3><p style="font-size:12px;color:var(--muted);line-height:1.9">برای منشی رمز جداگانه بسازید و رمز اصلی مدیر را در اختیار او نگذارید. منشی می‌تواند اطلاعات را ثبت کند اما گزارش‌ها و خلاصه مالی را نمی‌بیند. حساب‌های این بخش روی همین دستگاه ذخیره می‌شوند.</p><button class="btn btn-primary btn-block" onclick="showStaffManager()">مدیریت کاربران و نقش‌ها</button></div>':''}
+
   `;
-  loadSavedUpdateInfo();
-  updatePlatformUi();
 }
 function setTreatmentPrice(type, value){
   STATE.treatmentPrices = STATE.treatmentPrices || {};
@@ -3580,9 +3707,17 @@ function refreshDentyarWeb(){
   try{ if('caches' in window){ caches.keys().then(keys=>Promise.all(keys.filter(k=>/^dentyar-/i.test(k)).map(k=>caches.delete(k)))).finally(()=>location.replace(location.href.split('#')[0]+'?v='+Date.now())); return; } }catch(e){}
   location.replace(location.href.split('#')[0]+'?v='+Date.now());
 }
+function isDentyarNativeApp(){
+  try{
+    const C=window.Capacitor;
+    if(C && typeof C.isNativePlatform==='function' && C.isNativePlatform()) return true;
+    if(C && typeof C.getPlatform==='function' && String(C.getPlatform()).toLowerCase()==='android') return true;
+  }catch(e){}
+  return false;
+}
 function getDentyarPlatform(){
   try{
-    if(window.Capacitor && typeof window.Capacitor.isNativePlatform==='function' && window.Capacitor.isNativePlatform()){
+    if(isDentyarNativeApp()){
       return String(window.Capacitor.getPlatform?.()||'android').toLowerCase();
     }
   }catch(e){}
@@ -3603,15 +3738,16 @@ function updatePlatformUi(){
   if(badge) badge.textContent=names[p]||'مرورگر وب';
   if(hint){
     hint.textContent = p==='android'
-      ? 'این نسخه Android است. جایگزینی فایل برنامه و نصب APK هر دو به‌صورت دستی از همین بخش تنظیمات انجام می‌شوند؛ اطلاعات محلی DENTYAR حفظ می‌شود.'
-      : 'جایگزینی فایل برنامه (index.html) به‌صورت دستی از همین بخش تنظیمات انجام می‌شود. در iPhone/iPad و رایانه‌ها APK نصب نمی‌شود و نسخه وب/PWA مسیر استاندارد اجرا و بروزرسانی است.';
+      ? 'این نسخه Android است. پیش از نصب APK جدید، نسخه پشتیبان بگیرید و سازگاری امضای برنامه را تأیید کنید؛ حفظ داده‌ها تا انجام این بررسی تضمین‌شده نیست.'
+      : 'در نسخه وب/PWA، پیش از اعمال فایل جدید نسخه پشتیبان تهیه کنید. در iPhone/iPad و رایانه‌ها APK نصب نمی‌شود؛ مسیر وب باید جداگانه آزمایش شود.';
   }
   if(android) android.style.display = p==='android' ? '' : 'none';
 }
 async function checkAndApplyWebUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','بررسی به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('dentyarPlatformBadge');
   if(badge) badge.textContent='در حال بررسی…';
-  const manifestUrl='https://raw.githubusercontent.com/dentyar1349-png/DENTYAR-TEST/main/update.json?ts='+Date.now();
+  const manifestUrl='https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now();
   try{
     const res=await fetch(manifestUrl,{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!res.ok) throw new Error('update manifest '+res.status);
@@ -3650,6 +3786,7 @@ async function checkAndApplyWebUpdate(){
    داده‌های بیماران/نوبت‌ها/تنظیمات (localStorage و IndexedDB) به آدرس برنامه وابسته‌اند،
    نه به فایل HTML؛ بنابراین با این جایگزینی از بین نمی‌روند. */
 async function applyHtmlFileUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','اعمال نسخه جدید فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('htmlUpdateStateBadge');
   const input=document.getElementById('htmlUpdateFileInput');
   const file=input?.files?.[0];
@@ -3698,10 +3835,11 @@ async function applyHtmlFileUpdate(){
 }
 
 async function checkAndInstallAndroidUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','بررسی به‌روزرسانی Android فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('updateStateBadge');
   if(badge) badge.textContent='در حال بررسی…';
   try{
-    const r=await fetch('https://raw.githubusercontent.com/dentyar1349-png/DENTYAR-TEST/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch('https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
     const m=await r.json();
     const remoteVersion=String(m.version||m.android?.version||'').toUpperCase();
@@ -3743,6 +3881,7 @@ async function checkAndInstallAndroidUpdate(){
 }
 
 function saveAppUpdatePackage(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','مدیریت به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const input=document.getElementById('updateApkInput');
   const file=input?.files?.[0];
   const version=(document.getElementById('updateVersionInput')?.value||'').trim().toUpperCase();
@@ -3774,6 +3913,7 @@ function saveAppUpdatePackage(){
   reader.readAsArrayBuffer(file);
 }
 async function executeSavedAppUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','نصب به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const req=indexedDB.open('dentyar_updates_v1',1);
   req.onupgradeneeded=e=>{ if(!e.target.result.objectStoreNames.contains('updates')) e.target.result.createObjectStore('updates',{keyPath:'id'}); };
   req.onsuccess=async e=>{
@@ -3784,23 +3924,15 @@ async function executeSavedAppUpdate(){
       try{
         const C=window.Capacitor;
         if(C && C.isNativePlatform && C.isNativePlatform()){
-          const fs=C.registerPlugin ? C.registerPlugin('Filesystem') : null;
-          const opener=C.registerPlugin ? C.registerPlugin('FileOpener') : null;
-          if(!fs || !fs.writeFile) throw new Error('Filesystem unavailable');
+          const nativePlugin=(C.Plugins&&C.Plugins.DentyarNative)||(C.registerPlugin?C.registerPlugin('DentyarNative'):null);
+          if(!nativePlugin || typeof nativePlugin.installApk!=='function') throw new Error('Native APK installer is unavailable');
           const arr=new Uint8Array(await rec.blob.arrayBuffer());
           let binary=''; const chunk=0x8000;
           for(let p=0;p<arr.length;p+=chunk) binary+=String.fromCharCode.apply(null,arr.subarray(p,p+chunk));
           const data=btoa(binary);
           const safeName=String(rec.fileName||('DENTYAR-'+rec.version+'.apk')).replace(/[\\/:*?"<>|]/g,'_');
-          const path='DENTYAR/'+safeName;
-          await fs.writeFile({path,data,directory:'CACHE',recursive:true});
-          if(fs.getUri && opener && opener.openFile){
-            const u=await fs.getUri({path,directory:'CACHE'});
-            await opener.openFile({path:String(u.uri||u.path),mimeType:'application/vnd.android.package-archive'});
-            toast('نصب بروزرسانی آغاز شد؛ تأیید نهایی با اندروید انجام می‌شود');
-          }else{
-            toast('APK در حافظه موقت برنامه ذخیره شد؛ اجرای نصب را دوباره بزنید');
-          }
+          await nativePlugin.installApk({filename:safeName,data});
+          toast('درخواست نصب به اندروید ارسال شد؛ نصب فقط پس از تأیید سیستم انجام می‌شود.');
         }else{
           const url=URL.createObjectURL(rec.blob);
           const a=document.createElement('a'); a.href=url; a.download=rec.fileName||('DENTYAR-'+rec.version+'.apk'); a.rel='noopener';
@@ -3842,9 +3974,40 @@ function saveSmsTemplates(){
   saveState();
   toast('قالب پیامک‌ها ذخیره شد');
 }
+
+function showStaffManager(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
+  const users=STATE.meta.appUsers||[];
+  const list=users.map(u=>'<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span>'+esc(u.name)+' — '+(u.role==='dentist'?'دندان‌پزشک':'منشی')+'</span><button class="btn btn-danger btn-sm" onclick="deleteStaffUser(\''+esc(u.id)+'\')">حذف</button></div>').join('')||'<div class="empty">کاربر جداگانه‌ای تعریف نشده است.</div>';
+  showModal('<h3>مدیریت دسترسی کاربران</h3><label>نام کاربر</label><input id="staffUserName" placeholder="مثلاً منشی مطب"><label>رمز ورود ۸ رقمی</label><input id="staffUserPin" type="password" inputmode="numeric" maxlength="8" placeholder="۸ رقم"><label>نقش کاربر</label><select id="staffUserRole"><option value="receptionist">منشی — بدون دسترسی به گزارش‌ها</option><option value="dentist">دندان‌پزشک — دسترسی به گزارش‌ها</option></select><button class="btn btn-primary btn-block" style="margin-top:10px" onclick="saveStaffUser()">ذخیره کاربر</button><div style="margin-top:12px">'+list+'</div>');
+}
+function saveStaffUser(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
+  const name=(document.getElementById('staffUserName')?.value||'').trim();
+  const pin=toEnDigits((document.getElementById('staffUserPin')?.value||'').trim());
+  const role=document.getElementById('staffUserRole')?.value||'receptionist';
+  if(!name){ modalAlert('خطا','نام کاربر را وارد کنید.'); return; }
+  if(toEnDigits(STATE.meta.password||'')==='12345678'){ modalAlert('ابتدا رمز مدیر را تغییر دهید','برای جلوگیری از ورود منشی با رمز پیش‌فرض، ابتدا رمز اصلی مدیر را در تنظیمات تغییر دهید؛ سپس حساب منشی را بسازید.'); return; }
+  if(!/^\d{8}$/.test(pin)){ modalAlert('خطا','رمز کاربر باید دقیقاً ۸ رقم باشد.'); return; }
+  if(pin===toEnDigits(STATE.meta.password||'')){ modalAlert('خطا','رمز کاربر نباید با رمز اصلی مدیر یکسان باشد.'); return; }
+  if(!['dentist','receptionist'].includes(role)){ modalAlert('خطا','نقش انتخاب‌شده معتبر نیست.'); return; }
+  const users=STATE.meta.appUsers||(STATE.meta.appUsers=[]);
+  if(users.some(u=>toEnDigits(u.pin||'')===pin && String(u.name||'').toLowerCase()!==name.toLowerCase())){ modalAlert('خطا','این رمز قبلاً برای کاربر دیگری استفاده شده است.'); return; }
+  const existing=users.find(u=>String(u.name||'').toLowerCase()===name.toLowerCase());
+  if(existing){ existing.pin=pin; existing.role=role; existing.active=true; }
+  else users.push({id:uid('usr'),name,pin,role,active:true,createdAt:Date.now()});
+  saveState(); closeModal(); toast('اطلاعات کاربر ذخیره شد'); renderSettings();
+}
+function deleteStaffUser(id){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
+  modalConfirm('حذف کاربر','آیا از حذف این کاربر مطمئن هستید؟',()=>{ STATE.meta.appUsers=(STATE.meta.appUsers||[]).filter(u=>u.id!==id); saveState(); showStaffManager(); toast('کاربر حذف شد'); });
+}
+
 function changePassword(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','تغییر رمز اصلی فقط برای مدیر مطب مجاز است.'); return; }
   const v = toEnDigits(document.getElementById('newPassInput').value.trim());
   if(v.length!==8 || !/^\d{8}$/.test(v)){ modalAlert('خطا','رمز عبور باید دقیقاً ۸ رقم باشد.'); return; }
+  if((STATE.meta.appUsers||[]).some(u=>toEnDigits(u.pin||'')===v)){ modalAlert('خطا','رمز جدید با رمز یکی از کاربران یکسان است؛ رمز دیگری انتخاب کنید.'); return; }
   modalConfirm('تغییر رمز عبور','آیا از تغییر رمز عبور مطمئن هستید؟', ()=>{
     STATE.meta.password = v; saveState(); toast('رمز عبور تغییر کرد');
   });
@@ -3875,10 +4038,7 @@ function isProfileUnlocked(){
   return sessionStorage.getItem('lb_profile_unlocked') === '1';
 }
 function renderProfile(){
-  if(!isProfileUnlocked()){
-    renderProfileGate();
-    return;
-  }
+  // پروفایل عادی متعلق به مطب است؛ مدیریت محرمانه سامانه همچنان با کد مستقل محافظت می‌شود.
   document.getElementById('pageContent').innerHTML = `
     <div class="card">
       <h3>لوگوی کلینیک</h3>
@@ -3935,14 +4095,15 @@ function renderProfile(){
     </div>
 
     <div class="card">
-      <h3>رمز دسترسی به پروفایل</h3>
-      <p style="font-size:11px;color:var(--muted)">این رمز جدا از رمز ورود روزمره است و فقط برای ورود به همین صفحه استفاده می‌شود.</p>
-      <label>رمز جدید (۸ رقم)</label>
-      <input type="text" id="newProfilePassInput" maxlength="8" placeholder="********">
-      <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changeProfilePassword()">ذخیره‌ی رمز جدید</button>
+      <h3>ارسال دنت‌یار به دستگاه دیگر</h3>
+      <p style="font-size:12px;color:var(--muted);line-height:1.8">برای انتقال به دستگاه دیگر، فقط در صورت نیاز و با انتخاب آگاهانه، اطلاعات مطب را نیز همراه برنامه ارسال کنید.</p>
+      <div class="grid2">
+        <button class="btn btn-outline" onclick="shareAppTransfer(false)">ارسال برنامه بدون اطلاعات</button>
+        <button class="btn btn-primary" onclick="shareAppTransfer(true)">ارسال برنامه همراه اطلاعات</button>
+      </div>
     </div>
 
-    <button class="btn btn-outline btn-block" onclick="lockProfile()">خروج از پروفایل</button>
+    <button class="btn btn-outline btn-block" onclick="lockProfile()">بازگشت</button>
   `;
 }
 function renderProfileGate(){
@@ -4046,7 +4207,7 @@ function creatorLogoTap(){
 }
 function isCreatorUnlocked(){ return sessionStorage.getItem('dentyar_creator_unlocked')==='1'; }
 function showCreatorGate(){
-  showModal(`<h3>ورود به مدیریت اپلیکیشن</h3><p class="notice">این بخش محرمانه و خارج از منوی عمومی است.</p><label>رمز سازنده (۸ رقم)</label><input type="password" id="creatorPassInput" maxlength="8" inputmode="numeric" style="text-align:center;letter-spacing:4px"><div id="creatorPassError" style="color:var(--danger);font-size:12px;height:18px;margin-top:7px"></div><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="submitCreatorGate()">ورود سازنده</button>`);
+  showModal(`<h3>ورود به مدیریت سامانه</h3><p class="notice">این بخش ویژه تیم فنی و پشتیبانی است و خارج از منوی عمومی قرار دارد.</p><label>رمز سازنده (۸ رقم)</label><input type="password" id="creatorPassInput" maxlength="8" inputmode="numeric" style="text-align:center;letter-spacing:4px"><div id="creatorPassError" style="color:var(--danger);font-size:12px;height:18px;margin-top:7px"></div><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="submitCreatorGate()">ورود سازنده</button>`);
   setTimeout(()=>document.getElementById('creatorPassInput')?.focus(),100);
 }
 function submitCreatorGate(){
@@ -4058,7 +4219,7 @@ function lockCreator(){ sessionStorage.removeItem('dentyar_creator_unlocked'); n
 function renderAppAdmin(){
   if(!isCreatorUnlocked()){ showCreatorGate(); return; }
   document.getElementById('pageContent').innerHTML=`
-    <div class="card"><h3>مدیریت محرمانه اپلیکیشن</h3><div class="notice">این پنل در ناوبری عمومی وجود ندارد و فقط با رمز مستقل سازنده قابل دسترسی است.</div></div>
+    <div class="card"><h3>مدیریت سامانه</h3><div class="notice">این پنل محرمانه است و فقط با کد مستقل مدیریت سامانه قابل دسترسی است.</div></div>
     <div class="card"><h3>کنترل دسترسی پنل سازنده</h3><label><input type="checkbox" ${STATE.meta.appAdminEnabled!==false?'checked':''} onchange="STATE.meta.appAdminEnabled=this.checked;saveState();"> فعال بودن دسترسی سازنده</label><br><label><input type="checkbox" ${STATE.meta.appAdminHidden!==false?'checked':''} onchange="STATE.meta.appAdminHidden=this.checked;saveState();"> مخفی بودن از منو</label><p style="font-size:11px;color:var(--muted)">این دو گزینه فقط وضعیت دسترسی و نمایش را کنترل می‌کنند.</p></div>
     <div class="card"><h3>تغییر رمز سازنده</h3><label>رمز جدید (۸ رقم)</label><input type="password" id="newCreatorPass" maxlength="8" inputmode="numeric"><button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changeCreatorPassword()">ذخیره رمز جدید</button></div>
     <div class="card"><h3>مدیریت ساختار فرم‌ها</h3><p style="font-size:12px;color:var(--muted);line-height:1.9">از اینجا نیز می‌توانید ساختار فیلدهای دو فرم اصلی را کنترل کنید؛ تنظیمات عادی همین قابلیت را در اختیار مدیر مطب قرار می‌دهد.</p></div>
@@ -4682,6 +4843,7 @@ th,td{padding:7px 6px!important;font-size:12px!important;}
 .pinPad button{color:var(--yz-navy)!important;}
 .pinPad button.unlockBtn{background:linear-gradient(180deg,var(--yz-green),var(--yz-green2))!important;color:#fff!important;}
 #lockScreen h2{color:var(--yz-navy)!important;}
+#lockScreen .lockSlogan .brandFa{color:var(--yz-navy)!important;}
 #lockScreen .lockSlogan,#lockScreen .lockSlogan .brandEn{color:var(--yz-gold)!important;}
 #topHeader .appName,#topHeader .clinicSideName{color:var(--yz-navy)!important;}
 #topHeader .appSlogan{color:var(--yz-gold)!important;}
@@ -4919,29 +5081,31 @@ document.addEventListener('blur',e=>{
 (function(){
   const SYNC = {};
   let fb=null, dbm=null, fbApp=null, db=null, rootRef=null;
-  let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false;
+  let subs=[], deviceId=null, pushTimer=null, retryTimer=null, merging=false, connected=false, started=false;
   const FB_APP_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
   const PUSHED_KEY='dentyar_sync_pushed_ids';
 
   SYNC.cfg = function(){ return (STATE && STATE.meta && STATE.meta.sync) ? STATE.meta.sync : null; };
   SYNC.isReady = function(){ return started && connected; };
+  SYNC.isMerging = function(){ return merging; };
+  SYNC.lastError = '';
 
   function ensureDeviceId(){
     let id = localStorage.getItem('dentyar_device_id');
     if(!id){ id='dev_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('dentyar_device_id', id); }
     deviceId = id; return id;
   }
-  function sensitiveKeys(){ return ['password','profilePassword','appAdminPassword','appAdminEnabled','appAdminHidden','sync','_syncUpdatedAt']; }
+  function sensitiveKeys(){ return ['password','profilePassword','appAdminPassword','appAdminEnabled','appAdminHidden','appUsers','sync','_syncUpdatedAt']; }
   function sanitizedMeta(){
     const m = JSON.parse(JSON.stringify(STATE.meta||{}));
     sensitiveKeys().forEach(function(k){ delete m[k]; });
     return m;
   }
   async function loadSdk(){
-    if(fb) return;
-    fb = await import(FB_APP_URL);
-    dbm = await import(FB_DB_URL);
+    // Load each module independently so a partial network failure can recover on retry.
+    if(!fb) fb = await import(FB_APP_URL);
+    if(!dbm) dbm = await import(FB_DB_URL);
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
   function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
@@ -4949,28 +5113,37 @@ document.addEventListener('blur',e=>{
   SYNC.connect = async function(){
     const cfg = SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig){ return; }
+    if(started) return;
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
     try{
       await loadSdk();
       if(fbApp){ try{ await fb.deleteApp(fbApp); }catch(_){} }
       fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
       db = dbm.getDatabase(fbApp);
-      try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
+      // Patient records remain local-first in localStorage/IndexedDB; cloud sync is retried separately.
       ensureDeviceId();
       dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
-        { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
-      subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); SYNC.renderStatus&&SYNC.renderStatus(); }));
+        { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() }).catch(function(e){ console.warn('Dentyar device registration failed:',e); });
+      subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){ SYNC.lastError=''; SYNC.schedulePush(true); } SYNC.renderStatus&&SYNC.renderStatus(); }));
+      setTimeout(function(){ if(!SYNC.isReady()){ SYNC.lastError='اتصال Firebase برقرار نشد؛ شبکه، VPN و تنظیمات اتصال را بررسی کنید.'; SYNC.renderStatus&&SYNC.renderStatus(); } },12000);
       ['patients','dentists','appointments'].forEach(subscribeCollection);
       ['lists','formFields','treatmentPrices'].forEach(subscribeValue);
       subscribeValue('meta');
       ['patients','dentists','appointments'].forEach(subscribeTombstones);
       started=true;
       SYNC.renderStatus&&SYNC.renderStatus();
-      toast('همگام‌سازی چنددستگاهی فعال شد');
+      toast('تنظیمات همگام‌سازی بارگذاری شد؛ وضعیت اتصال واقعی در همین بخش نمایش داده می‌شود.');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
-    }catch(e){ console.error('DentyarSync connect failed', e); toast('اتصال همگام‌سازی ناموفق بود: '+(e&&e.message||e)); }
+    }catch(e){
+      SYNC.lastError=String(e&&e.message||e); console.error('DentyarSync connect failed', e); SYNC.renderStatus&&SYNC.renderStatus();
+      if(retryTimer) clearTimeout(retryTimer);
+      retryTimer=setTimeout(function(){ retryTimer=null; const next=SYNC.cfg(); if(next&&next.enabled&&!started) SYNC.connect(); },15000);
+      toast('اتصال همگام‌سازی برقرار نشد؛ اطلاعات محلی حفظ می‌شود و تلاش مجدد خودکار انجام خواهد شد.');
+    }
   };
 
   SYNC.disconnect = function(){
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
     clearSubs();
     if(db){ try{ dbm.goOffline(db); }catch(_){} }
     if(fbApp){ try{ fb.deleteApp(fbApp); }catch(_){} }
@@ -5063,35 +5236,42 @@ document.addEventListener('blur',e=>{
       await dbm.set(dbm.ref(db, b+'/records/formFields'), ff);
       const tp = JSON.parse(JSON.stringify(STATE.treatmentPrices||{})); tp._updatedAt = now;
       await dbm.set(dbm.ref(db, b+'/records/treatmentPrices'), tp);
-      ['patients','dentists','appointments'].forEach(function(coll){
+      for(const coll of ['patients','dentists','appointments']){
         const arr = STATE[coll]||[];
         const curIds = arr.map(function(x){ return x.id; });
-        arr.forEach(function(rec){
+        await Promise.all(arr.map(function(rec){
           const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
-          dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
-        });
+          return dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
+        }));
         const prev = prevIds[coll]||[];
-        prev.forEach(function(id){ if(curIds.indexOf(id)===-1){
-          dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null);
-          dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now });
-        } });
+        const deleted = prev.filter(function(id){ return curIds.indexOf(id)===-1; });
+        await Promise.all(deleted.map(function(id){
+          return Promise.all([
+            dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null),
+            dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now })
+          ]);
+        }));
         nextIds[coll] = curIds;
-      });
+      }
       localStorage.setItem(PUSHED_KEY, JSON.stringify(nextIds));
-      STATE.meta.sync.lastSyncAt = now; saveState();
+      // Update the local sync timestamp without calling saveState(), which would schedule
+      // another push and create an endless push loop.
+      STATE.meta.sync.lastSyncAt = now;
+      localStorage.setItem(APP_KEY, JSON.stringify(STATE));
+      if(typeof indexedDB !== 'undefined') idbPutAll(STATE).catch(function(e){ console.warn('IndexedDB sync timestamp mirror failed:',e); });
       SYNC.renderStatus&&SYNC.renderStatus();
     }catch(e){ console.warn('DentyarSync push failed', e); }
   }
 
   SYNC.renderStatus = function(){
     const b=document.getElementById('syncStatusBadge');
-    if(b){ b.textContent = SYNC.isReady() ? 'متصل' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال'); }
+    if(b){ b.textContent = SYNC.isReady() ? 'متصل' : (SYNC.lastError ? 'خطا در اتصال' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در انتظار اتصال…' : 'غیرفعال')); if(SYNC.lastError) b.title=SYNC.lastError; else b.removeAttribute('title'); }
   };
 
   SYNC.settingsCardHtml = function(){
     const cfg = SYNC.cfg()||{ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null };
     const fbCfg = cfg.firebaseConfig||{};
-    const ls = cfg.lastSyncAt ? new Date(cfg.lastSyncAt).toLocaleString('fa-IR') : '—';
+    const ls = cfg.lastSyncAt ? toEnDigits(new Date(cfg.lastSyncAt).toLocaleString('fa-IR')) : '—';
     const ready = SYNC.isReady();
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
