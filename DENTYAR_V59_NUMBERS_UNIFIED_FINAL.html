@@ -3867,9 +3867,9 @@ async function executeSavedAppUpdate(){
           const safeName=String(rec.fileName||('DENTYAR-'+rec.version+'.apk')).replace(/[\\/:*?"<>|]/g,'_');
           const path='DENTYAR/'+safeName;
           await fs.writeFile({path,data,directory:'CACHE',recursive:true});
-          if(fs.getUri && opener && opener.openFile){
+          if(fs.getUri && opener && typeof opener.open==='function'){
             const u=await fs.getUri({path,directory:'CACHE'});
-            await opener.openFile({path:String(u.uri||u.path),mimeType:'application/vnd.android.package-archive'});
+            await opener.open({filePath:String(u.uri||u.path),contentType:'application/vnd.android.package-archive',openWithDefault:true});
             toast('نصب بروزرسانی آغاز شد؛ تأیید نهایی با اندروید انجام می‌شود');
           }else{
             toast('APK در حافظه موقت برنامه ذخیره شد؛ اجرای نصب را دوباره بزنید');
@@ -4753,6 +4753,7 @@ th,td{padding:7px 6px!important;font-size:12px!important;}
 .pinPad button{color:var(--yz-navy)!important;}
 .pinPad button.unlockBtn{background:linear-gradient(180deg,var(--yz-green),var(--yz-green2))!important;color:#fff!important;}
 #lockScreen h2{color:var(--yz-navy)!important;}
+#lockScreen .lockSlogan .brandFa{color:var(--yz-navy)!important;}
 #lockScreen .lockSlogan,#lockScreen .lockSlogan .brandEn{color:var(--yz-gold)!important;}
 #topHeader .appName,#topHeader .clinicSideName{color:var(--yz-navy)!important;}
 #topHeader .appSlogan{color:var(--yz-gold)!important;}
