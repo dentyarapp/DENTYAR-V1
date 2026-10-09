@@ -1,9 +1,9 @@
 {
   "version": "V59",
-  "notes": "Manifest رسمی بررسی نسخه دنت‌یار. شماره نسخه و نشانی فایل APK فقط پس از انتشار و آزمون نسخه رسمی به‌روزرسانی می‌شود.",
+  "notes": "نشانی عمومی بررسی نسخه و بسته Android. شماره نسخه پس از تأیید ساخت و انتشار رسمی به‌روزرسانی می‌شود.",
   "android": {
     "version": "V59",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/latest/download/DENTYAR-update.apk",
+    "apkUrl": "https://dentyarapp.github.io/DENTYAR-V1/DENTYAR-update.apk",
     "fileName": "DENTYAR-update.apk"
   },
   "web": {
