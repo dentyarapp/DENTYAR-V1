@@ -268,7 +268,7 @@
   h1{font-size:22px!important;} h2{font-size:19px!important;} h3{font-size:17px!important;} h4{font-size:16px!important;}
   .clinicName{font-size:21px!important;font-weight:900!important;color:#123b5d!important;}
   .brandEn{font-family:var(--font-en)!important;font-size:14px!important;font-weight:700!important;letter-spacing:.35px;}
-  .brandFa{font-size:15px!important;font-weight:900!important;color:#0f6f78!important;}
+  .brandFa{font-size:15px!important;font-weight:900!important;color:#0f766e!important;}
   #topHeader .clinicSlogan .brandEn{font-size:13px!important;font-weight:700!important;}
   input,select,textarea{font-family:var(--font-fa)!important;font-size:17px!important;font-weight:600!important;color:#163446!important;background:#fff;}
   input::placeholder,textarea::placeholder{color:#71838c!important;opacity:1!important;font-weight:500!important;}
@@ -1527,7 +1527,7 @@ function dentyarReportAction(){
 
     const share =
       makeButton(
-        'Share کردن گزارش',
+        'شیر کردن گزارش',
         'btn-gold'
       );
 
@@ -1709,9 +1709,10 @@ document.addEventListener('keydown', function(e){
   const app=document.getElementById('app');
   if(!lock || lock.style.display==='none' || (app && app.style.display==='block')) return;
   if(e.ctrlKey || e.altKey || e.metaKey) return;
-  if(/^[0-9]$/.test(e.key)){
+  const keyDigit=/^[0-9]$/.test(e.key)?e.key:(/^Numpad[0-9]$/.test(e.code||'')?(e.code||'').slice(-1):null);
+  if(keyDigit!==null){
     e.preventDefault();
-    pinPress(e.key);
+    pinPress(keyDigit);
   } else if(e.key==='Backspace'){
     e.preventDefault();
     pinBuffer=pinBuffer.slice(0,-1);
@@ -2293,7 +2294,7 @@ function saveAppointment(){
   const appointmentPhone=toEnDigits(String(document.getElementById('apPhone').value||'')).replace(/\D/g,'');
   const appointmentDate=document.getElementById('apDate').value || todayISO();
   const appointmentTime=document.getElementById('apTime').value || '';
-  const duplicateAppointment=(STATE.appointments||[]).find(a=>a.status!=='ثبت‌شده' && String(a.name||'').trim().toLowerCase()===name.toLowerCase() && toEnDigits(String(a.phone||'')).replace(/\D/g,'')===appointmentPhone && (a.date||'')===appointmentDate && (a.time||'')===appointmentTime && appointmentPhone.length>=7);
+  const duplicateAppointment=(STATE.appointments||[]).find(a=>!['لغو شده','لغوشده','لغو‌شده','حذف شده','حذف‌شده'].includes(String(a.status||'').trim()) && String(a.name||'').trim().toLowerCase()===name.toLowerCase() && toEnDigits(String(a.phone||'')).replace(/\D/g,'')===appointmentPhone && (a.date||'')===appointmentDate && (a.time||'')===appointmentTime && appointmentPhone.length>=7);
   if(duplicateAppointment){ modalAlert('نوبت تکراری','برای همین بیمار در همین تاریخ و ساعت، نوبت ثبت شده است. نوبت قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('appointment').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('appointmentCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
   if(missingCustom){ modalAlert('خطا',`فیلد «${esc(missingCustom.label)}» الزامی است.`); return; }
@@ -3282,14 +3283,24 @@ function exportReportPDF(){
   // در مرورگر معمولی (قبل از نصب) رفتار قبلی حفظ می‌شود: نمایش مستقیم + پنجره‌ی چاپ.
   const isInstalledApp = getDentyarPlatform()!=='android-web' && getDentyarPlatform()!=='windows' && getDentyarPlatform()!=='macos' && getDentyarPlatform()!=='linux';
   if(isInstalledApp){
-    const bytes = new TextEncoder().encode(html);
-    downloadBlob(bytes, `گزارش-${todayJalaliCompact()}.html`, 'text/html', {share:false}).then(result=>{
-      toast(result==='shared'?'فایل گزارش آماده شد':result==='cancelled'?'ذخیره لغو شد':'فایل گزارش مستقیم ذخیره شد؛ برای PDF آن را با مرورگر/چاپ باز کنید');
-    });
+    (async()=>{
+      try{
+        const action=await dentyarReportAction();
+        if(action==='cancel') return;
+        const bytes=new TextEncoder().encode(html);
+        const result=await downloadBlob(bytes,`گزارش-${todayJalaliCompact()}.html`,'text/html',{share:action==='share'});
+        if(result==='cancelled') return;
+        if(result==='saved') toast('گزارش مستقیماً ذخیره شد؛ برای تبدیل به PDF آن را در مرورگر باز کنید.');
+        else if(result==='shared') toast('فایل گزارش برای اشتراک‌گذاری آماده شد.');
+      }catch(e){
+        console.error('DENTYAR PDF/HTML report export failed',e);
+        toast('ساخت یا دریافت گزارش ناموفق بود؛ دوباره تلاش کنید.');
+      }
+    })();
     return;
   }
   showDentyarPrintOverlay(html);
-  toast('گزارش PDF آماده است؛ در پنجره چاپ گزینه «ذخیره به‌صورت PDF» را انتخاب کنید');
+  toast('گزارش آماده است؛ در پنجره چاپ گزینه «ذخیره به‌صورت PDF» را انتخاب کنید');
 }
 
 /* ===================== پشتیبان‌گیری ===================== */
