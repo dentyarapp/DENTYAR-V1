@@ -1947,7 +1947,7 @@ function renderDashboard(){
   if(saved.length<4 || saved.some(k=>['completed','levels','surfaces'].includes(k))){ saved=curated; }
   const financialMetricKeys=['revenue','received','debts','insurance','discounts','cash','nonCash','refunds'];
   const keys=(dentyarCanViewReports()?saved:saved.filter(k=>!financialMetricKeys.includes(k))).slice(0,10);
-  const statHtml=keys.map(k=>{const d=metricDefs[k];const nav=d[2]==='reports'?"navigate('reports')":`navigate('${d[2]}')`;return `<button type="button" class="statCard ${d[4]} clickable" onclick="${nav}" aria-label="${esc(d[0])}"><span class="iconBadge">${d[3]}</span><span class="num">${esc(faDigits(d[1]))}</span><span class="lbl">${esc(d[0])}</span></button>`}).join('');
+  const statHtml=keys.map(k=>{const d=metricDefs[k];const nav=d[2]==='reports'?(dentyarCanViewReports()?"navigate('reports')":"navigate('patients')"):`navigate('${d[2]}')`;return `<button type="button" class="statCard ${d[4]} clickable" onclick="${nav}" aria-label="${esc(d[0])}"><span class="iconBadge">${d[3]}</span><span class="num">${esc(faDigits(d[1]))}</span><span class="lbl">${esc(d[0])}</span></button>`}).join('');
   const financeItems=dentyarCanViewReports() ? [
     ['مبلغ ناخالص خدمات',totals.gross,'gross'],['تخفیف',totals.discount,'discount'],['سهم بیمه',totals.insurance,'insurance'],
     ['خالص قابل پرداخت',totals.net,'net'],['دریافت نقدی',totals.cash,'cash'],['دریافت غیرنقدی',totals.nonCash,'nonCash'],
@@ -3465,7 +3465,7 @@ function renderSettings(){
     <div class="card">
       <h3>شماره‌گذاری استاندارد پرونده</h3>
       <p style="font-size:12px;color:var(--muted);line-height:1.9">شماره پرونده‌ها به‌صورت سریالی و پیوسته تولید می‌شوند. شماره شروع برای نصب تازه <b>۱۴۰۵۰۱۰۱۰۰۰۱</b> است. شماره پرونده‌های موجود تغییر نمی‌کند و ریست سالانه یا دستی انجام نمی‌شود.</p>
-      <div class="notice">شماره بعدی بر اساس آخرین شماره ثبت‌شده محاسبه می‌شود: <b dir="ltr">${faDigits(previewNextFileNo())}</b></div>
+      <div class="notice">شماره بعدی بر اساس آخرین شماره ثبت‌شده محاسبه می‌شود: <b dir="ltr">${toEnDigits(previewNextFileNo())}</b></div>
     </div>
     <div class="card">
       <h3>مدیریت فیلدهای فرم‌ها</h3>
@@ -4988,7 +4988,7 @@ document.addEventListener('blur',e=>{
       db = dbm.getDatabase(fbApp);
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       ensureDeviceId();
-      dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
+      await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
       subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); SYNC.renderStatus&&SYNC.renderStatus(); }));
       ['patients','dentists','appointments'].forEach(subscribeCollection);
@@ -4997,7 +4997,7 @@ document.addEventListener('blur',e=>{
       ['patients','dentists','appointments'].forEach(subscribeTombstones);
       started=true;
       SYNC.renderStatus&&SYNC.renderStatus();
-      toast('همگام‌سازی چنددستگاهی فعال شد');
+      toast('تنظیمات همگام‌سازی بارگذاری شد؛ وضعیت اتصال واقعی در همین بخش نمایش داده می‌شود.');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
     }catch(e){ console.error('DentyarSync connect failed', e); toast('اتصال همگام‌سازی ناموفق بود: '+(e&&e.message||e)); }
   };
@@ -5095,22 +5095,29 @@ document.addEventListener('blur',e=>{
       await dbm.set(dbm.ref(db, b+'/records/formFields'), ff);
       const tp = JSON.parse(JSON.stringify(STATE.treatmentPrices||{})); tp._updatedAt = now;
       await dbm.set(dbm.ref(db, b+'/records/treatmentPrices'), tp);
-      ['patients','dentists','appointments'].forEach(function(coll){
+      for(const coll of ['patients','dentists','appointments']){
         const arr = STATE[coll]||[];
         const curIds = arr.map(function(x){ return x.id; });
-        arr.forEach(function(rec){
+        await Promise.all(arr.map(function(rec){
           const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
-          dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
-        });
+          return dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
+        }));
         const prev = prevIds[coll]||[];
-        prev.forEach(function(id){ if(curIds.indexOf(id)===-1){
-          dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null);
-          dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now });
-        } });
+        const deleted = prev.filter(function(id){ return curIds.indexOf(id)===-1; });
+        await Promise.all(deleted.map(function(id){
+          return Promise.all([
+            dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null),
+            dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now })
+          ]);
+        }));
         nextIds[coll] = curIds;
-      });
+      }
       localStorage.setItem(PUSHED_KEY, JSON.stringify(nextIds));
-      STATE.meta.sync.lastSyncAt = now; saveState();
+      // Update the local sync timestamp without calling saveState(), which would schedule
+      // another push and create an endless push loop.
+      STATE.meta.sync.lastSyncAt = now;
+      localStorage.setItem(APP_KEY, JSON.stringify(STATE));
+      if(typeof indexedDB !== 'undefined') idbPutAll(STATE).catch(function(e){ console.warn('IndexedDB sync timestamp mirror failed:',e); });
       SYNC.renderStatus&&SYNC.renderStatus();
     }catch(e){ console.warn('DentyarSync push failed', e); }
   }
