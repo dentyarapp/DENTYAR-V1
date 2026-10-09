@@ -20,6 +20,13 @@ jobs:
       - name: دریافت کد پروژه
         uses: actions/checkout@v4
 
+      - name: دریافت فایل‌های منتشرشده قبلی
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-existing
+          fetch-depth: 1
+
       - name: آماده‌سازی نسخه وب نصب‌شونده
         run: |
           rm -rf dist
@@ -27,9 +34,13 @@ jobs:
           cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html dist/index.html
           cp manifest.webmanifest dist/manifest.webmanifest
           cp sw.js dist/sw.js
+          cp update.json dist/update.json
+          # نگهداری فایل APK رسمی قبلی هنگام انتشار مجدد PWA
+          if [ -s gh-pages-existing/DENTYAR-update.apk ]; then cp gh-pages-existing/DENTYAR-update.apk dist/DENTYAR-update.apk; fi
           test -s dist/index.html
           test -s dist/manifest.webmanifest
           test -s dist/sw.js
+          test -s dist/update.json
 
       - name: انتشار نسخه وب
         uses: peaceiris/actions-gh-pages@v4
