@@ -2884,6 +2884,42 @@ function deleteDentist(id){
 /* ===================== گزارش‌ها ===================== */
 let reportFilters = {};
 function renderReports(){
+  const unlocked = sessionStorage.getItem('dentyar_finance_reports_unlocked') === '1';
+  if(unlocked){ renderReportsUnlocked(); return; }
+  document.getElementById('pageContent').innerHTML = `
+    <div class="card" style="max-width:520px;margin:18px auto;text-align:center;padding:24px 16px">
+      <div class="iconCircle">${NAV_ICONS.reports}</div>
+      <h3>گزارش‌ها و اطلاعات مالی محرمانه</h3>
+      <p style="font-size:12px;line-height:1.9;color:var(--muted)">مشاهده گزارش‌ها فقط برای دندان‌پزشک یا مدیر مجاز مطب است. منشی می‌تواند اطلاعات روزمره را ثبت کند، اما برای ورود به گزارش‌ها رمز مستقل مدیر لازم است.</p>
+      <label for="financeReportGateInput">رمز مدیر مطب (۸ رقم)</label>
+      <input type="password" id="financeReportGateInput" maxlength="8" inputmode="numeric" autocomplete="off" style="text-align:center;letter-spacing:4px" placeholder="••••••••">
+      <div id="financeReportGateError" style="color:var(--danger);font-size:12px;margin-top:8px;min-height:18px"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="unlockFinanceReports()">ورود به گزارش‌ها</button>
+      <p style="font-size:10px;line-height:1.8;color:var(--muted);margin-top:12px">برای محافظت بهتر، رمز پیش‌فرض را از بخش پروفایل تغییر دهید. این قفل برنامه‌ای است و به‌تنهایی جایگزین حساب کاربری جداگانه و مجوزهای امنیتی سمت سرور نیست.</p>
+    </div>`;
+  const input=document.getElementById('financeReportGateInput');
+  input.focus();
+  input.addEventListener('keydown',e=>{if(e.key==='Enter') unlockFinanceReports();});
+}
+function unlockFinanceReports(){
+  const input=document.getElementById('financeReportGateInput');
+  const err=document.getElementById('financeReportGateError');
+  if(!input||!err) return;
+  const value=toEnDigits(input.value.trim());
+  if(value===toEnDigits(STATE.meta.profilePassword)){
+    sessionStorage.setItem('dentyar_finance_reports_unlocked','1');
+    renderReportsUnlocked();
+  }else{
+    err.textContent='رمز مدیر مطب نادرست است.';
+    input.value='';
+    input.focus();
+  }
+}
+function lockFinanceReports(){
+  sessionStorage.removeItem('dentyar_finance_reports_unlocked');
+  if(currentPage==='reports') renderReports();
+}
+function renderReportsUnlocked(){
   if(pageParams && Object.keys(pageParams).length){
     reportFilters = {...pageParams};
     pageParams = {};
