@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - fix/v59-safe-numeric-serial-20261009
+      - test/dentyar-comprehensive-fixes-20261009
 
 jobs:
   build-apk:
