@@ -454,7 +454,7 @@ const DEFAULT_STATE = () => ({
       legalName:'', managerName:'', medicalDirector:'', clinicPhone:'', clinicMobile:'', clinicEmail:'', website:'',
       address:'', city:'', postalCode:'', licenseNo:'', nationalIdentifier:'', economicCode:'', workingHours:'', emergencyPhone:'', notes:''
     },
-    appAdminPassword:'49944994', appAdminEnabled:true, appAdminHidden:true,
+    appAdminPassword:'49944994', appAdminEnabled:true, appAdminHidden:true, appUsers:[],
     sync:{ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }
   },
   formFields: { appointment: [], register: [] },
@@ -1689,10 +1689,17 @@ function pinPress(d){
   }
 }
 function pinSubmit(){
-  if(toEnDigits(pinBuffer) === toEnDigits(STATE.meta.password) && pinBuffer.length===8){
+  const enteredPin=toEnDigits(pinBuffer);
+  const staff=(STATE.meta.appUsers||[]).find(u=>u && u.active!==false && toEnDigits(u.pin||'')===enteredPin);
+  const role=staff ? staff.role : (enteredPin===toEnDigits(STATE.meta.password||'')?'manager':null);
+  if(role && pinBuffer.length===8 && ['manager','dentist','receptionist'].includes(role)){
+    sessionStorage.setItem('dentyar_role',role);
+    sessionStorage.setItem('dentyar_user_name',staff?String(staff.name||'کاربر'):'مدیر مطب');
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('app').style.display='block';
     sessionStorage.setItem('lb_unlocked','1');
+    if(currentPage==='reports' && !dentyarCanViewReports()) currentPage='dashboard';
+    renderBottomNav(); renderPage();
   } else {
     document.getElementById('lockError').textContent = 'رمز عبور اشتباه است';
     setTimeout(()=>{ pinBuffer=''; updatePinDots(); }, 400);
@@ -1740,6 +1747,8 @@ function lockApp(){
 function finishLockApp(){
   sessionStorage.removeItem('lb_unlocked');
   sessionStorage.removeItem('lb_profile_unlocked');
+  sessionStorage.removeItem('dentyar_role');
+  sessionStorage.removeItem('dentyar_user_name');
   pinBuffer='';
   renderLock();
   document.getElementById('lockScreen').style.display='flex';
@@ -1798,6 +1807,10 @@ const NAV_ICONS = {
 };
 
 /* ===================== ناوبری ===================== */
+function dentyarCurrentRole(){ return sessionStorage.getItem('dentyar_role') || 'manager'; }
+function dentyarCanViewReports(){ return ['manager','dentist'].includes(dentyarCurrentRole()); }
+function dentyarIsManager(){ return dentyarCurrentRole()==='manager'; }
+function dentyarReportDenied(){ modalAlert('دسترسی محدود','مشاهده گزارش‌های مالی فقط برای دندان‌پزشک یا مدیر مطب مجاز است.'); }
 const PAGES = [
   {id:'dashboard', label:'داشبورد', icon:'dashboard'},
   {id:'appointments', label:'نوبت‌دهی', icon:'appointments'},
@@ -1847,7 +1860,7 @@ function renderHeader(){
   syncFixedTopHeight();
 }
 function renderBottomNav(){
-  document.getElementById('bottomNav').innerHTML = PAGES.map(p=>`
+  document.getElementById('bottomNav').innerHTML = PAGES.filter(p=>p.id!=='reports'||dentyarCanViewReports()).map(p=>`
     <button class="navItem ${currentPage===p.id?'active':''}" onclick="navigate('${p.id}')">
       ${NAV_ICONS[p.icon]}
       <span>${p.label}</span>
@@ -1869,6 +1882,7 @@ function syncFixedTopHeight(){
   });
 }
 function navigate(pageId, params){
+  if(pageId==='reports' && !dentyarCanViewReports()){ dentyarReportDenied(); return; }
   closeModal();
   if(pageId !== 'patients') openPatientId = null;
   currentPage = pageId;
@@ -1931,13 +1945,14 @@ function renderDashboard(){
   let saved=(STATE.meta.dashboardMetrics||[]).filter(k=>metricDefs[k]);
   // Prevent legacy/broken metric sets from resurrecting stale dashboard labels.
   if(saved.length<4 || saved.some(k=>['completed','levels','surfaces'].includes(k))){ saved=curated; }
-  const keys=saved.slice(0,10);
+  const financialMetricKeys=['revenue','received','debts','insurance','discounts','cash','nonCash','refunds'];
+  const keys=(dentyarCanViewReports()?saved:saved.filter(k=>!financialMetricKeys.includes(k))).slice(0,10);
   const statHtml=keys.map(k=>{const d=metricDefs[k];const nav=d[2]==='reports'?"navigate('reports')":`navigate('${d[2]}')`;return `<button type="button" class="statCard ${d[4]} clickable" onclick="${nav}" aria-label="${esc(d[0])}"><span class="iconBadge">${d[3]}</span><span class="num">${esc(faDigits(d[1]))}</span><span class="lbl">${esc(d[0])}</span></button>`}).join('');
-  const financeItems=[
+  const financeItems=dentyarCanViewReports() ? [
     ['مبلغ ناخالص خدمات',totals.gross,'gross'],['تخفیف',totals.discount,'discount'],['سهم بیمه',totals.insurance,'insurance'],
     ['خالص قابل پرداخت',totals.net,'net'],['دریافت نقدی',totals.cash,'cash'],['دریافت غیرنقدی',totals.nonCash,'nonCash'],
     ['استرداد وجه',totals.refund,'refund'],['کل دریافتی',totals.paid,'paid'],['مطالبات / باقیمانده',totals.balance,'balance']
-  ];
+  ] : [];
   const financeHtml=financeItems.map(([label,val,key])=>`<div class="financeItem finance-${key}"><span>${esc(label)}</span><b>${esc(fmtMoney(val))}</b></div>`).join('');
   const servicesHtml=typeRows.length
     ? typeRows.slice(0,8).map(([name,count])=>`<div class="serviceRow"><span>${esc(name)}</span><b>${esc(faDigits(count))}</b></div>`).join('')
@@ -1949,8 +1964,7 @@ function renderDashboard(){
     </section>
     <div class="sectionTitle">شاخص‌های کلیدی</div>
     <section class="statGrid dashboardStats">${statHtml}</section>
-    <div class="sectionTitle">خلاصه مالی</div>
-    <section class="card financeCard"><div class="financeGrid">${financeHtml}</div></section>
+    ${dentyarCanViewReports()?'<div class="sectionTitle">خلاصه مالی</div><section class="card financeCard"><div class="financeGrid">'+financeHtml+'</div></section>':''}
     <div class="sectionTitle">خدمات پرتکرار</div>
     <section class="card servicesCard"><div class="servicesList">${servicesHtml}</div></section>
   `;
@@ -2901,6 +2915,7 @@ function deleteDentist(id){
 /* ===================== گزارش‌ها ===================== */
 let reportFilters = {};
 function renderReports(){
+  if(!dentyarCanViewReports()){ document.getElementById('pageContent').innerHTML='<div class="card"><h3>دسترسی محدود</h3><p>گزارش‌های مالی فقط برای دندان‌پزشک یا مدیر مطب قابل مشاهده است.</p></div>'; return; }
   if(pageParams && Object.keys(pageParams).length){
     reportFilters = {...pageParams};
     pageParams = {};
@@ -3016,6 +3031,7 @@ function applyReportFilters(){
   renderReports();
 }
 function getReportRowsForExport(){
+  if(!dentyarCanViewReports()) return [[]];
   const f = reportFilters;
   let rows = [];
   STATE.patients.forEach(p=>{
@@ -3053,7 +3069,7 @@ function getReportRowsForExport(){
   return [header, ...body];
 }
 async function exportReportCSV(){
-
+  if(!dentyarCanViewReports()){ dentyarReportDenied(); return; }
   try{
 
     const action =
@@ -3129,7 +3145,7 @@ async function exportReportCSV(){
 
 
 async function exportReportXLSX(){
-
+  if(!dentyarCanViewReports()){ dentyarReportDenied(); return; }
   try{
 
     const action =
@@ -3204,6 +3220,7 @@ async function exportReportXLSX(){
 
 }
 function exportReportPDF(){
+  if(!dentyarCanViewReports()){ dentyarReportDenied(); return; }
   const rows=getReportRowsForExport();
   const header=rows[0]||[];
   const dataRows=rows.slice(1);
@@ -3598,6 +3615,8 @@ function renderSettings(){
       <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="changePassword()">ذخیره‌ی رمز جدید</button>
     </div>
 
+
+    ${dentyarIsManager()?'<div class="card"><h3>مدیریت دسترسی کاربران</h3><p style="font-size:12px;color:var(--muted);line-height:1.9">برای منشی رمز جداگانه بسازید و رمز اصلی مدیر را در اختیار او نگذارید. منشی می‌تواند اطلاعات را ثبت کند اما گزارش‌ها و خلاصه مالی را نمی‌بیند. حساب‌های این بخش روی همین دستگاه ذخیره می‌شوند.</p><button class="btn btn-primary btn-block" onclick="showStaffManager()">مدیریت کاربران و نقش‌ها</button></div>':''}
     <div class="card">
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
@@ -3682,9 +3701,10 @@ function updatePlatformUi(){
   if(android) android.style.display = p==='android' ? '' : 'none';
 }
 async function checkAndApplyWebUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','بررسی به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('dentyarPlatformBadge');
   if(badge) badge.textContent='در حال بررسی…';
-  const manifestUrl='https://raw.githubusercontent.com/dentyar1349-png/DENTYAR-TEST/main/update.json?ts='+Date.now();
+  const manifestUrl='https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now();
   try{
     const res=await fetch(manifestUrl,{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!res.ok) throw new Error('update manifest '+res.status);
@@ -3723,6 +3743,7 @@ async function checkAndApplyWebUpdate(){
    داده‌های بیماران/نوبت‌ها/تنظیمات (localStorage و IndexedDB) به آدرس برنامه وابسته‌اند،
    نه به فایل HTML؛ بنابراین با این جایگزینی از بین نمی‌روند. */
 async function applyHtmlFileUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','اعمال نسخه جدید فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('htmlUpdateStateBadge');
   const input=document.getElementById('htmlUpdateFileInput');
   const file=input?.files?.[0];
@@ -3771,10 +3792,11 @@ async function applyHtmlFileUpdate(){
 }
 
 async function checkAndInstallAndroidUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','بررسی به‌روزرسانی Android فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('updateStateBadge');
   if(badge) badge.textContent='در حال بررسی…';
   try{
-    const r=await fetch('https://raw.githubusercontent.com/dentyar1349-png/DENTYAR-TEST/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch('https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
     const m=await r.json();
     const remoteVersion=String(m.version||m.android?.version||'').toUpperCase();
@@ -3816,6 +3838,7 @@ async function checkAndInstallAndroidUpdate(){
 }
 
 function saveAppUpdatePackage(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','مدیریت به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const input=document.getElementById('updateApkInput');
   const file=input?.files?.[0];
   const version=(document.getElementById('updateVersionInput')?.value||'').trim().toUpperCase();
@@ -3847,6 +3870,7 @@ function saveAppUpdatePackage(){
   reader.readAsArrayBuffer(file);
 }
 async function executeSavedAppUpdate(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','نصب به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const req=indexedDB.open('dentyar_updates_v1',1);
   req.onupgradeneeded=e=>{ if(!e.target.result.objectStoreNames.contains('updates')) e.target.result.createObjectStore('updates',{keyPath:'id'}); };
   req.onsuccess=async e=>{
@@ -3907,7 +3931,36 @@ function saveSmsTemplates(){
   saveState();
   toast('قالب پیامک‌ها ذخیره شد');
 }
+
+function showStaffManager(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
+  const users=STATE.meta.appUsers||[];
+  const list=users.map(u=>'<div class="row" style="justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span>'+esc(u.name)+' — '+(u.role==='dentist'?'دندان‌پزشک':'منشی')+'</span><button class="btn btn-danger btn-sm" onclick="deleteStaffUser(\\''+esc(u.id)+'\\')">حذف</button></div>').join('')||'<div class="empty">کاربر جداگانه‌ای تعریف نشده است.</div>';
+  showModal('<h3>مدیریت دسترسی کاربران</h3><label>نام کاربر</label><input id="staffUserName" placeholder="مثلاً منشی مطب"><label>رمز ورود ۸ رقمی</label><input id="staffUserPin" type="password" inputmode="numeric" maxlength="8" placeholder="۸ رقم"><label>نقش کاربر</label><select id="staffUserRole"><option value="receptionist">منشی — بدون دسترسی به گزارش‌ها</option><option value="dentist">دندان‌پزشک — دسترسی به گزارش‌ها</option></select><button class="btn btn-primary btn-block" style="margin-top:10px" onclick="saveStaffUser()">ذخیره کاربر</button><div style="margin-top:12px">'+list+'</div>');
+}
+function saveStaffUser(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
+  const name=(document.getElementById('staffUserName')?.value||'').trim();
+  const pin=toEnDigits((document.getElementById('staffUserPin')?.value||'').trim());
+  const role=document.getElementById('staffUserRole')?.value||'receptionist';
+  if(!name){ modalAlert('خطا','نام کاربر را وارد کنید.'); return; }
+  if(!/^\d{8}$/.test(pin)){ modalAlert('خطا','رمز کاربر باید دقیقاً ۸ رقم باشد.'); return; }
+  if(pin===toEnDigits(STATE.meta.password||'')){ modalAlert('خطا','رمز کاربر نباید با رمز اصلی مدیر یکسان باشد.'); return; }
+  if(!['dentist','receptionist'].includes(role)){ modalAlert('خطا','نقش انتخاب‌شده معتبر نیست.'); return; }
+  const users=STATE.meta.appUsers||(STATE.meta.appUsers=[]);
+  if(users.some(u=>toEnDigits(u.pin||'')===pin && String(u.name||'').toLowerCase()!==name.toLowerCase())){ modalAlert('خطا','این رمز قبلاً برای کاربر دیگری استفاده شده است.'); return; }
+  const existing=users.find(u=>String(u.name||'').toLowerCase()===name.toLowerCase());
+  if(existing){ existing.pin=pin; existing.role=role; existing.active=true; }
+  else users.push({id:uid('usr'),name,pin,role,active:true,createdAt:Date.now()});
+  saveState(); closeModal(); toast('اطلاعات کاربر ذخیره شد'); renderSettings();
+}
+function deleteStaffUser(id){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','فقط مدیر مطب می‌تواند کاربران را مدیریت کند.'); return; }
+  modalConfirm('حذف کاربر','آیا از حذف این کاربر مطمئن هستید؟',()=>{ STATE.meta.appUsers=(STATE.meta.appUsers||[]).filter(u=>u.id!==id); saveState(); showStaffManager(); toast('کاربر حذف شد'); });
+}
+
 function changePassword(){
+  if(!dentyarIsManager()){ modalAlert('دسترسی محدود','تغییر رمز اصلی فقط برای مدیر مطب مجاز است.'); return; }
   const v = toEnDigits(document.getElementById('newPassInput').value.trim());
   if(v.length!==8 || !/^\d{8}$/.test(v)){ modalAlert('خطا','رمز عبور باید دقیقاً ۸ رقم باشد.'); return; }
   modalConfirm('تغییر رمز عبور','آیا از تغییر رمز عبور مطمئن هستید؟', ()=>{
@@ -5155,7 +5208,7 @@ document.addEventListener('blur',e=>{
   SYNC.settingsCardHtml = function(){
     const cfg = SYNC.cfg()||{ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null };
     const fbCfg = cfg.firebaseConfig||{};
-    const ls = cfg.lastSyncAt ? new Date(cfg.lastSyncAt).toLocaleString('fa-IR') : '—';
+    const ls = cfg.lastSyncAt ? toEnDigits(new Date(cfg.lastSyncAt).toLocaleString('fa-IR')) : '—';
     const ready = SYNC.isReady();
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
