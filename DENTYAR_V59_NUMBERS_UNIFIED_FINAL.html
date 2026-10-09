@@ -1808,6 +1808,7 @@ const PAGES = [
   {id:'reports', label:'گزارش‌ها', icon:'reports'},
   {id:'backup', label:'پشتیبان‌گیری', icon:'backup'},
   {id:'updater', label:'مدیریت بروزرسانی', icon:'settings'},
+  {id:'security', label:'پدافند غیرعامل', icon:'settings'},
   {id:'settings', label:'تنظیمات', icon:'settings'},
   {id:'profile', label:'پروفایل', icon:'profile'},
   {id:'guide', label:'راهنما', icon:'guide'},
@@ -1890,6 +1891,7 @@ function renderPage(){
     reports: renderReports,
     backup: renderBackup,
     updater: renderUpdaterPanel,
+    security: renderSecurityPanel,
     settings: renderSettings,
     profile: renderProfile,
     guide: renderGuide,
@@ -3594,6 +3596,33 @@ function renderSettings(){
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
+function renderSecurityPanel(){
+  const target=document.getElementById('pageContent');
+  target.innerHTML=`
+    <div class="pageTitle"><h2>🛡️ پدافند غیرعامل و امنیت اطلاعات</h2><p>کنترل‌های پیشگیرانه برای کاهش خطر دستکاری، افشای اطلاعات و اختلال</p></div>
+    <div class="securityPanel"><h4>بررسی اولیه دستگاه</h4><p id="securityLocalStatus">در حال بررسی قابلیت‌های دستگاه…</p><button class="btn btn-outline btn-block" onclick="runDentyarSecurityCheck()">بررسی دوباره</button></div>
+    <div class="securityPanel"><h4>برنامه حفاظت و تداوم خدمت</h4><ul>
+      <li>پشتیبان‌گیری منظم و آزمایش بازیابی روی نسخه آزمایشی؛ نگهداری یک نسخه جدا از گوشی و حفاظت از آن با دسترسی محدود.</li>
+      <li>استفاده از رمز قوی و منحصربه‌فرد؛ عدم اشتراک‌گذاری رمز، کد مطب و فایل پشتیبان در پیام‌رسان‌ها یا کانال‌های عمومی.</li>
+      <li>نصب به‌روزرسانی فقط از منبع معتبر؛ بررسی سازگاری نسخه و امضای برنامه پیش از جایگزینی نسخه موجود.</li>
+      <li>محدودسازی دسترسی Firebase برای کاربران مجاز و قواعد سمت سرور؛ پنهان‌کردن تنظیمات در رابط کاربری به‌تنهایی امنیت ایجاد نمی‌کند.</li>
+      <li>در زمان اختلال شبکه، از حذف داده یا بازنشانی برنامه خودداری شود؛ ابتدا نسخه پشتیبان سالم بررسی و سپس بازیابی آزمایش شود.</li>
+      <li>اطلاعات بیماران در گزارش‌ها و فایل‌های انتقالی فقط به اندازه نیاز صادر و در محل امن نگهداری شود.</li>
+    </ul></div>
+    <div class="securityPanel"><h4>محدودیت بررسی</h4><p>این صفحه فقط وضعیت‌های پایه دستگاه را نشان می‌دهد و گواهی امنیت یا نفوذناپذیری نیست. رمزگذاری داده‌ها، قواعد Firebase، احراز هویت کاربران و اعتبارسنجی امضای APK باید جداگانه در زیرساخت پیاده‌سازی و با آزمون واقعی تأیید شوند.</p></div>
+  `;
+  runDentyarSecurityCheck();
+}
+function runDentyarSecurityCheck(){
+  const el=document.getElementById('securityLocalStatus');
+  if(!el) return;
+  const checks=[];
+  checks.push((location.protocol==='https:'||location.protocol==='capacitor:')?'بستر اجرا HTTPS یا برنامه بومی است؛ این مورد به‌تنهایی امنیت را تضمین نمی‌کند.':'هشدار: بستر اجرا HTTPS نیست.');
+  checks.push(typeof indexedDB!=='undefined'?'حافظه محلی IndexedDB در دسترس است.':'هشدار: IndexedDB در دسترس نیست.');
+  checks.push(typeof localStorage!=='undefined'?'حافظه محلی برنامه در دسترس است.':'هشدار: حافظه محلی در دسترس نیست.');
+  checks.push(navigator.onLine?'دستگاه اتصال شبکه را گزارش می‌کند؛ امنیت سرور بررسی نشده است.':'دستگاه فعلاً آفلاین است؛ همگام‌سازی شبکه‌ای انجام نمی‌شود.');
+  el.innerHTML=checks.map(x=>'<div>• '+esc(x)+'</div>').join('');
+}
 function renderUpdaterPanel(){
   document.getElementById('pageContent').innerHTML = `<div class="card">
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
@@ -4314,6 +4343,14 @@ td{font-size:16px!important;font-weight:700!important;color:#203d4b!important;}
 .financeMini span{font-size:13px;color:#355463}
 .financeMini b{font-weight:900;color:#173d4d}
 @media(min-width:650px){.financeSummary{grid-template-columns:repeat(4,minmax(0,1fr));}.financeMini{grid-template-columns:repeat(3,minmax(0,1fr));}}
+</style>
+<style id="dentyar-hardening-panel">
+.securityPanel{border:1px solid #b7d8d2;border-radius:14px;padding:14px;margin:12px 0;background:var(--card,#fff)}
+.securityPanel h4{margin:0 0 8px;color:#0f766e}
+.securityPanel p,.securityPanel li{font-size:12px;line-height:1.9}
+.securityPanel ul{padding-inline-start:20px}
+.securityGood{color:#0f766e;font-weight:800}
+.securityWarn{color:#9a6700;font-weight:800}
 </style>
 <style id="dentyar-update-styles">
 .updateBox{border:1px solid var(--border);border-radius:14px;padding:12px;background:linear-gradient(180deg,#fbffff,#f7fbfb)}
