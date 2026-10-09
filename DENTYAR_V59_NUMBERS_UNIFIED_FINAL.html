@@ -3241,6 +3241,30 @@ function exportReportPDF(){
     <div class="footer-note">${clinicName} — سند این گزارش به‌صورت رسمی و بر اساس اطلاعات ثبت‌شده در سامانه دنت‌یار صادر شده است.</div>
   <script>setTimeout(()=>window.print(),350);<\/script></body></html>`;
 
+  const nativeCap=window.Capacitor;
+  if(nativeCap && nativeCap.isNativePlatform && nativeCap.isNativePlatform()){
+    (async()=>{
+      const action=await dentyarReportAction();
+      if(action==='cancel') return;
+      if(action==='direct'){
+        try{
+          const plugin=(nativeCap.Plugins&&nativeCap.Plugins.DentyarNative)||(nativeCap.registerPlugin?nativeCap.registerPlugin('DentyarNative'):null);
+          if(!plugin||typeof plugin.printHtml!=='function') throw new Error('Native print plugin unavailable');
+          await plugin.printHtml({html,jobName:'DENTYAR-Financial-Report'});
+          toast('پنجره چاپ Android باز شد؛ برای فایل PDF گزینه «ذخیره به‌صورت PDF» را انتخاب کنید.');
+        }catch(e){ console.error('DENTYAR report print failed',e); modalAlert('چاپ گزارش','پنجره چاپ Android باز نشد.'); }
+      }else{
+        try{
+          const result=await downloadBlob(new TextEncoder().encode(html),'گزارش-'+todayJalaliCompact()+'.html','text/html',{share:true});
+          if(result==='shared') toast('گزارش برای اشتراک‌گذاری آماده شد.');
+          else if(result==='cancelled') return;
+          else toast('فایل گزارش ذخیره شد.');
+        }catch(e){ modalAlert('اشتراک گزارش','اشتراک‌گذاری گزارش انجام نشد.'); }
+      }
+    })();
+    return;
+  }
+
   // در نسخه‌ی نصبی (APK/WebView) دستور window.print() هیچ رابط چاپی ندارد و بی‌اثر است؛
   // در این حالت فایل گزارش را به‌صورت HTML ذخیره/اشتراک می‌گذاریم تا کاربر آن را در
   // مرورگر خارجی (Chrome) باز و از همان‌جا چاپ یا ذخیره‌ی PDF کند.
@@ -3600,8 +3624,6 @@ function renderSettings(){
     ${dentyarIsManager()?'<div class="card"><h3>مدیریت دسترسی کاربران</h3><p style="font-size:12px;color:var(--muted);line-height:1.9">برای منشی رمز جداگانه بسازید و رمز اصلی مدیر را در اختیار او نگذارید. منشی می‌تواند اطلاعات را ثبت کند اما گزارش‌ها و خلاصه مالی را نمی‌بیند. حساب‌های این بخش روی همین دستگاه ذخیره می‌شوند.</p><button class="btn btn-primary btn-block" onclick="showStaffManager()">مدیریت کاربران و نقش‌ها</button></div>':''}
 
   `;
-  loadSavedUpdateInfo();
-  updatePlatformUi();
 }
 function setTreatmentPrice(type, value){
   STATE.treatmentPrices = STATE.treatmentPrices || {};
