@@ -47,7 +47,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
+          npx cap init "دنت‌یار آزمایشی" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -155,7 +155,7 @@ jobs:
                       JSObject result = new JSObject();
                       result.put("saved", true);
                       result.put("uri", uri.toString());
-                      result.put("path", "Download/DENTYAR/Reports/" + fileName);
+                      result.put("path", "Download/DENTYAR/" + folder + "/" + fileName);
                       call.resolve(result);
 
                   } catch (Exception e) {
@@ -268,6 +268,8 @@ jobs:
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "native && native.cancelled" www/index.html
+          grep -q "numberingSystem" www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
