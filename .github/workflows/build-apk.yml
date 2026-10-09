@@ -216,6 +216,7 @@ jobs:
                   } catch (Exception e) {
                       call.reject("Could not open Android package installer: " + e.getMessage(), e);
                   }
+              }
 
               @PluginMethod
               public void printHtml(PluginCall call) {
