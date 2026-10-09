@@ -122,6 +122,8 @@ jobs:
                   String fileName = call.getString("filename", "DENTYAR-report");
                   String mimeType = call.getString("mimeType", "application/octet-stream");
                   String data = call.getString("data", "");
+                  String folder = call.getString("folder", "Reports");
+                  if (!"Reports".equals(folder) && !"Backups".equals(folder) && !"Transfers".equals(folder) && !"Updates".equals(folder)) { folder = "Reports"; }
 
                   if (data == null || data.isEmpty()) {
                       call.reject("Empty report data");
@@ -136,7 +138,7 @@ jobs:
                   values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
                   values.put(
                       MediaStore.Downloads.RELATIVE_PATH,
-                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/Reports"
+                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/" + folder
                   );
                   values.put(MediaStore.Downloads.IS_PENDING, 1);
 
@@ -169,7 +171,7 @@ jobs:
                       JSObject result = new JSObject();
                       result.put("saved", true);
                       result.put("uri", uri.toString());
-                      result.put("path", "Download/DENTYAR/Reports/" + fileName);
+                      result.put("path", "Download/DENTYAR/" + folder + "/" + fileName);
                       call.resolve(result);
 
                   } catch (Exception e) {
@@ -323,6 +325,7 @@ jobs:
           grep -q "@capacitor/share" package.json
           grep -q "installApk" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
           grep -q "printHtml" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
+          grep -q "Download/DENTYAR/" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
           test -s android/app/src/main/res/xml/file_paths.xml
           npx cap sync android
 
