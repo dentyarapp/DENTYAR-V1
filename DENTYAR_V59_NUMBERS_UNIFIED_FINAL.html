@@ -1334,7 +1334,7 @@ async function v31NativeFile(bytes, filename, mime, options={}){
    */
   try{
     const C=window.Capacitor;
-    if(!C || typeof C.isNativePlatform!=='function' || !C.isNativePlatform()){
+    if(!C || !isDentyarNativeApp()){
       return {saved:false,shared:false};
     }
 
@@ -1365,7 +1365,8 @@ async function v31NativeFile(bytes, filename, mime, options={}){
       const result=await nativePlugin.saveToDownloads({
         filename:safeName,
         mimeType:String(mime||'application/octet-stream'),
-        data:data
+        data:data,
+        folder:String(options.folder||'Reports')
       });
 
       if(!result || result.saved!==true){
@@ -1375,7 +1376,7 @@ async function v31NativeFile(bytes, filename, mime, options={}){
       return {
         saved:true,
         shared:false,
-        path:String(result.path||'Download/DENTYAR/Reports/'+safeName),
+        path:String(result.path||'Download/DENTYAR/'+String(options.folder||'Reports')+'/'+safeName),
         uri:String(result.uri||'')
       };
     }
@@ -1433,7 +1434,7 @@ async function downloadBlob(bytes, filename, mime, options={}){
     return native.shared ? 'shared' : 'saved';
   }
   const C=window.Capacitor;
-  if(C && C.isNativePlatform && C.isNativePlatform()){
+  if(isDentyarNativeApp()){
     const detail=native && native.error ? String(native.error.message||native.error) : 'native export unavailable';
     console.error('DENTYAR Android export failed:', detail);
     throw new Error('Android export failed: '+detail);
@@ -3363,7 +3364,7 @@ async function createBackup(){
   const snap = snapshotData();
   const json = JSON.stringify(snap);
   storeBackupSnapshot(json, `${STATE.patients.length} بیمار`);
-  const result=await downloadBlob(new TextEncoder().encode(json), `پشتیبان-DENTYAR-${todayJalaliCompact()}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}${String(new Date().getSeconds()).padStart(2,'0')}.json`, 'application/json', {share:false});
+  const result=await downloadBlob(new TextEncoder().encode(json), `پشتیبان-DENTYAR-${todayJalaliCompact()}-${String(new Date().getHours()).padStart(2,'0')}${String(new Date().getMinutes()).padStart(2,'0')}${String(new Date().getSeconds()).padStart(2,'0')}.json`, 'application/json', {share:false,folder:'Backups'});
   toast(result==='shared'?'پشتیبان آماده ذخیره یا ارسال شد':result==='cancelled'?'ارسال لغو شد':'فایل پشتیبان آماده دریافت است');
   renderBackup();
 }
@@ -3467,7 +3468,7 @@ async function exportAppTransfer(withData){
     finalHtml = finalHtml.slice(0,lastIdx) + declReplacement + finalHtml.slice(lastIdx+declPrefix.length);
   }
   const bytes = new TextEncoder().encode(finalHtml);
-  const result=await downloadBlob(bytes, withData? 'DENTYAR-انتقال-با-اطلاعات.html' : 'DENTYAR-انتقال-خالی.html', 'text/html;charset=utf-8', {share:false});
+  const result=await downloadBlob(bytes, withData? 'DENTYAR-انتقال-با-اطلاعات.html' : 'DENTYAR-انتقال-خالی.html', 'text/html;charset=utf-8', {share:false,folder:'Transfers'});
   toast(result==='shared'?'فایل انتقالی آماده ذخیره یا ارسال شد':result==='cancelled'?'ارسال لغو شد':'فایل انتقالی آماده دریافت است');
 }
 function DEFAULT_STATE_MERGE(){
