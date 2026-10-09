@@ -3857,23 +3857,15 @@ async function executeSavedAppUpdate(){
       try{
         const C=window.Capacitor;
         if(C && C.isNativePlatform && C.isNativePlatform()){
-          const fs=C.registerPlugin ? C.registerPlugin('Filesystem') : null;
-          const opener=C.registerPlugin ? C.registerPlugin('FileOpener') : null;
-          if(!fs || !fs.writeFile) throw new Error('Filesystem unavailable');
+          const nativePlugin=(C.Plugins&&C.Plugins.DentyarNative)||(C.registerPlugin?C.registerPlugin('DentyarNative'):null);
+          if(!nativePlugin || typeof nativePlugin.installApk!=='function') throw new Error('Native APK installer is unavailable');
           const arr=new Uint8Array(await rec.blob.arrayBuffer());
           let binary=''; const chunk=0x8000;
           for(let p=0;p<arr.length;p+=chunk) binary+=String.fromCharCode.apply(null,arr.subarray(p,p+chunk));
           const data=btoa(binary);
           const safeName=String(rec.fileName||('DENTYAR-'+rec.version+'.apk')).replace(/[\\/:*?"<>|]/g,'_');
-          const path='DENTYAR/'+safeName;
-          await fs.writeFile({path,data,directory:'CACHE',recursive:true});
-          if(fs.getUri && opener && typeof opener.open==='function'){
-            const u=await fs.getUri({path,directory:'CACHE'});
-            await opener.open({filePath:String(u.uri||u.path),contentType:'application/vnd.android.package-archive',openWithDefault:true});
-            toast('نصب بروزرسانی آغاز شد؛ تأیید نهایی با اندروید انجام می‌شود');
-          }else{
-            toast('APK در حافظه موقت برنامه ذخیره شد؛ اجرای نصب را دوباره بزنید');
-          }
+          await nativePlugin.installApk({filename:safeName,data});
+          toast('درخواست نصب به اندروید ارسال شد؛ نصب فقط پس از تأیید سیستم انجام می‌شود.');
         }else{
           const url=URL.createObjectURL(rec.blob);
           const a=document.createElement('a'); a.href=url; a.download=rec.fileName||('DENTYAR-'+rec.version+'.apk'); a.rel='noopener';
