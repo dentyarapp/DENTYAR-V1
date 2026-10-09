@@ -3495,7 +3495,7 @@ function previewNextFileNo(){
   const stored = Number(STATE?.meta?.fileNoLastAssigned || 0);
   if(Number.isSafeInteger(stored) && stored >= firstNumber) lastAssigned = Math.max(lastAssigned, stored);
   (STATE?.patients || []).forEach(p => {
-    const n = Number(toEnDigits(String(p.fileNo || '')).replace(/\\D/g,''));
+    const n = Number(toEnDigits(String(p.fileNo || '')).replace(/\D/g,''));
     if(Number.isSafeInteger(n) && n >= firstNumber) lastAssigned = Math.max(lastAssigned, n);
   });
   return String(lastAssigned + 1);
