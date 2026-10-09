@@ -1,4 +1,4 @@
-name: Build DENTYAR V59 APK
+name: Build DENTYAR V60 APK
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar-v59",
-            "version": "59.0.0",
+            "version": "60.0.0",
             "private": true,
             "scripts": {
               "build": "echo DENTYAR V59"
@@ -344,6 +344,6 @@ jobs:
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V59-APK
+          name: DENTYAR-V60-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
