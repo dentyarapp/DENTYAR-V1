@@ -2744,7 +2744,7 @@ ${v.note?'<div class="section">توضیحات درمان</div><div class="note">
 <footer class="footer"><img src="${DENTYAR_LOGO_DATA}" alt="لوگوی دنت‌یار"><span>تهیه‌شده با سامانه دنت‌یار — دستیار هوشمند دندان‌پزشکی | ${esc(clinicName)}</span></footer>
 </main></body></html>`;
   const C=window.Capacitor;
-  if(C && C.isNativePlatform && C.isNativePlatform()){
+  if(isDentyarNativeApp()){
     const plugin=(C.Plugins&&C.Plugins.DentyarNative)||(C.registerPlugin?C.registerPlugin('DentyarNative'):null);
     if(!plugin||typeof plugin.printHtml!=='function'){ modalAlert('چاپ سند','پشتیبانی چاپ Android در این نسخه فعال نیست.'); return; }
     try{ await plugin.printHtml({html:html,jobName:'DENTYAR-'+(kind==='invoice'?'Invoice':'Receipt')}); }
