@@ -3841,7 +3841,7 @@ async function checkAndInstallAndroidUpdate(){
     const r=await fetch('https://dentyarapp.github.io/DENTYAR-V1/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
     const m=await r.json();
-    const remoteVersion=String(m.version||m.android?.version||'').toUpperCase();
+    const remoteVersion=String(m.android?.version||m.version||'').toUpperCase();
     const current=String(DENTYAR_APP_VERSION||'V57').toUpperCase();
     const num=v=>Number(String(v).replace(/[^0-9]/g,''))||0;
     if(!remoteVersion || num(remoteVersion)<=num(current)){
