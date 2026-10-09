@@ -3451,6 +3451,18 @@ function handleRestoreFile(file){
 function performRestore(snap, mode){
   if(!snap || !snap.data){ modalAlert('خطا','ساختار فایل پشتیبان نامعتبر است.'); return; }
   const incoming = snap.data;
+  if(!Array.isArray(incoming.patients) || !Array.isArray(incoming.dentists) || !Array.isArray(incoming.appointments)){
+    modalAlert('خطا','ساختار فایل پشتیبان کامل نیست؛ اطلاعات فعلی تغییر نکرد.');
+    return;
+  }
+  // Keep a local recovery point before any merge or replacement.
+  try{
+    storeBackupSnapshot(JSON.stringify(snapshotData()), 'پشتیبان خودکار پیش از بازیابی');
+  }catch(e){
+    console.error('Pre-restore backup failed',e);
+    modalAlert('بازیابی متوقف شد','تهیه نسخه پشتیبان از اطلاعات فعلی انجام نشد؛ برای جلوگیری از خطر، بازیابی لغو شد.');
+    return;
+  }
   if(mode==='replace'){
     STATE.patients = incoming.patients || [];
     STATE.dentists = incoming.dentists || [];
@@ -5212,20 +5224,24 @@ document.addEventListener('blur',e=>{
       await dbm.set(dbm.ref(db, b+'/records/formFields'), ff);
       const tp = JSON.parse(JSON.stringify(STATE.treatmentPrices||{})); tp._updatedAt = now;
       await dbm.set(dbm.ref(db, b+'/records/treatmentPrices'), tp);
-      ['patients','dentists','appointments'].forEach(function(coll){
+      for(const coll of ['patients','dentists','appointments']){
         const arr = STATE[coll]||[];
         const curIds = arr.map(function(x){ return x.id; });
-        arr.forEach(function(rec){
+        // Await every remote write so a failed sync cannot be reported as successful.
+        await Promise.all(arr.map(function(rec){
           const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
-          dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
-        });
+          return dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
+        }));
         const prev = prevIds[coll]||[];
-        prev.forEach(function(id){ if(curIds.indexOf(id)===-1){
-          dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null);
-          dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now });
-        } });
+        const deleted = prev.filter(function(id){ return curIds.indexOf(id)===-1; });
+        await Promise.all(deleted.flatMap(function(id){
+          return [
+            dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null),
+            dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now })
+          ];
+        }));
         nextIds[coll] = curIds;
-      });
+      }
       localStorage.setItem(PUSHED_KEY, JSON.stringify(nextIds));
       STATE.meta.sync.lastSyncAt = now; saveState();
       SYNC.renderStatus&&SYNC.renderStatus();
