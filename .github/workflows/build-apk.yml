@@ -47,7 +47,7 @@ jobs:
 
           npm install
 
-          npx cap init "دنتی‌یار آزمایشی" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -286,9 +286,12 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: نام‌گذاری خروجی APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR.apk
+
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V59-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: DENTYAR-TEST-APK
+          path: DENTYAR.apk
           if-no-files-found: error
