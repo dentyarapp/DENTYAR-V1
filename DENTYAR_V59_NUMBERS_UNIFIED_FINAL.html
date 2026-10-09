@@ -775,6 +775,30 @@ function loadState(){
   ensureFormFieldSettings();
   return STATE;
 }
+function maybeCreatePassiveBackup(){
+  // پشتیبان محلی خودکار حداکثر روزی یک‌بار؛ بدون شبکه و بدون فراخوانی saveState مجدد.
+  try{
+    const now=Date.now(), key='dentyar_passive_backup_at';
+    const last=Number(localStorage.getItem(key)||0);
+    if(last && now-last<24*60*60*1000) return;
+    if(typeof snapshotData!=='function' || typeof BACKUP_STORE_PREFIX==='undefined') return;
+    const json=JSON.stringify(snapshotData());
+    const id=uid('auto');
+    localStorage.setItem(BACKUP_STORE_PREFIX+id,json);
+    STATE.backupHistory=STATE.backupHistory||[];
+    STATE.backupHistory.push({id,ts:now,note:'پشتیبان خودکار پدافند غیرعامل',snapshotSize:json.length});
+    if(STATE.backupHistory.length>20){
+      const removed=STATE.backupHistory.splice(0,STATE.backupHistory.length-20);
+      removed.forEach(r=>{try{localStorage.removeItem(BACKUP_STORE_PREFIX+r.id);}catch(_){}});
+    }
+    localStorage.setItem(key,String(now));
+    localStorage.setItem(APP_KEY,JSON.stringify(STATE));
+  }catch(e){
+    // پشتیبان‌گیری نباید ثبت بیمار را متوقف کند؛ خطا در کنسول باقی می‌ماند.
+    console.warn('DENTYAR passive-defense backup failed:',e);
+  }
+}
+
 function saveState(){
   // Mark local edits before scheduling cloud sync; incoming remote merges are not re-marked.
   if(window.DentyarSync && !(window.DentyarSync.isMerging && window.DentyarSync.isMerging())){
@@ -782,6 +806,7 @@ function saveState(){
     ['patients','dentists','appointments'].forEach(coll=>(STATE[coll]||[]).forEach(rec=>{rec._updatedAt=changedAt;}));
   }
   localStorage.setItem(APP_KEY, JSON.stringify(STATE));
+  maybeCreatePassiveBackup();
   // آینه‌سازی غیرهمزمان؛ اگر IndexedDB در دسترس نباشد، localStorage همچنان منبع اصلی است.
   if (typeof indexedDB !== 'undefined' && location.protocol !== 'content:') {
     idbPutAll(STATE).catch(err=>console.warn('IndexedDB mirror save failed:', err));
