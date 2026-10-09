@@ -46,7 +46,18 @@ jobs:
 
           npm install
 
-          npx cap init "دنتی‌یار آزمایشی" "com.dentyar.testapp" --web-dir www
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            APP_NAME="دنتی‌یار"
+            APP_ID="com.dentyar.app"
+          else
+            APP_NAME="دنتی‌یار آزمایشی"
+            APP_ID="com.dentyar.testapp"
+          fi
+          PACKAGE_PATH=$(printf "%s" "$APP_ID" | tr "." "/")
+          echo "APP_NAME=$APP_NAME" >> "$GITHUB_ENV"
+          echo "APP_ID=$APP_ID" >> "$GITHUB_ENV"
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+          npx cap init "$APP_NAME" "$APP_ID" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -66,9 +77,9 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/testapp
+          mkdir -p "android/app/src/main/java/$PACKAGE_PATH"
 
-          cat > android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java <<'EOF'
+          cat > "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java" <<'EOF'
           package com.dentyar.testapp;
 
           import android.content.ContentResolver;
@@ -254,10 +265,11 @@ jobs:
               }
           }
           EOF
+          sed -i "s/^package com\\.dentyar\\.testapp;/package ${APP_ID};/" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
+          cat > "android/app/src/main/java/$PACKAGE_PATH/MainActivity.java" <<'EOF'
           package com.dentyar.testapp;
 
           import android.os.Bundle;
@@ -271,6 +283,7 @@ jobs:
               }
           }
           EOF
+          sed -i "s/^package com\\.dentyar\\.testapp;/package ${APP_ID};/" "android/app/src/main/java/$PACKAGE_PATH/MainActivity.java"
 
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/file_paths.xml <<'EOF'
@@ -305,11 +318,11 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "DentyarNative" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
-          grep -q "printHtml" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "installApk" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
+          grep -q "printHtml" "android/app/src/main/java/$PACKAGE_PATH/DentyarNativePlugin.java"
           test -s android/app/src/main/res/xml/file_paths.xml
           npx cap sync android
 
