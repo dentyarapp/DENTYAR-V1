@@ -3747,7 +3747,7 @@ async function checkAndApplyWebUpdate(){
   if(!dentyarIsManager()){ modalAlert('دسترسی محدود','بررسی به‌روزرسانی فقط برای مدیر مطب مجاز است.'); return; }
   const badge=document.getElementById('dentyarPlatformBadge');
   if(badge) badge.textContent='در حال بررسی…';
-  const manifestUrl='https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now();
+  const manifestUrl='https://dentyarapp.github.io/DENTYAR-V1/update.json?ts='+Date.now();
   try{
     const res=await fetch(manifestUrl,{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!res.ok) throw new Error('update manifest '+res.status);
@@ -3839,7 +3839,7 @@ async function checkAndInstallAndroidUpdate(){
   const badge=document.getElementById('updateStateBadge');
   if(badge) badge.textContent='در حال بررسی…';
   try{
-    const r=await fetch('https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
+    const r=await fetch('https://dentyarapp.github.io/DENTYAR-V1/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
     const m=await r.json();
     const remoteVersion=String(m.version||m.android?.version||'').toUpperCase();
