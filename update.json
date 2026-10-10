@@ -1,13 +1,13 @@
 {
-  "version": "V59",
-  "notes": "تا زمان تکمیل ساخت و بررسی بسته اصلاحی V60، نسخه پایدار فعلی V59 در پنل باقی می‌ماند.",
+  "version": "V63",
+  "notes": "نسخه آزمایشی V63: اصلاح ارقام فارسی کد ملی و تلفن در رسید چاپی. لطفاً پس از به‌روزرسانی، رسید و پیامک یادآوری را بررسی کنید.",
   "android": {
-    "version": "V59",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v59-final/DENTYAR-V59.apk",
-    "fileName": "DENTYAR-V59.apk"
+    "version": "V63",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v63-final/DENTYAR-V63.apk",
+    "fileName": "DENTYAR-V63.apk"
   },
   "web": {
-    "version": "V59",
+    "version": "V63",
     "url": "https://github.com/dentyarapp/DENTYAR-V1/tree/test/dentyar-comprehensive-fixes-20261009"
   }
 }
