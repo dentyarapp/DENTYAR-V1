@@ -2743,63 +2743,7 @@ ${insuranceStatus?'وضعیت تأیید بیمه: '+esc(insuranceStatus):'وض�
 <div class="signs"><div class="sign">مهر و امضای مطب</div><div class="sign">امضای بیمار</div></div>
 <div class="footer">${esc(clinicName)} · ${clinicPhone?'تلفن: '+esc(clinicPhone)+' · ':''}سامانه دنت‌یار</div>
 </main>
-<script>
-/* DENTYAR V61 FIX: explicitly reformat dynamically-created forms and SMS text. */
-(function(){
-  if(window.__dentyarV61LocaleFixInstalled) return;
-  window.__dentyarV61LocaleFixInstalled = true;
-  function apply(root){
-    root = root && root.querySelectorAll ? root : document;
-    try{
-      if(typeof setupV26JalaliDates === 'function') setupV26JalaliDates(root);
-      if(typeof formatAllNumericInputs === 'function') formatAllNumericInputs();
-      if(typeof toFaTextNodeTree === 'function') toFaTextNodeTree(root === document ? document.body : root);
-      root.querySelectorAll('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])').forEach(function(el){
-        const id=(el.id||'')+' '+(el.name||'')+' '+(el.getAttribute('autocomplete')||'');
-        const v=String(el.value||'');
-        const target=el.type==='tel' || /nid|national|phone|mobile|postal|economic|birth|insurance.?no|policy.?no/i.test(id);
-        if(target && v && /^[+\-()\s0-9۰-۹٠-٩.,/]+$/.test(v)){
-          el.value=typeof faDigits==='function'?faDigits(v):v.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
-          el.setAttribute('dir','ltr');
-          el.style.textAlign='left';
-        }
-      });
-    }catch(e){ console.warn('DENTYAR V61 locale display:',e); }
-  }
-  const originalShowModal=window.showModal;
-  if(typeof originalShowModal==='function'){
-    window.showModal=function(){
-      const result=originalShowModal.apply(this,arguments);
-      apply(document.getElementById('modalContent')||document);
-      requestAnimationFrame(function(){apply(document.getElementById('modalContent')||document);});
-      return result;
-    };
-  }
-  const originalRenderPage=window.renderPage;
-  if(typeof originalRenderPage==='function'){
-    window.renderPage=function(){
-      const result=originalRenderPage.apply(this,arguments);
-      apply(document.getElementById('pageContent')||document);
-      requestAnimationFrame(function(){apply(document.getElementById('pageContent')||document);});
-      return result;
-    };
-  }
-  document.addEventListener('input',function(e){
-    const el=e.target;
-    if(!el || !el.matches || !el.matches('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])')) return;
-    const v=String(el.value||'');
-    const id=(el.id||'')+' '+(el.name||'');
-    if((el.type==='tel'||/nid|national|phone|mobile|postal|economic|birth|insurance.?no|policy.?no/i.test(id)) && v && /^[+\-()\s0-9۰-۹٠-٩.,/]+$/.test(v)){
-      const start=el.selectionStart;
-      el.value=typeof faDigits==='function'?faDigits(v):v.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
-      try{if(start!==null)el.setSelectionRange(start,start);}catch(_){}
-    }
-  },true);
-  const observer=new MutationObserver(function(){apply(document);});
-  function start(){ if(document.body) observer.observe(document.body,{subtree:true,childList:true,characterData:true}); apply(document); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
-})();
-</script>
+
 
 </body></html>`;
   if(isDentyarNativeApp()){
@@ -5544,6 +5488,65 @@ document.addEventListener('focus',e=>{
   document.addEventListener('focusout',schedule,true);
   document.addEventListener('click',function(){ setTimeout(schedule,140); },true);
   document.addEventListener('keydown',function(e){if(e.key==='Enter')setTimeout(schedule,140);},true);
+})();
+</script>
+
+
+<script>
+/* DENTYAR V61 FIX: explicitly reformat dynamically-created forms and SMS text. */
+(function(){
+  if(window.__dentyarV61LocaleFixInstalled) return;
+  window.__dentyarV61LocaleFixInstalled = true;
+  function apply(root){
+    root = root && root.querySelectorAll ? root : document;
+    try{
+      if(typeof setupV26JalaliDates === 'function') setupV26JalaliDates(root);
+      if(typeof formatAllNumericInputs === 'function') formatAllNumericInputs();
+      if(typeof toFaTextNodeTree === 'function') toFaTextNodeTree(root === document ? document.body : root);
+      root.querySelectorAll('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])').forEach(function(el){
+        const id=(el.id||'')+' '+(el.name||'')+' '+(el.getAttribute('autocomplete')||'');
+        const v=String(el.value||'');
+        const target=el.type==='tel' || /nid|national|phone|mobile|postal|economic|birth|insurance.?no|policy.?no/i.test(id);
+        if(target && v && /^[+\-()\s0-9۰-۹٠-٩.,/]+$/.test(v)){
+          el.value=typeof faDigits==='function'?faDigits(v):v.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+          el.setAttribute('dir','ltr');
+          el.style.textAlign='left';
+        }
+      });
+    }catch(e){ console.warn('DENTYAR V61 locale display:',e); }
+  }
+  const originalShowModal=window.showModal;
+  if(typeof originalShowModal==='function'){
+    window.showModal=function(){
+      const result=originalShowModal.apply(this,arguments);
+      apply(document.getElementById('modalContent')||document);
+      requestAnimationFrame(function(){apply(document.getElementById('modalContent')||document);});
+      return result;
+    };
+  }
+  const originalRenderPage=window.renderPage;
+  if(typeof originalRenderPage==='function'){
+    window.renderPage=function(){
+      const result=originalRenderPage.apply(this,arguments);
+      apply(document.getElementById('pageContent')||document);
+      requestAnimationFrame(function(){apply(document.getElementById('pageContent')||document);});
+      return result;
+    };
+  }
+  document.addEventListener('input',function(e){
+    const el=e.target;
+    if(!el || !el.matches || !el.matches('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])')) return;
+    const v=String(el.value||'');
+    const id=(el.id||'')+' '+(el.name||'');
+    if((el.type==='tel'||/nid|national|phone|mobile|postal|economic|birth|insurance.?no|policy.?no/i.test(id)) && v && /^[+\-()\s0-9۰-۹٠-٩.,/]+$/.test(v)){
+      const start=el.selectionStart;
+      el.value=typeof faDigits==='function'?faDigits(v):v.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+      try{if(start!==null)el.setSelectionRange(start,start);}catch(_){}
+    }
+  },true);
+  const observer=new MutationObserver(function(){apply(document);});
+  function start(){ if(document.body) observer.observe(document.body,{subtree:true,childList:true,characterData:true}); apply(document); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
 })();
 </script>
 
