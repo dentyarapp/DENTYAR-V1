@@ -5,8 +5,8 @@
 <!-- DENTYAR V59 FINAL REPORT EXPORT FIX — ANDROID NATIVE SAVE -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DENTYAR — Your Smart Dental Assistant | V63</title>
-<script>const DENTYAR_APP_VERSION = "V63";</script>
+<title>DENTYAR — Your Smart Dental Assistant | V64</title>
+<script>const DENTYAR_APP_VERSION = "V64";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -5429,11 +5429,11 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V63 FIX: enforce Persian digits + Jalali date display after every render.
+/* DENTYAR V64 FIX: enforce Persian digits + Jalali date display after every render.
    Keep data values normalized only at action boundaries; visible numeric values remain Persian. */
 (function(){
-  if(window.__dentyarV63LocaleFixInstalled) return;
-  window.__dentyarV63LocaleFixInstalled = true;
+  if(window.__dentyarV64LocaleFixInstalled) return;
+  window.__dentyarV64LocaleFixInstalled = true;
   const numericValue = /^[+\-()\s0-9۰-۹٠-٩.,/:]+$/;
   function applyDentyarV63LocaleFix(root){
     try{
@@ -5488,10 +5488,10 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V63 FIX: explicitly reformat dynamically-created forms and SMS text. */
+/* DENTYAR V64 FIX: explicitly reformat dynamically-created forms and SMS text. */
 (function(){
-  if(window.__dentyarV63LocaleFixInstalled) return;
-  window.__dentyarV63LocaleFixInstalled = true;
+  if(window.__dentyarV64SmsLocaleFixInstalled) return;
+  window.__dentyarV64SmsLocaleFixInstalled = true;
   function apply(root){
     root = root && root.querySelectorAll ? root : document;
     try{
