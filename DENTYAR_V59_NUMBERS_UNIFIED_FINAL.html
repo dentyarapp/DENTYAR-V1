@@ -980,7 +980,7 @@ function formatAllNumericInputs(){
       el.style.textAlign='left';
     }
     if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]') || el.hasAttribute('data-numeric-only')){
-      if(el.value) el.value = (el===document.activeElement) ? toEnDigits(el.value) : faDigits(toEnDigits(el.value));
+      if(el.value) el.value = faDigits(toEnDigits(el.value));
       el.setAttribute('dir','ltr');
       el.style.textAlign='left';
     }
@@ -5092,13 +5092,13 @@ startDentyarIDBMirror();
     if(!el || !el.matches) return;
     if(el.matches('input[type=tel],input[inputmode=numeric],input[inputmode=decimal],input[type=number]') || el.hasAttribute('data-numeric-only') || /Nid$/.test(el.id||'')){
       const pos=el.selectionStart;
-      const converted=toEnDigits(el.value);
+      const converted=faDigits(toEnDigits(el.value));
       if(converted!==el.value){ el.value=converted; try{el.setSelectionRange(pos,pos);}catch(_){} }
     }
   },true);
 document.addEventListener('focus',e=>{
     const el=e.target;
-    if(el && el.matches && el.matches('input[data-numeric-only],input[data-v26-number],input[type=tel],input[inputmode=numeric],input[type=number]') && el.value) el.value=toEnDigits(el.value);
+    if(el && el.matches && el.matches('input[data-numeric-only],input[data-v26-number],input[type=tel],input[inputmode=numeric],input[type=number]') && el.value) el.value=faDigits(toEnDigits(el.value));
   },true);
   document.addEventListener('blur',e=>{
     const el=e.target;
