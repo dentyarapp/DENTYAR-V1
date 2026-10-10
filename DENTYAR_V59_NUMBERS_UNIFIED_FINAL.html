@@ -5,8 +5,8 @@
 <!-- DENTYAR V59 FINAL REPORT EXPORT FIX — ANDROID NATIVE SAVE -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DENTYAR — Your Smart Dental Assistant | V60</title>
-<script>const DENTYAR_APP_VERSION = "V60";</script>
+<title>DENTYAR — Your Smart Dental Assistant | V61</title>
+<script>const DENTYAR_APP_VERSION = "V61";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -2220,9 +2220,11 @@ function buildSmsMessage(template, appt){
   let msg = (template||'')
     .replace(/\{نام\}/g, appt.name||'')
     .replace(/\{تاریخ\}/g, fmtDateFa(appt.date))
-    .replace(/\{ساعت\}/g, appt.time||'');
+    .replace(/\{ساعت\}/g, faDigits(appt.time||''));
   const footer = [STATE.meta.clinicName, STATE.meta.supportPhone].filter(Boolean).join(' - ');
-  return footer? (msg + '\n' + footer) : msg;
+  // SMS body is display text: convert every digit, including phone numbers in the footer,
+  // while openSmsComposer separately keeps the destination number in ASCII for Android.
+  return faDigits(footer ? (msg + '\n' + footer) : msg);
 }
 function openSmsComposer(phone, message){
   const p = toEnDigits(phone||'').replace(/\s+/g,'');
@@ -2457,7 +2459,7 @@ function openPatientForm(patientId, prefill){
     <label>نام و نام‌خانوادگی * (تنها فیلد الزامی)</label>
     <input type="text" id="pfName" value="${esc(p.name)}">
     <div class="grid2">
-      <div><label>کد ملی</label><input type="text" id="pfNid" value="${esc(p.nationalId||'')}"></div>
+      <div><label>کد ملی</label><input type="text" id="pfNid" value="${esc(faDigits(p.nationalId||''))}"></div>
       <div><label>شماره تماس</label><input type="tel" id="pfPhone" value="${esc(faDigits(p.phone||''))}"></div>
     </div>
     <div class="grid2">
@@ -2739,7 +2741,66 @@ ${insuranceStatus?'وضعیت تأیید بیمه: '+esc(insuranceStatus):'وض�
 این سند بر پایه اطلاعات ثبت‌شده در دنت‌یار تهیه شده و به‌خودی‌خود ادعای «فاکتور رسمی مالیاتی» ندارد.</div>
 <div class="signs"><div class="sign">مهر و امضای مطب</div><div class="sign">امضای بیمار</div></div>
 <div class="footer">${esc(clinicName)} · ${clinicPhone?'تلفن: '+esc(clinicPhone)+' · ':''}سامانه دنت‌یار</div>
-</main></body></html>`;
+</main>
+<script>
+/* DENTYAR V61 FIX: explicitly reformat dynamically-created forms and SMS text. */
+(function(){
+  if(window.__dentyarV61LocaleFixInstalled) return;
+  window.__dentyarV61LocaleFixInstalled = true;
+  function apply(root){
+    root = root && root.querySelectorAll ? root : document;
+    try{
+      if(typeof setupV26JalaliDates === 'function') setupV26JalaliDates(root);
+      if(typeof formatAllNumericInputs === 'function') formatAllNumericInputs();
+      if(typeof toFaTextNodeTree === 'function') toFaTextNodeTree(root === document ? document.body : root);
+      root.querySelectorAll('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])').forEach(function(el){
+        const id=(el.id||'')+' '+(el.name||'')+' '+(el.getAttribute('autocomplete')||'');
+        const v=String(el.value||'');
+        const target=el.type==='tel' || /nid|national|phone|mobile|postal|economic|birth|insurance.?no|policy.?no/i.test(id);
+        if(target && v && /^[+\-()\s0-9۰-۹٠-٩.,/]+$/.test(v)){
+          el.value=typeof faDigits==='function'?faDigits(v):v.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+          el.setAttribute('dir','ltr');
+          el.style.textAlign='left';
+        }
+      });
+    }catch(e){ console.warn('DENTYAR V61 locale display:',e); }
+  }
+  const originalShowModal=window.showModal;
+  if(typeof originalShowModal==='function'){
+    window.showModal=function(){
+      const result=originalShowModal.apply(this,arguments);
+      apply(document.getElementById('modalContent')||document);
+      requestAnimationFrame(function(){apply(document.getElementById('modalContent')||document);});
+      return result;
+    };
+  }
+  const originalRenderPage=window.renderPage;
+  if(typeof originalRenderPage==='function'){
+    window.renderPage=function(){
+      const result=originalRenderPage.apply(this,arguments);
+      apply(document.getElementById('pageContent')||document);
+      requestAnimationFrame(function(){apply(document.getElementById('pageContent')||document);});
+      return result;
+    };
+  }
+  document.addEventListener('input',function(e){
+    const el=e.target;
+    if(!el || !el.matches || !el.matches('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])')) return;
+    const v=String(el.value||'');
+    const id=(el.id||'')+' '+(el.name||'');
+    if((el.type==='tel'||/nid|national|phone|mobile|postal|economic|birth|insurance.?no|policy.?no/i.test(id)) && v && /^[+\-()\s0-9۰-۹٠-٩.,/]+$/.test(v)){
+      const start=el.selectionStart;
+      el.value=typeof faDigits==='function'?faDigits(v):v.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+      try{if(start!==null)el.setSelectionRange(start,start);}catch(_){}
+    }
+  },true);
+  const observer=new MutationObserver(function(){apply(document);});
+  function start(){ if(document.body) observer.observe(document.body,{subtree:true,childList:true,characterData:true}); apply(document); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
+})();
+</script>
+
+</body></html>`;
   if(isDentyarNativeApp()){
     try{
       const action=await dentyarReportAction();
@@ -3718,7 +3779,7 @@ function renderUpdaterPanel(){
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
         <div class="updateStatus">
-          <span>نسخه نصب‌شده: <b id="currentAppVersion">V60</b></span>
+          <span>نسخه نصب‌شده: <b id="currentAppVersion">V61</b></span>
           <span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span>
         </div>
         <div class="updateHint" id="platformUpdateHint">
@@ -3740,7 +3801,7 @@ function renderUpdaterPanel(){
             این بخش مخصوص نسخه Android است. فایل APK نسخه جدید را به‌صورت دستی انتخاب کنید تا ذخیره و برای نصب آماده شود؛ iPhone/iPad فایل APK را نصب نمی‌کند و از نسخه وب/PWA استفاده می‌کند.
           </p>
           <div class="grid2">
-            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V60"></div>
+            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V61"></div>
             <div><label>عنوان تغییرات</label><input id="updateNoteInput" placeholder="مثلاً بهبود سازگاری دستگاه‌ها"></div>
           </div>
           <label style="margin-top:8px">فایل APK نسخه جدید</label>
@@ -5428,13 +5489,13 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V60 FIX: enforce Persian digits + Jalali date display after every render.
+/* DENTYAR V61 FIX: enforce Persian digits + Jalali date display after every render.
    Keep data values normalized only at action boundaries; visible numeric values remain Persian. */
 (function(){
-  if(window.__dentyarV60LocaleFixInstalled) return;
-  window.__dentyarV60LocaleFixInstalled = true;
+  if(window.__dentyarV61LocaleFixInstalled) return;
+  window.__dentyarV61LocaleFixInstalled = true;
   const numericValue = /^[+\-()\s0-9۰-۹٠-٩.,/:]+$/;
-  function applyDentyarV60LocaleFix(root){
+  function applyDentyarV61LocaleFix(root){
     try{
       if(typeof setupV26JalaliDates === 'function') setupV26JalaliDates(root || document);
       if(typeof toFaTextNodeTree === 'function') toFaTextNodeTree(root || document.body);
@@ -5449,7 +5510,7 @@ document.addEventListener('focus',e=>{
           el.value = typeof faDigits==='function' ? faDigits(val) : val.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
         }
       });
-    }catch(e){ console.warn('DENTYAR V60 Persian display fix:',e); }
+    }catch(e){ console.warn('DENTYAR V61 Persian display fix:',e); }
   }
   let queued=false;
   function schedule(){
@@ -5457,7 +5518,7 @@ document.addEventListener('focus',e=>{
     queued=true;
     requestAnimationFrame(function(){
       queued=false;
-      applyDentyarV60LocaleFix(document);
+      applyDentyarV61LocaleFix(document);
     });
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',schedule,{once:true});
