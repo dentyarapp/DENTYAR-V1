@@ -1,5 +1,5 @@
-name: Build DENTYAR V63 APK
-# Trigger V63 release workflow
+name: Build DENTYAR V64 APK
+# Trigger V64 release workflow
 
 permissions:
   contents: write
@@ -34,10 +34,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar-v61",
-            "version": "63.0.0",
+            "version": "64.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V63"
+              "build": "echo DENTYAR V64"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -274,8 +274,8 @@ jobs:
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
-          grep -q "DENTYAR V63 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V63"' www/index.html
+          grep -q "DENTYAR V64 FIX" www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V64"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
@@ -318,32 +318,76 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: آماده‌سازی امضای ثابت برای به‌روزرسانی درون‌برنامه‌ای
+        id: signing
+        env:
+          DENTYAR_KEYSTORE_BASE64: ${{ secrets.DENTYAR_KEYSTORE_BASE64 }}
+          DENTYAR_KEYSTORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+          DENTYAR_KEY_ALIAS: ${{ secrets.DENTYAR_KEY_ALIAS }}
+          DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEY_PASSWORD }}
+        run: |
+          if [ -z "$DENTYAR_KEYSTORE_BASE64" ] || [ -z "$DENTYAR_KEYSTORE_PASSWORD" ] || [ -z "$DENTYAR_KEY_ALIAS" ] || [ -z "$DENTYAR_KEY_PASSWORD" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Stable signing secrets are not configured; only a debug APK will be built and it will not be published as an update."
+            exit 0
+          fi
+          printf '%s' "$DENTYAR_KEYSTORE_BASE64" | base64 --decode > android/app/dentyar-release.keystore
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          if "signingConfigs {" not in s:
+              s = s.replace("    buildTypes {", """    signingConfigs {
+                  release {
+                      storeFile file("dentyar-release.keystore")
+                      storePassword System.getenv("DENTYAR_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("DENTYAR_KEY_ALIAS")
+                      keyPassword System.getenv("DENTYAR_KEY_PASSWORD")
+                  }
+              }
+          
+              buildTypes {""", 1)
+          if "signingConfig signingConfigs.release" not in s:
+              s = s.replace("        release {", "        release {\n            signingConfig signingConfigs.release", 1)
+          p.write_text(s)
+          PY
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
       - name: ساخت APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: ساخت APK امضاشده با کلید ثابت
+        if: ${{ steps.signing.outputs.available == 'true' }}
+        working-directory: android
+        run: ./gradlew assembleRelease
+
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V63.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V64.apk
+
+      - name: جایگزینی با APK دارای امضای ثابت
+        if: ${{ steps.signing.outputs.available == 'true' }}
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V64.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V63-APK
-          path: DENTYAR-V63.apk
+          name: DENTYAR-V64-APK
+          path: DENTYAR-V64.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V63 در Release
-        if: ${{ contains(github.event.head_commit.message, '[publish-v63]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V63 release workflow fix') }}
+      - name: انتشار نسخه اصلاحی V64 در Release
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v64]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V64 release workflow fix')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v63-final
-          name: DENTYAR V63 Persian Digits and SMS Fix
+          tag_name: v64-final
+          name: DENTYAR V64 Persian Digits and SMS Fix
           body: |
-            نسخه اصلاحی دنت‌یار V63 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
+            نسخه اصلاحی دنت‌یار V64 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
             این نسخه با اصلاح اجباری نمایش اعداد فارسی و تاریخ‌های شمسی در رابط کاربری بسته‌بندی شده است.
-          files: DENTYAR-V63.apk
+          files: DENTYAR-V64.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
