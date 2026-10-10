@@ -447,7 +447,7 @@ const APP_KEY = 'lb_dental_v1';
 const DEFAULT_STATE = () => ({
   meta:{
     clinicName:'مطب لبخند زیبا', slogan:'دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما', password:'12345678', profilePassword:'87654321',
-    logoDataUrl:null, supportPhone:'', supportEmail:'', fileNoDate:null, fileNoSeq:0, fileNoYear:null, fileNoMode:'continuous', fileNoResetDate:null, createdAt: Date.now(), dashboardMetrics:['totalPatients','newPatients','todayVisits','todayAppointments','treatments','ongoing','completed','referrals','cancelled','revenue','received','debts','insurance','discounts','treatmentCount','topTreatment','dentists'],
+    logoDataUrl:null, supportPhone:'', supportEmail:'', systemContactPhone:'', systemContactEmail:'', fileNoDate:null, fileNoSeq:0, fileNoYear:null, fileNoMode:'continuous', fileNoResetDate:null, createdAt: Date.now(), dashboardMetrics:['totalPatients','newPatients','todayVisits','todayAppointments','treatments','ongoing','completed','referrals','cancelled','revenue','received','debts','insurance','discounts','treatmentCount','topTreatment','dentists'],
     smsConfirmTemplate:'{نام} عزیز، نوبت شما برای تاریخ {تاریخ} ساعت {ساعت} با موفقیت ثبت شد.',
     smsReminderTemplate:'{نام} عزیز، یک ساعت تا رسیدن نوبت شما در تاریخ {تاریخ} ساعت {ساعت} باقی‌مانده است.',
     clinicProfile:{
@@ -908,7 +908,10 @@ function toEnDigits(s){
 }
 function fmtDateFa(ts){
   try{
-    const d=new Date(ts);
+    // ISO date-only values are parsed at local noon to avoid timezone day shifts in reports/Excel.
+    const raw=String(ts ?? '');
+    const d=/^\\d{4}-\\d{2}-\\d{2}$/.test(raw) ? new Date(raw+'T12:00:00') : new Date(ts);
+    if(Number.isNaN(d.getTime())) return '';
     const [y,m,day]=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate());
     return faDigits(`${String(y).padStart(4,'0')}/${String(m).padStart(2,'0')}/${String(day).padStart(2,'0')}`);
   }catch(e){ return ''; }
@@ -1677,13 +1680,13 @@ function renderLock(){
     <div class="lockSlogan"><span class="brandFa">دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما</span></div>
     <div class="pinDots" id="pinDots">${'<span></span>'.repeat(8)}</div>
     <div class="pinPad">
-      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="pinPress('${n}')">${n}</button>`).join('')}
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="pinPress('${n}')">${faDigits(n)}</button>`).join('')}
       <button class="clearBtn" onclick="pinClear()">C</button>
-      <button onclick="pinPress('0')">0</button>
+      <button onclick="pinPress('0')">${faDigits(0)}</button>
       <button class="unlockBtn" onclick="pinSubmit()">${ICON_UNLOCK}</button>
     </div>
     <div id="lockError"></div>
-    <div id="lockHint">رمز پیش‌فرض: 12345678 — از بخش تنظیمات قابل تغییر است</div>
+    <div id="lockHint">رمز پیش‌فرض: ${faDigits('12345678')} — از بخش تنظیمات قابل تغییر است</div>
   `;
 }
 function updatePinDots(){
@@ -2694,7 +2697,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1
 <div class="doc"><span><b>${esc(title)}</b></span><span>شماره سند / پرونده: <b>${esc(faDigits(docNo))}</b></span><span>تاریخ: <b>${esc(fmtDateFa(v.date))}</b></span></div>
 <div class="section">مشخصات بیمار و درمان</div>
 <table><tbody>
-<tr><td>نام بیمار</td><td>${esc(p.name||'-')}</td><td>شماره پرونده</td><td>${esc(p.fileNo||'-')}</td></tr>
+<tr><td>نام بیمار</td><td>${esc(p.name||'-')}</td><td>شماره پرونده</td><td>${esc(faDigits(p.fileNo||'-'))}</td></tr>
 <tr><td>کد ملی</td><td>${esc(p.nationalId||'-')}</td><td>تلفن</td><td>${esc(p.phone||'-')}</td></tr>
 <tr><td>نوع درمان</td><td>${esc(v.treatmentType||'-')}</td><td>دندان‌پزشک</td><td>${esc(dentistName||'-')}</td></tr>
 </tbody></table>
@@ -4297,7 +4300,7 @@ function renderContact(){
     <div class="card">
       <h3>درباره‌ی سامانه</h3>
       <div class="kv"><span>نام سامانه</span><b>${esc(STATE.meta.clinicName)}</b></div>
-      <div class="kv"><span>نسخه</span><b>۱.۰</b></div>
+      <div class="kv"><span>نسخه</span><b>V59/1 — نسخه آزمایشی اصلاحات پنج‌گانه</b></div>
     </div>
   `;
 }
@@ -5115,7 +5118,7 @@ document.addEventListener('focus',e=>{
 (function(){
   const SYNC = {};
   let fb=null, dbm=null, fbApp=null, db=null, rootRef=null;
-  let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false, retryTimer=null, retryCount=0;
+  let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false, retryTimer=null, retryTimerDelay=0, retryCount=0;
   const FB_APP_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
   const PUSHED_KEY='dentyar_sync_pushed_ids';
@@ -5142,10 +5145,22 @@ document.addEventListener('focus',e=>{
   function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
   function scheduleReconnect(delay){
     const cfg=SYNC.cfg();
-    if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig || retryTimer) return;
+    if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig) return;
+    const requested=Number.isFinite(delay)?Math.max(250,delay):null;
+    // A network-online event must be able to replace a long backoff with a quick retry.
+    if(retryTimer){
+      if(requested!==null && requested<retryTimerDelay){
+        clearTimeout(retryTimer);
+        retryTimer=null;
+        retryTimerDelay=0;
+      }else{
+        return;
+      }
+    }
     retryCount=Math.min(retryCount+1,6);
-    const wait=Number.isFinite(delay)?delay:Math.min(5000*Math.pow(2,retryCount-1),60000);
-    retryTimer=setTimeout(function(){ retryTimer=null; SYNC.connect(); },wait);
+    const wait=requested!==null?requested:Math.min(3000*Math.pow(2,retryCount-1),60000);
+    retryTimerDelay=wait;
+    retryTimer=setTimeout(function(){ retryTimer=null; retryTimerDelay=0; SYNC.connect(); },wait);
   }
 
   SYNC.connect = async function(){
@@ -5175,6 +5190,9 @@ document.addEventListener('focus',e=>{
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
     }catch(e){
       console.error('DentyarSync connect failed', e);
+      clearSubs();
+      started=false;
+      connected=false;
       SYNC.renderStatus&&SYNC.renderStatus();
       toast('اتصال همگام‌سازی ناموفق بود؛ اتصال اینترنت و دسترسی به سرویس همگام‌سازی بررسی شود.');
       scheduleReconnect();
@@ -5182,7 +5200,7 @@ document.addEventListener('focus',e=>{
   };
 
   SYNC.disconnect = function(){
-    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     clearSubs();
     if(db){ try{ dbm.goOffline(db); }catch(_){} }
     if(fbApp){ try{ fb.deleteApp(fbApp); }catch(_){} }
