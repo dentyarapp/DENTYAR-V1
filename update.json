@@ -1,13 +1,13 @@
 {
-  "version": "V60",
-  "notes": "اصلاح نمایش پایدار ارقام فارسی در همه فیلدهای عددی و متن‌های رابط کاربری، همراه با نمایش تاریخ‌های شمسی در انتخابگرهای تاریخ. لطفاً پیش از نصب از اطلاعات پشتیبان تهیه شود.",
+  "version": "V59",
+  "notes": "تا زمان تکمیل ساخت و بررسی بسته اصلاحی V60، نسخه پایدار فعلی V59 در پنل باقی می‌ماند.",
   "android": {
-    "version": "V60",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v60-final/DENTYAR-V60.apk",
-    "fileName": "DENTYAR-V60.apk"
+    "version": "V59",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v59-final/DENTYAR-V59.apk",
+    "fileName": "DENTYAR-V59.apk"
   },
   "web": {
-    "version": "V60",
+    "version": "V59",
     "url": "https://github.com/dentyarapp/DENTYAR-V1/tree/test/dentyar-comprehensive-fixes-20261009"
   }
 }
