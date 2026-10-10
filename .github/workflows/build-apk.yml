@@ -1,4 +1,4 @@
-name: Build DENTYAR V61 APK
+name: Build DENTYAR V62 APK
 
 permissions:
   contents: write
@@ -33,10 +33,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar-v61",
-            "version": "61.0.0",
+            "version": "62.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V61"
+              "build": "echo DENTYAR V62"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -273,8 +273,8 @@ jobs:
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
-          grep -q "DENTYAR V61 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V61"' www/index.html
+          grep -q "DENTYAR V62 FIX" www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V62"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
@@ -324,25 +324,25 @@ jobs:
           ./gradlew assembleDebug
 
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V61.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V62.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V61-APK
-          path: DENTYAR-V61.apk
+          name: DENTYAR-V62-APK
+          path: DENTYAR-V62.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V61 در Release
+      - name: انتشار نسخه اصلاحی V62 در Release
         if: ${{ contains(github.event.head_commit.message, '[publish-v61]') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v61-final
-          name: DENTYAR V61 Persian Digits and SMS Fix
+          tag_name: v62-final
+          name: DENTYAR V62 Persian Digits and SMS Fix
           body: |
-            نسخه اصلاحی دنت‌یار V61 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
+            نسخه اصلاحی دنت‌یار V62 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
             این نسخه با اصلاح اجباری نمایش اعداد فارسی و تاریخ‌های شمسی در رابط کاربری بسته‌بندی شده است.
-          files: DENTYAR-V61.apk
+          files: DENTYAR-V62.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
