@@ -1,4 +1,4 @@
-name: Build DENTYAR V59 APK
+name: Build DENTYAR V60 APK
 
 permissions:
   contents: write
@@ -32,11 +32,11 @@ jobs:
 
           cat > package.json <<'EOF'
           {
-            "name": "dentyar-v59",
-            "version": "59.0.0",
+            "name": "dentyar-v60",
+            "version": "60.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V59"
+              "build": "echo DENTYAR V60"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -322,25 +322,25 @@ jobs:
           ./gradlew assembleDebug
 
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V59.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V60.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V59-APK
-          path: DENTYAR-V59.apk
+          name: DENTYAR-V60-APK
+          path: DENTYAR-V60.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه نهایی V59 در Release
-        if: ${{ contains(github.event.head_commit.message, '[publish-v59]') }}
+      - name: انتشار نسخه اصلاحی V60 در Release
+        if: ${{ contains(github.event.head_commit.message, '[publish-v60]') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v59-final
-          name: DENTYAR V59 Final
+          tag_name: v60-final
+          name: DENTYAR V60 Numeric Fix
           body: |
-            نسخه نهایی تثبیت‌شده دنت‌یار V59.
-            اصلاحات گزارش‌گیری، ذخیره مستقیم و اشتراک‌گذاری، و پنل به‌روزرسانی در این نسخه بسته‌بندی شده‌اند.
-          files: DENTYAR-V59.apk
+            نسخه اصلاحی دنت‌یار V60 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
+            این نسخه با اصلاح اجباری نمایش اعداد فارسی و تاریخ‌های شمسی در رابط کاربری بسته‌بندی شده است.
+          files: DENTYAR-V60.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
