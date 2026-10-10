@@ -3380,7 +3380,7 @@ function renderBackup(){
         <div class="row" style="justify-content:space-between;align-items:center">
           <div>
             <b>${fmtDateFa(h.ts)}</b>
-            <div style="font-size:11.5px;color:var(--muted)">${(()=>{const d=new Date(h.ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()} · ${h.note||''}</div>
+            <div style="font-size:11.5px;color:var(--muted)">${(()=>{const d=new Date(h.ts);return faDigits(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'));})()} · ${h.note||''}</div>
           </div>
           <div class="row">
             <button class="btn btn-outline btn-sm" onclick="restoreFromHistory('${h.id}','merge')">ادغام</button>
@@ -5325,7 +5325,7 @@ document.addEventListener('focus',e=>{
   SYNC.settingsCardHtml = function(){
     const cfg = SYNC.cfg()||{ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null };
     const fbCfg = cfg.firebaseConfig||{};
-    const ls = cfg.lastSyncAt ? new Date(cfg.lastSyncAt).toLocaleString('en-GB',{numberingSystem:'latn'}) : '—';
+    const ls = cfg.lastSyncAt ? (()=>{ const d=new Date(cfg.lastSyncAt); return fmtDateFa(d.getTime())+' '+faDigits(String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')); })() : '—';
     const ready = SYNC.isReady();
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
