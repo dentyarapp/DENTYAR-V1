@@ -5,8 +5,8 @@
 <!-- DENTYAR V59 FINAL REPORT EXPORT FIX — ANDROID NATIVE SAVE -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DENTYAR — Your Smart Dental Assistant | V59</title>
-<script>const DENTYAR_APP_VERSION = "V59";</script>
+<title>DENTYAR — Your Smart Dental Assistant | V60</title>
+<script>const DENTYAR_APP_VERSION = "V60";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -3718,7 +3718,7 @@ function renderUpdaterPanel(){
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
         <div class="updateStatus">
-          <span>نسخه نصب‌شده: <b id="currentAppVersion">V59</b></span>
+          <span>نسخه نصب‌شده: <b id="currentAppVersion">V60</b></span>
           <span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span>
         </div>
         <div class="updateHint" id="platformUpdateHint">
@@ -5423,6 +5423,65 @@ document.addEventListener('focus',e=>{
   function autoStart(){ const c=SYNC.cfg(); if(c&&c.enabled){ SYNC.connect(); } }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoStart, {once:true});
   else autoStart();
+})();
+</script>
+
+
+<script>
+/* DENTYAR V60 FIX: enforce Persian digits + Jalali date display after every render.
+   Keep data values normalized only at action boundaries; visible numeric values remain Persian. */
+(function(){
+  if(window.__dentyarV60LocaleFixInstalled) return;
+  window.__dentyarV60LocaleFixInstalled = true;
+  const numericValue = /^[+\-()\s0-9۰-۹٠-٩.,/:]+$/;
+  function applyDentyarV60LocaleFix(root){
+    try{
+      if(typeof setupV26JalaliDates === 'function') setupV26JalaliDates(root || document);
+      if(typeof toFaTextNodeTree === 'function') toFaTextNodeTree(root || document.body);
+      const scope = root && root.querySelectorAll ? root : document;
+      scope.querySelectorAll('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])').forEach(function(el){
+        if(el.type === 'number'){
+          try{ el.type='text'; }catch(_){}
+          el.setAttribute('inputmode','decimal');
+        }
+        const val=String(el.value||'');
+        if(val && numericValue.test(val) && /[0-9۰-۹٠-٩]/.test(val)){
+          el.value = typeof faDigits==='function' ? faDigits(val) : val.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+        }
+      });
+    }catch(e){ console.warn('DENTYAR V60 Persian display fix:',e); }
+  }
+  let queued=false;
+  function schedule(){
+    if(queued) return;
+    queued=true;
+    requestAnimationFrame(function(){
+      queued=false;
+      applyDentyarV60LocaleFix(document);
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',schedule,{once:true});
+  else schedule();
+  const observer = new MutationObserver(schedule);
+  function beginObserve(){
+    if(document.body) observer.observe(document.body,{subtree:true,childList:true,characterData:true});
+    schedule();
+  }
+  if(document.body) beginObserve();
+  else document.addEventListener('DOMContentLoaded',beginObserve,{once:true});
+  document.addEventListener('input',function(e){
+    const el=e.target;
+    if(!el || !el.matches || !el.matches('input:not([type="password"]):not([type="file"]):not([type="hidden"]):not([type="date"]):not([type="time"])')) return;
+    const val=String(el.value||'');
+    if(val && numericValue.test(val) && /[0-9۰-۹٠-٩]/.test(val)){
+      const start=el.selectionStart;
+      el.value=typeof faDigits==='function'?faDigits(val):val.replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+      try{if(start!==null)el.setSelectionRange(start,start);}catch(_){}
+    }
+  },true);
+  document.addEventListener('focusout',schedule,true);
+  document.addEventListener('click',function(){ setTimeout(schedule,140); },true);
+  document.addEventListener('keydown',function(e){if(e.key==='Enter')setTimeout(schedule,140);},true);
 })();
 </script>
 
