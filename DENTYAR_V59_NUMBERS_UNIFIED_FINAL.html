@@ -1593,6 +1593,28 @@ function dentyarReportAction(){
 }
 
 
+function formatRowsForExportFa(rows){
+  if(!Array.isArray(rows)) return rows;
+  const headers=Array.isArray(rows[0]) ? rows[0].map(v=>String(v??'')) : [];
+  const moneyHeader=/(مبلغ|تومان|سقف تعهد|تخفیف|سهم بیمه|پرداخت نقدی|پرداخت کارتخوان|انتقال بانکی|سایر پرداخت|استرداد وجه|کل پرداختی|باقیمانده)/;
+  function groupedFa(value){
+    const raw=toEnDigits(String(value??'')).trim();
+    if(!raw || !/^-?\d+(?:\.\d+)?$/.test(raw)) return faDigits(raw);
+    const parts=raw.split('.');
+    const intPart=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    return faDigits(intPart+(parts.length>1?'.'+parts[1]:''));
+  }
+  return rows.map((row,rowIndex)=>{
+    if(!Array.isArray(row)) return row;
+    return row.map((cell,colIndex)=>{
+      if(cell===null || cell===undefined) return '';
+      const value=String(cell);
+      if(rowIndex>0 && moneyHeader.test(headers[colIndex]||'')) return groupedFa(value);
+      return faDigits(toEnDigits(value));
+    });
+  });
+}
+
 async function exportRowsAsXLSX(
   rows,
   filename,
@@ -1600,10 +1622,11 @@ async function exportRowsAsXLSX(
   options={}
 ){
 
+  const exportRows = formatRowsForExportFa(rows);
   const bytes =
     XLSXWriter.build(
       sheetName || 'گزارش',
-      rows
+      exportRows
     );
 
   return await downloadBlob(
@@ -1627,8 +1650,9 @@ async function exportRowsAsCSV(
   options={}
 ){
 
+  const exportRows = formatRowsForExportFa(rows);
   const csv =
-    rows.map(function(row){
+    exportRows.map(function(row){
 
       return row.map(function(cell){
 
