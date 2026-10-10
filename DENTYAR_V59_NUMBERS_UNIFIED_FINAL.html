@@ -4307,23 +4307,42 @@ function renderGuide(){
 
 /* ===================== ارتباط با ما ===================== */
 function renderContact(){
+  const contactPhone = STATE.meta.systemContactPhone || STATE.meta.supportPhone || '۰۹۱۶۵۱۲۸۷۱۱';
+  const contactEmail = STATE.meta.systemContactEmail || STATE.meta.supportEmail || 'dentyar-app@gmail.com';
   document.getElementById('pageContent').innerHTML = `
-    <div class="card">
-      <h3>ارتباط با پشتیبانی فنی</h3>
-      <div class="kv"><span>تلفن پشتیبانی سامانه</span><b>${esc(STATE.meta.systemContactPhone || 'در انتظار تکمیل توسط مدیر سامانه')}</b></div>
-      <div class="kv"><span>ایمیل پشتیبانی سامانه</span><b>${esc(STATE.meta.systemContactEmail || 'در انتظار تکمیل توسط مدیر سامانه')}</b></div>
-      <p style="font-size:11px;color:var(--muted);margin-top:10px">این اطلاعات فقط از طریق مدیریت سامانه تکمیل و اصلاح می‌شوند.</p>
+    <div class="card" style="border-top:4px solid #0f766e">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <img src="${clinicLogoSrc()}" alt="لوگوی اصلی دنت‌یار" style="width:76px;height:76px;object-fit:contain;border-radius:16px;background:#fff;padding:4px">
+        <div style="flex:1;min-width:180px">
+          <h2 style="margin:0;color:#0f766e;font-size:23px">دنت‌یار</h2>
+          <div style="font-weight:800;color:#17324d;margin-top:5px">دستیار هوشمند دندان‌پزشکی شما</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V59</div>
+        </div>
+      </div>
     </div>
     <div class="card">
-      <h3>طراح و مدیر فنی</h3>
-      <div class="kv"><span>نام</span><b>حمید آل کثیر</b></div>
-      <div class="kv"><span>سمت</span><b>طراح، مدیر فنی و پشتیبانی</b></div>
-      <div class="kv"><span>شماره تماس</span><b>۰۹۱۶۵۱۲۸۷۱۱</b></div>
+      <h3>ارتباط با ما</h3>
+      <div class="kv"><span>شماره تماس پشتیبانی</span><b dir="ltr">${esc(contactPhone)}</b></div>
+      <div class="kv"><span>ایمیل پشتیبانی</span><b dir="ltr">${esc(contactEmail)}</b></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">برای پشتیبانی و دریافت راهنمایی، از راه‌های ارتباطی بالا استفاده کنید.</p>
     </div>
     <div class="card">
-      <h3>درباره‌ی سامانه</h3>
-      <div class="kv"><span>نام سامانه</span><b>${esc(STATE.meta.clinicName)}</b></div>
-      <div class="kv"><span>نسخه</span><b>V59/1 — نسخه آزمایشی اصلاحات پنج‌گانه</b></div>
+      <h3>درباره دنت‌یار | رسالت، قابلیت‌ها و مزایا</h3>
+      <p style="line-height:2;font-size:13.5px;color:var(--text)">
+        دنت‌یار سامانه‌ای تخصصی و نوآورانه در حوزه مدیریت مطب دندان‌پزشکی است که با هدف یکپارچه‌سازی فرایندهای اجرایی، سامان‌دهی اطلاعات و ارتقای کیفیت مدیریت خدمات طراحی شده است. این سامانه می‌کوشد با گردآوری امکانات موردنیاز در محیطی منسجم، به افزایش نظم، دقت و سرعت در امور روزمره مطب کمک کند.
+      </p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin-top:12px">
+        <div style="padding:11px;border-radius:12px;background:#eef8f7;border:1px solid #cfe8e5"><b style="color:#0f766e">پرونده بیماران</b><div style="font-size:12px;margin-top:4px">سامان‌دهی اطلاعات و سوابق درمانی</div></div>
+        <div style="padding:11px;border-radius:12px;background:#eef8f7;border:1px solid #cfe8e5"><b style="color:#0f766e">امور مالی و گزارش‌ها</b><div style="font-size:12px;margin-top:4px">دسترسی منظم به اطلاعات مالی و خروجی گزارش</div></div>
+        <div style="padding:11px;border-radius:12px;background:#eef8f7;border:1px solid #cfe8e5"><b style="color:#0f766e">پشتیبان‌گیری</b><div style="font-size:12px;margin-top:4px">امکانات نگهداری و انتقال اطلاعات با توجه به شرایط واقعی</div></div>
+        <div style="padding:11px;border-radius:12px;background:#eef8f7;border:1px solid #cfe8e5"><b style="color:#0f766e">به‌روزرسانی</b><div style="font-size:12px;margin-top:4px">پیگیری اصلاحات از طریق پنل به‌روزرسانی دنت‌یار</div></div>
+      </div>
+      <div class="notice" style="margin-top:12px">عملکرد قابلیت‌های وابسته به اینترنت، سرویس‌های بیرونی و همگام‌سازی، تابع تنظیمات و وضعیت واقعی اتصال است.</div>
+    </div>
+    <div class="card">
+      <h3>مشخصات نسخه</h3>
+      <div class="kv"><span>نسخه برنامه</span><b>V59 — نسخه نهایی تثبیت‌شده</b></div>
+      <div class="kv"><span>طراح، مدیر فنی و پشتیبان</span><b>حمید آل کثیر</b></div>
     </div>
   `;
 }
