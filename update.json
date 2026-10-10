@@ -1,13 +1,13 @@
 {
-  "version": "V59",
-  "notes": "نسخه نهایی تثبیت‌شده دنت‌یار V59. این نسخه مبنای بهره‌برداری است؛ اصلاحات بعدی از طریق پنل به‌روزرسانی منتشر خواهند شد.",
+  "version": "V60",
+  "notes": "اصلاح نمایش پایدار ارقام فارسی در همه فیلدهای عددی و متن‌های رابط کاربری، همراه با نمایش تاریخ‌های شمسی در انتخابگرهای تاریخ. لطفاً پیش از نصب از اطلاعات پشتیبان تهیه شود.",
   "android": {
-    "version": "V59",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v59-final/DENTYAR-V59.apk",
-    "fileName": "DENTYAR-V59.apk"
+    "version": "V60",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v60-final/DENTYAR-V60.apk",
+    "fileName": "DENTYAR-V60.apk"
   },
   "web": {
-    "version": "V59",
+    "version": "V60",
     "url": "https://github.com/dentyarapp/DENTYAR-V1/tree/test/dentyar-comprehensive-fixes-20261009"
   }
 }
