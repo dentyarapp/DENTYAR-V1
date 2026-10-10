@@ -1,13 +1,13 @@
 {
   "version": "V59",
-  "notes": "نسخه آزمایشی پنل مستقل به‌روزرسانی دنت‌یار. این manifest فقط برای آزمون بررسی نسخه است.",
+  "notes": "نسخه نهایی تثبیت‌شده دنت‌یار V59. این نسخه مبنای بهره‌برداری است؛ اصلاحات بعدی از طریق پنل به‌روزرسانی منتشر خواهند شد.",
   "android": {
     "version": "V59",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/latest/download/DENTYAR-TEST.apk",
-    "fileName": "DENTYAR-TEST.apk"
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v59-final/DENTYAR-V59.apk",
+    "fileName": "DENTYAR-V59.apk"
   },
   "web": {
     "version": "V59",
-    "url": "https://github.com/dentyarapp/DENTYAR-V1"
+    "url": "https://github.com/dentyarapp/DENTYAR-V1/tree/test/dentyar-comprehensive-fixes-20261009"
   }
 }
