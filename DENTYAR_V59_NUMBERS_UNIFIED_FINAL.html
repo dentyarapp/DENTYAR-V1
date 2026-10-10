@@ -2,7 +2,6 @@
 <html lang="fa" dir="rtl">
 <head>
 <!-- DENTYAR V59 FINAL: Android-safe report export source -->
-<!-- DENTYAR V61 TARGETED FIX: Persian patient phone/national-ID display and Persian SMS body digits. -->
 <!-- DENTYAR V59 FINAL REPORT EXPORT FIX — ANDROID NATIVE SAVE -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -2223,8 +2222,7 @@ function buildSmsMessage(template, appt){
     .replace(/\{تاریخ\}/g, fmtDateFa(appt.date))
     .replace(/\{ساعت\}/g, faDigits(appt.time||''));
   const footer = [STATE.meta.clinicName, STATE.meta.supportPhone].filter(Boolean).join(' - ');
-  // SMS body is display text: convert every digit, including phone numbers in the footer,
-  // while openSmsComposer separately keeps the destination number in ASCII for Android.
+  // SMS body uses Persian digits; the destination number remains normalized separately.
   return faDigits(footer ? (msg + '\n' + footer) : msg);
 }
 function openSmsComposer(phone, message){
@@ -2742,10 +2740,7 @@ ${insuranceStatus?'وضعیت تأیید بیمه: '+esc(insuranceStatus):'وض�
 این سند بر پایه اطلاعات ثبت‌شده در دنت‌یار تهیه شده و به‌خودی‌خود ادعای «فاکتور رسمی مالیاتی» ندارد.</div>
 <div class="signs"><div class="sign">مهر و امضای مطب</div><div class="sign">امضای بیمار</div></div>
 <div class="footer">${esc(clinicName)} · ${clinicPhone?'تلفن: '+esc(clinicPhone)+' · ':''}سامانه دنت‌یار</div>
-</main>
-
-
-</body></html>`;
+</main></body></html>`;
   if(isDentyarNativeApp()){
     try{
       const action=await dentyarReportAction();
