@@ -1600,9 +1600,8 @@ function formatRowsForExportFa(rows){
   function groupedFa(value){
     const raw=toEnDigits(String(value??'')).trim();
     if(!raw || !/^-?\d+(?:\.\d+)?$/.test(raw)) return faDigits(raw);
-    const parts=raw.split('.');
-    const intPart=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
-    return faDigits(intPart+(parts.length>1?'.'+parts[1]:''));
+    // Use the Persian numbering system and native digit grouping for exported monetary values.
+    return new Intl.NumberFormat('fa-IR',{numberingSystem:'arabext',useGrouping:true,maximumFractionDigits:12}).format(Number(raw));
   }
   return rows.map((row,rowIndex)=>{
     if(!Array.isArray(row)) return row;
