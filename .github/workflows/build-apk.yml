@@ -1,5 +1,8 @@
 name: Build DENTYAR V59 APK
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -319,11 +322,26 @@ jobs:
           ./gradlew assembleDebug
 
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V59.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-TEST-APK
-          path: DENTYAR.apk
+          name: DENTYAR-V59-APK
+          path: DENTYAR-V59.apk
           if-no-files-found: error
+
+      - name: انتشار نسخه نهایی V59 در Release
+        if: ${{ contains(github.event.head_commit.message, '[publish-v59]') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v59-final
+          name: DENTYAR V59 Final
+          body: |
+            نسخه نهایی تثبیت‌شده دنت‌یار V59.
+            اصلاحات گزارش‌گیری، ذخیره مستقیم و اشتراک‌گذاری، و پنل به‌روزرسانی در این نسخه بسته‌بندی شده‌اند.
+          files: DENTYAR-V59.apk
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
