@@ -33,7 +33,7 @@ jobs:
 
           cat > package.json <<'EOF'
           {
-            "name": "dentyar-v61",
+            "name": "dentyar",
             "version": "64.0.0",
             "private": true,
             "scripts": {
@@ -51,7 +51,7 @@ jobs:
 
           npm install
 
-          npx cap init "دنت‌یار آزمایشی" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
