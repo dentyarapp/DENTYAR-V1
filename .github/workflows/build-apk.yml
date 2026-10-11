@@ -1,5 +1,5 @@
-name: Build DENTYAR V64 APK
-# Trigger V64 release workflow
+name: Build DENTYAR V65 APK
+# Trigger V65 release workflow
 
 permissions:
   contents: write
@@ -34,10 +34,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "64.0.0",
+            "version": "65.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V64"
+              "build": "echo DENTYAR V65"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -54,6 +54,19 @@ jobs:
           npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
+
+          # Set an explicit Android version code/name for the V65 package.
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 65', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "65.0.0"', s, count=1)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not set Android V65 versionCode/versionName")
+          p.write_text(s)
+          PY
 
           # Allow Android's system package installer to handle a user-confirmed APK update.
           python - <<'PY'
@@ -274,8 +287,8 @@ jobs:
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
-          grep -q "DENTYAR V64 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V64"' www/index.html
+          grep -q "DENTYAR V65 FIX" www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V65"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
@@ -365,29 +378,29 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V64.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V65.apk
 
       - name: جایگزینی با APK دارای امضای ثابت
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V64.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V65.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V64-APK
-          path: DENTYAR-V64.apk
+          name: DENTYAR-V65-APK
+          path: DENTYAR-V65.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V64 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v64]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V64 release workflow fix')) }}
+      - name: انتشار نسخه اصلاحی V65 در Release
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v65]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V65 release workflow fix')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v64-final
-          name: DENTYAR V64 Persian Digits and SMS Fix
+          tag_name: v65-final
+          name: DENTYAR V65 Persian Digits and SMS Fix
           body: |
-            نسخه اصلاحی دنت‌یار V64 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
+            نسخه اصلاحی دنت‌یار V65 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
             این نسخه با اصلاح اجباری نمایش اعداد فارسی و تاریخ‌های شمسی در رابط کاربری بسته‌بندی شده است.
-          files: DENTYAR-V64.apk
+          files: DENTYAR-V65.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
