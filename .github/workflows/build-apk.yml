@@ -51,7 +51,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYA" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
