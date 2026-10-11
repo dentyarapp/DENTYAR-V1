@@ -1,13 +1,13 @@
 {
   "version": "V63",
-  "notes": "به‌روزرسانی درون‌برنامه‌ای V64: اصلاحات رابط و نمایش ارقام از طریق دریافت HTML؛ APK نصب‌شده و امضای آن تغییر نمی‌کند.",
+  "notes": "نسخه آزمایشی جداگانه برای آزمون به‌روزرسانی درون‌برنامه‌ای از V63 به V64؛ برنامه اصلی نصب‌شده حذف یا جایگزین نمی‌شود.",
   "android": {
     "version": "V63",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v63-final/DENTYAR-V63.apk",
-    "fileName": "DENTYAR-V63.apk"
+    "apkUrl": "",
+    "fileName": "DENTYAR-V64-SAFE-TEST.apk"
   },
   "web": {
     "version": "V64",
-    "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/test/dentyar-comprehensive-fixes-20261009/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
+    "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/64e741f864b9dfd9c3e741e4b08526c6bad68b76/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
   }
 }
