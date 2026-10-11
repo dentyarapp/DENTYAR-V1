@@ -1,13 +1,13 @@
 {
-  "version": "V63",
-  "notes": "به‌روزرسانی درون‌برنامه‌ای V64: اصلاحات رابط و نمایش ارقام از طریق دریافت HTML؛ APK نصب‌شده و امضای آن تغییر نمی‌کند.",
+  "version": "V65",
+  "notes": "به‌روزرسانی درون‌برنامه‌ای V65: اصلاح لایه سیاه لوگوی اصلی در صفحه ورود. این به‌روزرسانی محتوای HTML را دریافت می‌کند و APK نصب‌شده را جایگزین نمی‌کند.",
   "android": {
     "version": "V63",
     "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v63-final/DENTYAR-V63.apk",
     "fileName": "DENTYAR-V63.apk"
   },
   "web": {
-    "version": "V64",
+    "version": "V65",
     "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/test/dentyar-comprehensive-fixes-20261009/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
   }
 }
