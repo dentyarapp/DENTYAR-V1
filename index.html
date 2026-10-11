@@ -2874,7 +2874,7 @@ function renderReports(){
     return true;
   });
 
-  const financialTotals = rows.reduce((a,r)=>{ if(r.visit){const f=financeOf(r.visit); a.gross+=f.gross; a.discount+=f.discount; a.insurance+=f.insurance; a.net+=f.net; a.paid+=f.paid; a.balance+=f.balance;} return a; },{gross:0,discount:0,insurance:0,net:0,paid:0,balance:0});
+  const financialTotals = rows.reduce((a,r)=>{ if(r.visit){const f=financeOf(r.visit); a.gross+=f.gross; a.discount+=f.discount; a.insurance+=f.insurance; a.net+=f.net; a.refund+=f.refund; a.cash+=f.cash; a.card+=f.card; a.transfer+=f.transfer; a.other+=f.other; a.paid+=f.paid; a.balance+=f.balance;} return a; },{gross:0,discount:0,insurance:0,net:0,refund:0,cash:0,card:0,transfer:0,other:0,paid:0,balance:0});
 
   document.getElementById('pageContent').innerHTML = `
     <div class="card">
@@ -2943,6 +2943,15 @@ function renderReports(){
         `).join('')}
       </table>${rows.length>200? `<div class="empty">فقط ۲۰۰ ردیف اول نمایش داده می‌شود — برای مشاهده‌ی کامل، خروجی بگیرید.</div>`:''}` : `<div class="empty">${STATE.patients.length===0?'هنوز بیماری در پایگاه داده ثبت نشده است. پس از ثبت بیمار، اطلاعات او در گزارش‌ها نمایش داده می‌شود.':'با فیلترهای فعلی نتیجه‌ای یافت نشد.'}</div>`}
     </div>
+    <div class="reportStickyTotals" role="status" aria-label="جمع مبالغ گزارش">
+      <strong>جمع کل</strong>
+      <span>ناخالص: ${fmtMoney(financialTotals.gross)}</span>
+      <span>تخفیف: ${fmtMoney(financialTotals.discount)}</span>
+      <span>سهم بیمه: ${fmtMoney(financialTotals.insurance)}</span>
+      <span>خالص: ${fmtMoney(financialTotals.net)}</span>
+      <span>پرداختی: ${fmtMoney(financialTotals.paid)}</span>
+      <span>باقیمانده: ${fmtMoney(financialTotals.balance)}</span>
+    </div>
   `;
 }
 function applyReportFilters(){
@@ -2993,6 +3002,21 @@ function getReportRowsForExport(){
     ];
   });
   return [header, ...body];
+}
+function getReportRowsForXLSX(){
+  const rows = getReportRowsForExport();
+  if(!rows.length) return rows;
+  const totals = new Array(rows[0].length).fill('');
+  totals[0] = 'جمع کل';
+  // فقط ستون‌های مالیِ قابل‌جمع؛ شناسه‌ها، شماره‌ها، درصدها و تاریخ‌ها جمع نمی‌شوند.
+  const sumColumns = [14,15,16,17,18,19,20,21,22,23,24];
+  sumColumns.forEach(index=>{
+    totals[index] = rows.slice(1).reduce((sum,row)=>{
+      const value = row[index];
+      return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+    },0);
+  });
+  return [...rows, totals];
 }
 async function exportReportCSV(){
 
@@ -3086,7 +3110,7 @@ async function exportReportXLSX(){
     const result =
       await exportRowsAsXLSX(
 
-        getReportRowsForExport(),
+        getReportRowsForXLSX(),
 
         'گزارش-' +
         todayJalaliCompact() +
@@ -4786,6 +4810,24 @@ body{display:flex!important;flex-direction:column!important;}
 
 /* نوار سبز/فیروزه‌ای پایین صفحات گزارش (خط ثابت زیر جدول‌ها): باید مانند بقیه‌ی محتوا افقی اسکرول شود، نه ثابت بماند */
 .card[style*="overflow-x:auto"]{-webkit-overflow-scrolling:touch!important;}
+</style>
+<style id="dentyar-report-totals">
+.reportStickyTotals{
+  position:fixed;left:10px;right:10px;
+  bottom:calc(9px + env(safe-area-inset-bottom));
+  z-index:1100;display:flex;align-items:center;gap:12px;
+  max-width:1180px;margin-inline:auto;padding:10px 12px;
+  overflow-x:auto;white-space:nowrap;
+  border:1px solid #2b4d7d;border-radius:12px;
+  background:rgba(18,48,94,.97);color:#fff;
+  box-shadow:0 5px 20px rgba(10,32,68,.25);
+  font-size:11px;font-weight:700;
+  scrollbar-width:thin;-webkit-overflow-scrolling:touch;
+}
+.reportStickyTotals strong{color:#ffe0a0;font-size:12px;flex:0 0 auto}
+.reportStickyTotals span{flex:0 0 auto}
+body:has(.reportStickyTotals) #app{padding-bottom:84px!important}
+@media print{.reportStickyTotals{display:none!important}}
 </style>
 </head>
 <body>
