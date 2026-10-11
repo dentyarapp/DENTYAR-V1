@@ -955,26 +955,32 @@ function faDigits(value){
   return toEnDigits(String(value ?? '')).replace(/[0-9]/g,d=>fa[Number(d)]);
 }
 function formatAllNumericInputs(){
-  document.querySelectorAll('input').forEach(el=>{
+  // Apply the same visible-digit policy to every numeric field, including fields
+  // created dynamically and values/placeholders injected after the first render.
+  const numericId=/(Nid|National|NationalCode|Phone|AltPhone|Mobile|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|Economic|License|Emergency|pin|Pass|Age|FileNo|PatientNo|Serial|Code)/i;
+  document.querySelectorAll('input:not([type=file]),textarea').forEach(el=>{
+    if(el.closest('[data-no-fa-digits]')) return;
     const id=el.id||'';
-    const numericOnly=/(Nid|Phone|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|national|postal|economic|License|EmergencyPhone|Mobile|pin|Pass)/i.test(id);
+    const isDateOrTime=el.type==='date'||el.type==='time'||el.type==='month'||el.type==='week';
+    const numericOnly=numericId.test(id) || el.type==='number' || el.type==='tel' ||
+      /^(numeric|decimal|tel)$/i.test(el.getAttribute('inputmode')||'') || el.hasAttribute('data-numeric-only');
     if(el.type==='number'){
       el.setAttribute('data-original-number-type','true');
-      el.setAttribute('data-numeric-only','true');
       el.type='text';
       el.setAttribute('inputmode','decimal');
     }
-    if(numericOnly && el.type!=='date' && el.type!=='time' && el.type!=='file'){
-      el.setAttribute('inputmode', /Phone|Mobile/i.test(id) ? 'tel' : 'numeric');
-      el.setAttribute('autocomplete','off');
+    if(numericOnly && !isDateOrTime){
       el.setAttribute('data-numeric-only','true');
-      el.setAttribute('dir','ltr');
-      el.style.textAlign='left';
+      if(!el.hasAttribute('inputmode')) el.setAttribute('inputmode',/(Phone|AltPhone|Mobile|Emergency)/i.test(id)?'tel':'numeric');
+      el.setAttribute('autocomplete','off');
+      el.setAttribute('dir','rtl');
+      el.style.textAlign='right';
+      if(el.value) el.value=faDigits(el.value);
     }
-    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]') || el.hasAttribute('data-numeric-only')){
-      if(el.value) el.value=faDigits(toEnDigits(el.value));
-      el.setAttribute('dir','ltr');
-      el.style.textAlign='left';
+    // Placeholder/accessible labels are visible too; keep them consistent.
+    for(const attr of ['placeholder','aria-label','title']){
+      const value=el.getAttribute(attr);
+      if(value && /[0-9٠-٩۰-۹]/.test(value)) el.setAttribute(attr,faDigits(value));
     }
   });
 }
@@ -4962,16 +4968,20 @@ startDentyarIDBMirror();
   
   document.addEventListener('input',e=>{
     const el=e.target;
-    if(!el || !el.matches) return;
-    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]') || /Nid$/.test(el.id||'')){
+    if(!el || !el.matches || !el.matches('input,textarea')) return;
+    if(el.closest('[data-no-fa-digits]')) return;
+    const numericId=/(Nid|National|NationalCode|Phone|AltPhone|Mobile|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|Economic|License|Emergency|pin|Pass|Age|FileNo|PatientNo|Serial|Code)/i;
+    if(el.hasAttribute('data-numeric-only') || numericId.test(el.id||'') || el.matches('input[type=tel],input[inputmode=numeric],input[inputmode=decimal],input[type=number]')){
       const pos=el.selectionStart;
-      const converted=faDigits(toEnDigits(el.value));
+      const converted=faDigits(el.value);
       if(converted!==el.value){ el.value=converted; try{el.setSelectionRange(pos,pos);}catch(_){} }
     }
   },true);
 document.addEventListener('blur',e=>{
     const el=e.target;
-    if(el && el.matches && el.matches('input[data-v26-number]') && el.value.trim()) el.value=faDigits(toEnDigits(el.value));
+    if(el && el.matches && el.matches('input,textarea') && !el.closest('[data-no-fa-digits]') &&
+       (el.hasAttribute('data-numeric-only') || /(Nid|National|NationalCode|Phone|AltPhone|Mobile|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|Economic|License|Emergency|pin|Pass|Age|FileNo|PatientNo|Serial|Code)/i.test(el.id||'')) &&
+       el.value.trim()) el.value=faDigits(el.value);
   },true);
 })();
 </script>
