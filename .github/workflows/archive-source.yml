@@ -1,0 +1,42 @@
+name: Archive DENTYA V65 source
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source-archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: دریافت کد نهایی
+        uses: actions/checkout@v4
+      - name: آماده‌سازی بسته کامل منبع
+        run: |
+          mkdir -p DENTYA_V65_Full_Source/.github/workflows
+          cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html DENTYA_V65_Full_Source/
+          cp DENTYAR_INTRO_PREVIEW.html DENTYA_V65_Full_Source/
+          cp README.md about.json manifest.webmanifest sw.js update.json DENTYA_V65_Full_Source/
+          cp .github/workflows/build-apk.yml DENTYA_V65_Full_Source/.github/workflows/
+          cp .github/workflows/check-web-syntax.yml DENTYA_V65_Full_Source/.github/workflows/
+          cp .github/workflows/deploy-pwa.yml DENTYA_V65_Full_Source/.github/workflows/
+          cat > DENTYA_V65_Full_Source/README-ARCHIVE.txt <<'EOF'
+          DENTYA V65 — نسخه نهایی تثبیت‌شده با ایمیل پشتیبانی اصلاح‌شده
+          فایل اصلی برنامه: DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html
+          نام نمایشی برنامه: DENTYA
+          ایمیل ارتباط با ما: Dentyar.app@gmail.com
+          این بسته شامل فایل منبع اصلی، فایل‌های پیکربندی و گردش‌کارهای ساخت است.
+          برای دریافت APK آماده نصب، بسته APK را جداگانه نگهداری کنید.
+          EOF
+          zip -r DENTYA_V65_Full_Source.zip DENTYA_V65_Full_Source
+      - name: بارگذاری بسته منبع
+        uses: actions/upload-artifact@v4
+        with:
+          name: DENTYA-V65-FULL-SOURCE-ZIP
+          path: DENTYA_V65_Full_Source.zip
+          if-no-files-found: error
+          retention-days: 90
