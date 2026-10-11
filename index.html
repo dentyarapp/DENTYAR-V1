@@ -949,15 +949,33 @@ function currentJalaliYear(){ return gregorianToJalali(new Date().getFullYear(),
 function jalaliDateFromISO(iso){ if(!iso) return ''; const d=new Date(iso+'T12:00:00'); if(Number.isNaN(d.getTime())) return ''; const [jy,jm,jd]=gregorianToJalali(d.getFullYear(),d.getMonth()+1,d.getDate()); return faDateString(jy,jm,jd); }
 
 /* ---------- فارسی‌سازی سراسری اعداد و تاریخ‌ها ---------- */
-// V59 SAFE NUMBER POLICY: all visible numerals use ASCII/English digits.
+// DENTYAR Persian-digit policy: show Persian digits in the interface; normalize to English only for calculations/storage.
 function faDigits(value){
-  return toEnDigits(String(value ?? ''));
+  const fa='۰۱۲۳۴۵۶۷۸۹';
+  return toEnDigits(String(value ?? '')).replace(/[0-9]/g,d=>fa[Number(d)]);
 }
 function formatAllNumericInputs(){
-  document.querySelectorAll('input[type=tel],input[inputmode=numeric],input[type=number]').forEach(el=>{
-    if(el.value) el.value=faDigits(toEnDigits(el.value));
-    el.setAttribute('dir','rtl');
-    el.style.textAlign='right';
+  document.querySelectorAll('input').forEach(el=>{
+    const id=el.id||'';
+    const numericOnly=/(Nid|Phone|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|national|postal|economic|License|EmergencyPhone|Mobile|pin|Pass)/i.test(id);
+    if(el.type==='number'){
+      el.setAttribute('data-original-number-type','true');
+      el.setAttribute('data-numeric-only','true');
+      el.type='text';
+      el.setAttribute('inputmode','decimal');
+    }
+    if(numericOnly && el.type!=='date' && el.type!=='time' && el.type!=='file'){
+      el.setAttribute('inputmode', /Phone|Mobile/i.test(id) ? 'tel' : 'numeric');
+      el.setAttribute('autocomplete','off');
+      el.setAttribute('data-numeric-only','true');
+      el.setAttribute('dir','ltr');
+      el.style.textAlign='left';
+    }
+    if(el.matches('input[type=tel],input[inputmode=numeric],input[type=number]') || el.hasAttribute('data-numeric-only')){
+      if(el.value) el.value=faDigits(toEnDigits(el.value));
+      el.setAttribute('dir','ltr');
+      el.style.textAlign='left';
+    }
   });
 }
 function toFaTextNodeTree(root=document.body){
