@@ -3747,7 +3747,7 @@ function renderUpdaterPanel(){
           <label style="margin-top:8px">فایل APK نسخه جدید</label>
           <input type="file" id="updateApkInput" accept=".apk,application/vnd.android.package-archive">
           <div class="updateActions">
-            <button class="btn btn-outline" onclick="checkAndInstallAndroidUpdate()">بررسی نسخه جدید</button>
+            <button class="btn btn-outline" onclick="checkAndInstallAndroidUpdate()">بررسی و اعمال به‌روزرسانی درون‌برنامه‌ای</button>
             <button class="btn btn-outline" onclick="saveAppUpdatePackage()">ذخیره APK انتخاب‌شده</button>
             <button class="btn btn-outline" onclick="executeSavedAppUpdate()">اجرای نصب Android</button>
           </div>
@@ -3756,6 +3756,8 @@ function renderUpdaterPanel(){
         </div>
       </div>
     </div>`;
+  const versionLabel=document.getElementById("currentAppVersion");
+  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V64");
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
@@ -3807,6 +3809,35 @@ function updatePlatformUi(){
   }
   if(android) android.style.display = p==='android' ? '' : 'none';
 }
+async function applyRemoteDentyarHtmlUpdate(manifest, badge){
+  const remoteVersion=String(manifest.web?.version||manifest.version||'').toUpperCase();
+  const current=String(DENTYAR_APP_VERSION||'V57').toUpperCase();
+  const num=v=>Number(String(v).replace(/[^0-9]/g,''))||0;
+  const sourceUrl=String(manifest.web?.url||'').trim();
+  if(!remoteVersion || !sourceUrl) throw new Error('missing web version or URL');
+  if(num(remoteVersion)<=num(current)){
+    if(badge) badge.textContent='به‌روز';
+    modalAlert('به‌روزرسانی DENTYAR',`نسخه درون‌برنامه‌ای فعلی ${faDigits(current)} است؛ نسخه جدیدتری منتشر نشده است.`);
+    return false;
+  }
+  if(!confirm(`نسخه درون‌برنامه‌ای ${remoteVersion} آماده است. کد برنامه دریافت و اعمال شود؟ اطلاعات ذخیره‌شده در همین برنامه حفظ می‌شود.`)) return false;
+  if(badge) badge.textContent='در حال دریافت فایل برنامه…';
+  const response=await fetch(sourceUrl+(sourceUrl.includes('?')?'&':'?')+'ts='+Date.now(),{cache:'no-store',headers:{'Accept':'text/html'}});
+  if(!response.ok) throw new Error('HTML update '+response.status);
+  const html=await response.text();
+  if(!/<html[\s>]/i.test(html) || !/DENTYAR_APP_VERSION\s*=\s*["']V\d+["']/.test(html) ||
+     num((html.match(/DENTYAR_APP_VERSION\s*=\s*["']V(\d+)["']/)||[])[1]||0)!==num(remoteVersion)){
+    throw new Error('downloaded HTML failed version validation');
+  }
+  if(typeof saveState==='function'){ try{saveState();}catch(e){console.warn('State save before update:',e);} }
+  if(badge) badge.textContent='در حال اعمال نسخه…';
+  // Replacing the document content keeps the current WebView origin, so localStorage/IndexedDB remain in place.
+  document.open();
+  document.write(html);
+  document.close();
+  return true;
+}
+
 async function checkAndApplyWebUpdate(){
   const badge=document.getElementById('dentyarPlatformBadge');
   if(badge) badge.textContent='در حال بررسی…';
@@ -3814,30 +3845,12 @@ async function checkAndApplyWebUpdate(){
   try{
     const res=await fetch(manifestUrl,{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!res.ok) throw new Error('update manifest '+res.status);
-    const remote=await res.json();
-    const remoteVersion=String(remote.version||'').toUpperCase();
-    const current=String(DENTYAR_APP_VERSION||'V57').toUpperCase();
-    if(!remoteVersion){throw new Error('missing version');}
-    const num=v=>Number(String(v).replace(/[^0-9]/g,''))||0;
-    if(num(remoteVersion)<=num(current)){
-      if(badge) badge.textContent=getDentyarPlatform();
-      modalAlert('بروزرسانی DENTYAR',`نسخه فعلی ${faDigits(current)} است و بروزرسانی جدیدی منتشر نشده است.`);
-      return;
-    }
-    const ok=confirm(`نسخه ${remoteVersion} آماده است. بروزرسانی وب انجام شود؟`);
-    if(!ok) return;
-    // The web/PWA update is always applied on the same deployment URL so the clinic data remains local.
-    if('serviceWorker' in navigator){
-      for(const reg of await navigator.serviceWorker.getRegistrations()){
-        try{await reg.update(); if(reg.waiting){reg.waiting.postMessage({type:'SKIP_WAITING'}); await new Promise(r=>setTimeout(r,250));}}catch(e){}
-      }
-    }
-    if('caches' in window){for(const k of await caches.keys()){if(/^dentyar-/i.test(k)) await caches.delete(k);}}
-    location.replace(location.href.split('#')[0]+'?v='+Date.now());
+    const manifest=await res.json();
+    await applyRemoteDentyarHtmlUpdate(manifest,badge);
   }catch(e){
-    console.error('DENTYAR web update check failed',e);
+    console.error('DENTYAR web update failed',e);
     if(badge) badge.textContent=getDentyarPlatform();
-    modalAlert('بروزرسانی DENTYAR','بررسی بروزرسانی انجام نشد. فایل update.json باید در مخزن اصلی DENTYAR قرار داشته باشد و اتصال اینترنت فعال باشد.');
+    modalAlert('به‌روزرسانی DENTYAR','به‌روزرسانی درون‌برنامه‌ای انجام نشد. اتصال اینترنت و نشانی فایل نسخه جدید را بررسی کنید. اطلاعات فعلی دست‌نخورده باقی مانده است.');
   }
 }
 
@@ -3902,45 +3915,14 @@ async function checkAndInstallAndroidUpdate(){
   try{
     const r=await fetch('https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/test/dentyar-comprehensive-fixes-20261009/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
-    const m=await r.json();
-    const remoteVersion=String(m.version||m.android?.version||'').toUpperCase();
-    const current=String(DENTYAR_APP_VERSION||'V57').toUpperCase();
-    const num=v=>Number(String(v).replace(/[^0-9]/g,''))||0;
-    if(!remoteVersion || num(remoteVersion)<=num(current)){
-      if(badge) badge.textContent='به‌روز';
-      modalAlert('بروزرسانی DENTYAR',`نسخه نصب‌شده ${faDigits(current)} است و نسخه جدیدی منتشر نشده است.`);
-      return;
-    }
-    const apkUrl=String(m.android?.apkUrl||m.apkUrl||'').trim();
-    if(!apkUrl) throw new Error('missing apkUrl');
-    if(!confirm(`نسخه ${remoteVersion} آماده نصب است. دریافت و نصب انجام شود؟`)) return;
-    if(badge) badge.textContent='در حال دریافت APK…';
-    const ar=await fetch(apkUrl,{cache:'no-store'});
-    if(!ar.ok) throw new Error('apk '+ar.status);
-    const blob=await ar.blob();
-    const fileName=String(m.android?.fileName||('DENTYAR-'+remoteVersion+'.apk')).replace(/[\\/:*?"<>|]/g,'_');
-    await new Promise((resolve,reject)=>{
-      const req=indexedDB.open('dentyar_updates_v1',1);
-      req.onupgradeneeded=e=>{if(!e.target.result.objectStoreNames.contains('updates'))e.target.result.createObjectStore('updates',{keyPath:'id'});};
-      req.onerror=()=>reject(req.error||new Error('IDB open failed'));
-      req.onsuccess=e=>{
-        const db=e.target.result,tx=db.transaction('updates','readwrite');
-        tx.objectStore('updates').put({id:'latest',version:remoteVersion,note:m.notes||'',fileName,size:blob.size,blob,savedAt:Date.now()});
-        tx.oncomplete=()=>{db.close();resolve();};
-        tx.onerror=()=>{db.close();reject(tx.error||new Error('IDB write failed'));};
-      };
-    });
-    if(badge) badge.textContent='نسخه دریافت شد';
-    const info=document.getElementById('savedUpdateInfo');
-    if(info) info.textContent=`نسخه ${remoteVersion} | ${fileName} | ${Math.round(blob.size/1024)} کیلوبایت`;
-    await executeSavedAppUpdate();
+    const manifest=await r.json();
+    await applyRemoteDentyarHtmlUpdate(manifest,badge);
   }catch(e){
-    console.error('DENTYAR Android update failed',e);
+    console.error('DENTYAR in-app update failed',e);
     if(badge) badge.textContent='خطا';
-    modalAlert('بروزرسانی Android','دریافت یا نصب خودکار انجام نشد. بررسی کنید اینترنت فعال باشد و آخرین APK در بخش Releases مخزن DENTYAR منتشر شده باشد.');
+    modalAlert('به‌روزرسانی درون‌برنامه‌ای','دریافت یا اعمال فایل برنامه انجام نشد. اتصال اینترنت را بررسی کنید؛ نسخه فعلی و اطلاعات ذخیره‌شده تغییر نکرده‌اند.');
   }
 }
-
 function saveAppUpdatePackage(){
   const input=document.getElementById('updateApkInput');
   const file=input?.files?.[0];
