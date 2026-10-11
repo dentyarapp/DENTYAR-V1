@@ -3242,39 +3242,6 @@ async function exportReportCSV(){
 
 
 
-function withFinancialTotalsForExcel(rows){
-  if(!Array.isArray(rows) || rows.length < 1 || !Array.isArray(rows[0])) return rows;
-  const headers=rows[0].map(v=>String(v??''));
-  const totalColumns=new Set([
-    'مبلغ ناخالص (تومان)',
-    'تخفیف (تومان)',
-    'سهم بیمه (تومان)',
-    'خالص قابل پرداخت (تومان)',
-    'پرداخت نقدی',
-    'پرداخت کارتخوان',
-    'انتقال بانکی',
-    'سایر پرداخت',
-    'استرداد وجه',
-    'کل پرداختی',
-    'باقیمانده'
-  ]);
-  const totalRow=Array(headers.length).fill('');
-  totalRow[0]='جمع کل گزارش';
-  let summed=0;
-  for(let col=0;col<headers.length;col++){
-    if(!totalColumns.has(headers[col])) continue;
-    let total=0;
-    for(let r=1;r<rows.length;r++){
-      const raw=toEnDigits(String(rows[r]?.[col]??'')).replace(/[\\s,٬،]/g,'').trim();
-      if(raw && /^-?\\d+(?:\\.\\d+)?$/.test(raw)) total+=Number(raw);
-    }
-    totalRow[col]=String(total);
-    summed++;
-  }
-  if(summed===0) return rows;
-  return [...rows,totalRow];
-}
-
 async function exportReportXLSX(){
 
   try{
@@ -3291,7 +3258,7 @@ async function exportReportXLSX(){
     const result =
       await exportRowsAsXLSX(
 
-        withFinancialTotalsForExcel(getReportRowsForExport()),
+        getReportRowsForExport(),
 
         'گزارش-' +
         todayJalaliCompact() +
@@ -4384,7 +4351,7 @@ function renderContact(){
         <div style="flex:1;min-width:180px">
           <h2 style="margin:0;color:#0f766e;font-size:23px">دنت‌یار</h2>
           <div style="font-weight:800;color:#17324d;margin-top:5px">دستیار هوشمند دندان‌پزشکی شما</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V66</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V65</div>
         </div>
       </div>
     </div>
@@ -4421,7 +4388,7 @@ function renderContact(){
       </div>
     </div>    <div class="card">
       <h3>مشخصات نسخه</h3>
-      <div class="kv"><span>نسخه برنامه</span><b>V66 — نسخه نهایی تثبیت‌شده</b></div>
+      <div class="kv"><span>نسخه برنامه</span><b>V65 — نسخه نهایی تثبیت‌شده</b></div>
       <div class="kv"><span>طراح، مدیر فنی و پشتیبان</span><b>حمید آل کثیر</b></div>
     </div>
   `;
