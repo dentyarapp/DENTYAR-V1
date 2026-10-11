@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DENTYAR</title>
-<script>const DENTYAR_APP_VERSION = "V64";</script>
+<script>const DENTYAR_APP_VERSION = "V65";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -2029,7 +2029,49 @@ function renderRegister(){
   `;
 }
 
+let registerPendingFiles = [];
+
+function handleRegisterFileSelection(fileList){
+  const selected = Array.from(fileList || []);
+  if(!selected.length) return;
+  const readers = selected.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({name:file.name, type:file.type || 'application/octet-stream', data:reader.result, size:file.size || 0});
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  }));
+  Promise.all(readers).then(results => {
+    const added = results.filter(Boolean);
+    registerPendingFiles.push(...added);
+    renderRegisterPendingFiles();
+    const input = document.getElementById('rgFilesInput');
+    if(input) input.value = '';
+    if(added.length !== selected.length) toast('بعضی فایل‌ها خوانده نشدند؛ دوباره انتخابشان کنید');
+    else if(added.length) toast('فایل‌ها برای پیوست به پرونده آماده شدند');
+  });
+}
+
+function renderRegisterPendingFiles(){
+  const box = document.getElementById('rgPendingFiles');
+  if(!box) return;
+  box.innerHTML = registerPendingFiles.map((f,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="width:48px;height:48px;flex:0 0 48px;border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f4f8f8">
+        ${f.type && f.type.startsWith('image/') ? `<img src="${f.data}" alt="" style="width:100%;height:100%;object-fit:contain">` : '<span style="font-size:10px">فایل</span>'}
+      </div>
+      <span style="flex:1;min-width:0;overflow-wrap:anywhere;font-size:12px">${esc(f.name || 'فایل پیوست')}</span>
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeRegisterPendingFile(${i})">حذف</button>
+    </div>
+  `).join('') || '<span style="font-size:12px;color:var(--muted)">هنوز فایلی انتخاب نشده است.</span>';
+}
+
+function removeRegisterPendingFile(index){
+  registerPendingFiles.splice(index, 1);
+  renderRegisterPendingFiles();
+}
+
 function openRegisterForm(appointmentId){
+  registerPendingFiles = [];
   const ap = appointmentId ? STATE.appointments.find(a=>a.id===appointmentId) : null;
   document.getElementById('pageContent').innerHTML = `
     <button class="btn btn-outline btn-sm" onclick="navigate('register')">← بازگشت</button>
@@ -2075,6 +2117,15 @@ function openRegisterForm(appointmentId){
       <input type="text" id="rgAddress">
       <label>توضیحات</label>
       <textarea id="rgNotes"></textarea>
+      <div class="card" style="margin-top:10px;background:#f8fcfb">
+        <h3 style="font-size:15px">پیوست‌های اولیه پرونده (اختیاری)</h3>
+        <p style="font-size:12px;color:var(--muted);line-height:1.9">می‌توانید عکس و رادیوگرافی دندان، فاکتور، PDF و سایر مدارک مرتبط را همین‌جا انتخاب کنید. فایل‌ها پس از ثبت نهایی، در پرونده بیمار ذخیره می‌شوند.</p>
+        <label for="rgFilesInput">انتخاب یک یا چند فایل</label>
+        <input type="file" id="rgFilesInput" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple onchange="handleRegisterFileSelection(this.files)">
+        <div id="rgPendingFiles" style="margin-top:8px">
+          <span style="font-size:12px;color:var(--muted)">هنوز فایلی انتخاب نشده است.</span>
+        </div>
+      </div>
       ${renderCustomFormFields('register',ap)}
       <div id="rgDupWarning" style="color:var(--danger);font-size:12.5px;margin-top:6px;"></div>
 
@@ -2180,7 +2231,7 @@ function saveRegisterForm(appointmentId){
     address: document.getElementById('rgAddress').value.trim(),
     notes: document.getElementById('rgNotes').value.trim(),
     customFields: collectCustomFormFields('register'),
-    files: [],
+    files: registerPendingFiles.slice(),
     visits: [{
       id: uid('vs'),
       date: document.getElementById('rgDate').value || todayISO(),
@@ -2210,6 +2261,7 @@ function saveRegisterForm(appointmentId){
     if(a) a.status = 'ثبت‌شده';
   }
   saveState();
+  registerPendingFiles = [];
   toast('پرونده‌ی بیمار با موفقیت ثبت شد');
   openPatientId = patient.id;
   navigate('patients');
@@ -3757,7 +3809,7 @@ function renderUpdaterPanel(){
       </div>
     </div>`;
   const versionLabel=document.getElementById("currentAppVersion");
-  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V64");
+  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V65");
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
@@ -5411,11 +5463,11 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V64 FIX: enforce Persian digits + Jalali date display after every render.
+/* DENTYAR V65 FIX: enforce Persian digits + Jalali date display after every render.
    Keep data values normalized only at action boundaries; visible numeric values remain Persian. */
 (function(){
-  if(window.__dentyarV64LocaleFixInstalled) return;
-  window.__dentyarV64LocaleFixInstalled = true;
+  if(window.__dentyarV65LocaleFixInstalled) return;
+  window.__dentyarV65LocaleFixInstalled = true;
   const numericValue = /^[+\-()\s0-9۰-۹٠-٩.,/:]+$/;
   function applyDentyarV63LocaleFix(root){
     try{
@@ -5470,10 +5522,10 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V64 FIX: explicitly reformat dynamically-created forms and SMS text. */
+/* DENTYAR V65 FIX: explicitly reformat dynamically-created forms and SMS text. */
 (function(){
-  if(window.__dentyarV64SmsLocaleFixInstalled) return;
-  window.__dentyarV64SmsLocaleFixInstalled = true;
+  if(window.__dentyarV65SmsLocaleFixInstalled) return;
+  window.__dentyarV65SmsLocaleFixInstalled = true;
   function apply(root){
     root = root && root.querySelectorAll ? root : document;
     try{
