@@ -1,4 +1,4 @@
-name: Build DENTYAR V64 APK
+name: Build isolated DENTYAR updater test APK
 # Trigger V64 release workflow
 
 permissions:
@@ -11,6 +11,7 @@ on:
       - main
       - fix/v59-safe-numeric-serial-20261009
       - test/dentyar-comprehensive-fixes-20261009
+      - test/dentyar-v64-safe-install
 
 jobs:
   build-apk:
@@ -51,7 +52,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR TEST" "com.dentyar.previewtest" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -71,10 +72,10 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/testapp
+          mkdir -p android/app/src/main/java/com/dentyar/previewtest
 
-          cat > android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/previewtest/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.previewtest;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -223,8 +224,8 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/previewtest/MainActivity.java <<'EOF'
+          package com.dentyar.previewtest;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -271,14 +272,14 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/previewtest/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V64 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V64"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V63"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/previewtest/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -365,17 +366,17 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V64.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V64-SAFE-TEST.apk
 
       - name: جایگزینی با APK دارای امضای ثابت
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V64.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V64-SAFE-TEST.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V64-APK
-          path: DENTYAR-V64.apk
+          name: DENTYAR-V64-SAFE-TEST
+          path: DENTYAR-V64-SAFE-TEST.apk
           if-no-files-found: error
 
       - name: انتشار نسخه اصلاحی V64 در Release
@@ -387,7 +388,7 @@ jobs:
           body: |
             نسخه اصلاحی دنت‌یار V64 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
             این نسخه با اصلاح اجباری نمایش اعداد فارسی و تاریخ‌های شمسی در رابط کاربری بسته‌بندی شده است.
-          files: DENTYAR-V64.apk
+          files: DENTYAR-V64-SAFE-TEST.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
