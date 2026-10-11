@@ -3166,6 +3166,21 @@ function getReportRowsForExport(){
   });
   return [header, ...body];
 }
+function getReportRowsForXLSX(){
+  const rows = getReportRowsForExport();
+  if(!rows.length) return rows;
+  const totals = new Array(rows[0].length).fill('');
+  totals[0] = 'جمع کل';
+  // فقط ستون‌های مالیِ قابل‌جمع؛ شناسه‌ها، شماره‌ها، درصدها و تاریخ‌ها جمع نمی‌شوند.
+  const sumColumns = [14,15,16,17,18,19,20,21,22,23,24];
+  sumColumns.forEach(index=>{
+    totals[index] = rows.slice(1).reduce((sum,row)=>{
+      const value = row[index];
+      return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+    },0);
+  });
+  return [...rows, totals];
+}
 async function exportReportCSV(){
 
   try{
@@ -3258,7 +3273,7 @@ async function exportReportXLSX(){
     const result =
       await exportRowsAsXLSX(
 
-        getReportRowsForExport(),
+        getReportRowsForXLSX(),
 
         'گزارش-' +
         todayJalaliCompact() +
