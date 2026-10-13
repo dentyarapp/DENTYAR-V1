@@ -5,15 +5,15 @@
 <!-- DENTYAR V59 FINAL REPORT EXPORT FIX — ANDROID NATIVE SAVE -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DENTYA</title>
-<script>const DENTYAR_APP_VERSION = "V65";</script>
+<title>DENTYAR</title>
+<script>const DENTYAR_APP_VERSION = "V67";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DENTYA">
+<meta name="apple-mobile-web-app-title" content="DENTYAR">
 <style>
   :root{
     --navy:#0f4f4f;
@@ -3824,7 +3824,7 @@ function renderUpdaterPanel(){
       </div>
     </div>`;
   const versionLabel=document.getElementById("currentAppVersion");
-  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V65");
+  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V67");
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
@@ -3978,16 +3978,66 @@ async function applyHtmlFileUpdate(){
 
 async function checkAndInstallAndroidUpdate(){
   const badge=document.getElementById('updateStateBadge');
+  let apkUrl='';
   if(badge) badge.textContent='در حال بررسی…';
   try{
     const r=await fetch('https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/update.json?ts='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json'}});
     if(!r.ok) throw new Error('manifest '+r.status);
     const manifest=await r.json();
-    await applyRemoteDentyarHtmlUpdate(manifest,badge);
+    const android=manifest.android||{};
+    const version=String(android.version||'').toUpperCase();
+    apkUrl=String(android.apkUrl||'').trim();
+    const fileName=String(android.fileName||('DENTYAR-'+version+'.apk'));
+    if(!/^V\d+$/.test(version) || !/^https:\/\/github\.com\/dentyarapp\/DENTYAR-V1\/releases\/download\/v\d+-final\/DENTYAR-V\d+\.apk$/i.test(apkUrl)){
+      throw new Error('Android APK URL/version is missing or not trusted');
+    }
+    if(!confirm('نسخه اندروید '+version+' آماده است. فایل APK دریافت و نصب شود؟ اطلاعات برنامه حفظ می‌شود؛ نصب نهایی را اندروید تأیید می‌کند.')) {
+      if(badge) badge.textContent='آماده';
+      return;
+    }
+    if(badge) badge.textContent='در حال دریافت APK…';
+    const C=window.Capacitor;
+    const nativePlugin=(C&&(C.Plugins&&C.Plugins.DentyarNative))||(C&&C.registerPlugin?C.registerPlugin('DentyarNative'):null);
+    if(C&&C.isNativePlatform&&C.isNativePlatform()&&nativePlugin&&typeof nativePlugin.downloadAndInstallApk==='function'){
+      await nativePlugin.downloadAndInstallApk({url:apkUrl,filename:fileName});
+      if(badge) badge.textContent='درخواست نصب ارسال شد';
+      toast('فایل به‌روزرسانی دریافت شد؛ نصب را در پنجره اندروید تأیید کنید.');
+      return;
+    }
+    const response=await fetch(apkUrl+(apkUrl.includes('?')?'&':'?')+'ts='+Date.now(),{cache:'no-store'});
+    if(!response.ok) throw new Error('APK download '+response.status);
+    const blob=await response.blob();
+    if(blob.size<1000000) throw new Error('Downloaded APK is unexpectedly small');
+    const magic=new Uint8Array(await blob.slice(0,4).arrayBuffer());
+    if(magic[0]!==80||magic[1]!==75||magic[2]!==3||magic[3]!==4) throw new Error('Downloaded file is not a valid APK');
+    if(C&&C.isNativePlatform&&C.isNativePlatform()){
+      if(!nativePlugin||typeof nativePlugin.installApk!=='function') throw new Error('Native APK installer is unavailable');
+      const arr=new Uint8Array(await blob.arrayBuffer());
+      let binary=''; const chunk=0x8000;
+      for(let p=0;p<arr.length;p+=chunk) binary+=String.fromCharCode.apply(null,arr.subarray(p,p+chunk));
+      await nativePlugin.installApk({filename:fileName,data:btoa(binary)});
+      if(badge) badge.textContent='درخواست نصب ارسال شد';
+      toast('درخواست نصب به اندروید ارسال شد؛ نصب را تأیید کنید.');
+    }else{
+      const objectUrl=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=objectUrl; a.download=fileName; a.rel='noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);
+      if(badge) badge.textContent='دانلود آماده';
+      toast('فایل APK برای دانلود آماده شد.');
+    }
   }catch(e){
-    console.error('DENTYAR in-app update failed',e);
+    console.error('DENTYAR Android update failed',e);
     if(badge) badge.textContent='خطا';
-    modalAlert('به‌روزرسانی درون‌برنامه‌ای','دریافت یا اعمال فایل برنامه انجام نشد. اتصال اینترنت را بررسی کنید؛ نسخه فعلی و اطلاعات ذخیره‌شده تغییر نکرده‌اند.');
+    if(apkUrl){
+      try{
+        const a=document.createElement('a'); a.href=apkUrl; a.target='_blank'; a.rel='noopener';
+        document.body.appendChild(a); a.click(); a.remove();
+      }catch(ignore){}
+      modalAlert('به‌روزرسانی اندروید','دریافت مستقیم APK در این محیط محدود شد. لینک دانلود باز شده است؛ پس از دانلود فایل، آن را نصب کنید. اگر پیام ناسازگاری امضا نمایش داده شد، نصب را لغو کنید و به ما اطلاع دهید.');
+    }else{
+      modalAlert('به‌روزرسانی اندروید','دریافت اطلاعات نسخه جدید انجام نشد. اتصال اینترنت و نشانی فایل را بررسی کنید؛ اطلاعات برنامه تغییر نکرده است.');
+    }
   }
 }
 function saveAppUpdatePackage(){
@@ -4366,7 +4416,7 @@ function renderContact(){
         <div style="flex:1;min-width:180px">
           <h2 style="margin:0;color:#0f766e;font-size:23px">دنت‌یار</h2>
           <div style="font-weight:800;color:#17324d;margin-top:5px">دستیار هوشمند دندان‌پزشکی شما</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V65</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V67</div>
         </div>
       </div>
     </div>
@@ -4403,7 +4453,7 @@ function renderContact(){
       </div>
     </div>    <div class="card">
       <h3>مشخصات نسخه</h3>
-      <div class="kv"><span>نسخه برنامه</span><b>V65 — نسخه نهایی تثبیت‌شده</b></div>
+      <div class="kv"><span>نسخه برنامه</span><b>V67 — نسخه نهایی تثبیت‌شده</b></div>
       <div class="kv"><span>طراح، مدیر فنی و پشتیبان</span><b>حمید آل کثیر</b></div>
     </div>
   `;
@@ -5490,11 +5540,11 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V65 FIX: enforce Persian digits + Jalali date display after every render.
+/* DENTYAR V67 FIX: enforce Persian digits + Jalali date display after every render.
    Keep data values normalized only at action boundaries; visible numeric values remain Persian. */
 (function(){
-  if(window.__dentyarV65LocaleFixInstalled) return;
-  window.__dentyarV65LocaleFixInstalled = true;
+  if(window.__dentyarV67LocaleFixInstalled) return;
+  window.__dentyarV67LocaleFixInstalled = true;
   const numericValue = /^[+\-()\s0-9۰-۹٠-٩.,/:]+$/;
   function applyDentyarV63LocaleFix(root){
     try{
@@ -5549,10 +5599,10 @@ document.addEventListener('focus',e=>{
 
 
 <script>
-/* DENTYAR V65 FIX: explicitly reformat dynamically-created forms and SMS text. */
+/* DENTYAR V67 FIX: explicitly reformat dynamically-created forms and SMS text. */
 (function(){
-  if(window.__dentyarV65SmsLocaleFixInstalled) return;
-  window.__dentyarV65SmsLocaleFixInstalled = true;
+  if(window.__dentyarV67SmsLocaleFixInstalled) return;
+  window.__dentyarV67SmsLocaleFixInstalled = true;
   function apply(root){
     root = root && root.querySelectorAll ? root : document;
     try{
