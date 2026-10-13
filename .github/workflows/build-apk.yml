@@ -470,6 +470,10 @@ jobs:
       - name: ساخت APK امضاشده با کلید ثابت
         if: ${{ steps.signing.outputs.available == 'true' }}
         working-directory: android
+        env:
+          DENTYAR_KEYSTORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+          DENTYAR_KEY_ALIAS: dentyar-release
+          DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
         run: ./gradlew assembleRelease
 
       - name: نام‌گذاری خروجی APK
