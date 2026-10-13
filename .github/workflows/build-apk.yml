@@ -16,6 +16,7 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: دریافت کد پروژه
@@ -461,12 +462,6 @@ jobs:
           PY
           echo "available=true" >> "$GITHUB_OUTPUT"
 
-      - name: ساخت APK
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
-
       - name: ساخت APK امضاشده با کلید ثابت
         if: ${{ steps.signing.outputs.available == 'true' }}
         working-directory: android
@@ -474,23 +469,22 @@ jobs:
           DENTYAR_KEYSTORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
           DENTYAR_KEY_ALIAS: dentyar-release
           DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
 
-      - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V67.apk
-
-      - name: جایگزینی با APK دارای امضای ثابت
+      - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V65.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V67.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V67-APK
-          path: DENTYAR-V65.apk
+          path: DENTYAR-V67.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V65 در Release
+      - name: انتشار نسخه اصلاحی V67 در Release
         if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v67]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V67 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
@@ -499,7 +493,7 @@ jobs:
           body: |
             نسخه امضاشده دنت‌یار V67 با اصلاح مسیر به‌روزرسانی درون‌برنامه‌ای اندروید و حفظ اصلاحات اعداد فارسی.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V65.apk
+          files: DENTYAR-V67.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
