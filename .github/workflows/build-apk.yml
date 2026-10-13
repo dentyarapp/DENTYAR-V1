@@ -449,7 +449,14 @@ jobs:
 
               buildTypes {""", 1)
           if "signingConfig signingConfigs.release" not in s:
-              s = s.replace("        release {", "        release {\n            signingConfig signingConfigs.release", 1)
+              marker = "    buildTypes {"
+              if marker not in s:
+                  raise SystemExit("Android buildTypes marker not found")
+              prefix, rest = s.split(marker, 1)
+              if "        release {" not in rest:
+                  raise SystemExit("Android release build type not found")
+              rest = rest.replace("        release {", "        release {\n            signingConfig signingConfigs.release", 1)
+              s = prefix + marker + rest
           p.write_text(s)
           PY
           echo "available=true" >> "$GITHUB_OUTPUT"
