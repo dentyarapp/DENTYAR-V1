@@ -18,20 +18,19 @@ jobs:
 
       - name: Validate password and generate key
         env:
-          STORE_PASSWORD: "${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}"
+          STORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ -z "${STORE_PASSWORD:-}" ] || [ "${#STORE_PASSWORD}" -lt 16 ]; then
+          if [ -z "$STORE_PASSWORD" ] || [ "${#STORE_PASSWORD}" -lt 16 ]; then
             echo "ERROR: Signing password is missing or too short."
             exit 1
           fi
 
-          keytool -genkeypair \
-            -noprompt \
+          keytool -genkeypair -noprompt \
             -keystore "$RUNNER_TEMP/dentyar-release.keystore" \
-            -storetype JKS \
+            -storetype PKCS12 \
             -alias dentyar-release \
             -keyalg RSA \
             -keysize 2048 \
@@ -40,5 +39,14 @@ jobs:
             -keypass "$STORE_PASSWORD" \
             -dname "CN=DENTYAR Release, OU=DENTYAR, O=DENTYAR, L=Unknown, ST=Unknown, C=DE"
 
-          keytool -list -v \
-            -keystore "$RUNNER_TEMP/denty
+          keytool -list \
+            -keystore "$RUNNER_TEMP/dentyar-release.keystore" \
+            -storepass "$STORE_PASSWORD" \
+            -alias dentyar-release
+
+      - name: Upload private signing key
+        uses: actions/upload-artifact@v4
+        with:
+          name: DENTYAR-SIGNING-KEY-PRIVATE
+          path: ${{ runner.temp }}/dentyar-release.keystore
+          retention-days: 7
