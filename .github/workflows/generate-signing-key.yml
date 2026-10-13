@@ -1,0 +1,54 @@
+name: Generate DENTYAR Permanent Signing Key
+
+on:
+workflow_dispatch:
+
+permissions:
+contents: read
+
+jobs:
+generate-key:
+runs-on: ubuntu-latest
+steps:
+- name: Set up Java
+uses: actions/setup-java@v4
+with:
+distribution: temurin
+java-version: '21'
+
+  - name: Validate password and generate key
+    env:
+      STORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      if [ -z "${STORE_PASSWORD:-}" ] || [ "${#STORE_PASSWORD}" -lt 16 ]; then
+        echo "ERROR: Create DENTYAR_KEYSTORE_PASSWORD with at least 16 characters."
+        exit 1
+      fi
+
+      keytool -genkeypair \
+        -noprompt \
+        -keystore "$RUNNER_TEMP/dentyar-release.keystore" \
+        -storetype JKS \
+        -alias dentyar-release \
+        -keyalg RSA \
+        -keysize 2048 \
+        -validity 10000 \
+        -storepass "$STORE_PASSWORD" \
+        -keypass "$STORE_PASSWORD" \
+        -dname "CN=DENTYAR Release, OU=DENTYAR, O=DENTYAR, L=Unknown, ST=Unknown, C=DE"
+
+      keytool -list -v \
+        -keystore "$RUNNER_TEMP/dentyar-release.keystore" \
+        -storepass "$STORE_PASSWORD" \
+        -alias dentyar-release |
+        grep -E 'Alias name:|SHA256:'
+
+  - name: Upload private signing key
+    uses: actions/upload-artifact@v4
+    with:
+      name: DENTYAR-SIGNING-KEY-PRIVATE
+      path: ${{ runner.temp }}/dentyar-release.keystore
+      retention-days: 7
