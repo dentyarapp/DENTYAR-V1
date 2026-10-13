@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "clinics": {
+      "$clinicCode": {
+        ".read": "auth != null && root.child('clinicMembers').child($clinicCode).child(auth.uid).val() === true",
+        ".write": "auth != null && root.child('clinicMembers').child($clinicCode).child(auth.uid).val() === true"
+      }
+    },
+    "clinicMembers": {
+      "$clinicCode": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    }
+  }
+}
