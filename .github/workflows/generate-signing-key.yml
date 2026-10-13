@@ -1,6 +1,6 @@
 name: Generate DENTYAR Permanent Signing Key
 
-on:
+'on':
   workflow_dispatch:
 
 permissions:
@@ -41,14 +41,4 @@ jobs:
             -dname "CN=DENTYAR Release, OU=DENTYAR, O=DENTYAR, L=Unknown, ST=Unknown, C=DE"
 
           keytool -list -v \
-            -keystore "$RUNNER_TEMP/dentyar-release.keystore" \
-            -storepass "$STORE_PASSWORD" \
-            -alias dentyar-release |
-            grep -E 'Alias name:|SHA256:'
-
-      - name: Upload private signing key
-        uses: actions/upload-artifact@v4
-        with:
-          name: DENTYAR-SIGNING-KEY-PRIVATE
-          path: "${{ runner.temp }}/dentyar-release.keystore"
-          retention-days: 7
+            -keystore "$RUNNER_TEMP/denty
