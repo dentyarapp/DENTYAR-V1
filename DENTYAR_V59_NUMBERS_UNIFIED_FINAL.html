@@ -5256,7 +5256,7 @@ document.addEventListener('focus',e=>{
   async function ensureAuthenticated(){
     if(!auth) auth=authm.getAuth(fbApp);
     let user=await waitForInitialAuthState();
-    if(user) return user;
+    if(user){ sessionPassword=''; const passwordField=document.getElementById('syncAuthPassword'); if(passwordField) passwordField.value=''; return user; }
     const cfg=SYNC.cfg()||{};
     const email=((document.getElementById('syncAuthEmail')||{}).value||cfg.authEmail||'').trim();
     const password=sessionPassword||((document.getElementById('syncAuthPassword')||{}).value||'');
@@ -5265,6 +5265,7 @@ document.addEventListener('focus',e=>{
     authUser=credential.user;
     if(cfg){ cfg.authEmail=email; saveState(); }
     sessionPassword='';
+    const passwordField=document.getElementById('syncAuthPassword'); if(passwordField) passwordField.value='';
     return authUser;
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
@@ -5303,7 +5304,7 @@ document.addEventListener('focus',e=>{
       db = dbm.getDatabase(fbApp);
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       ensureDeviceId();
-      dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
+      await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
       subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); SYNC.renderStatus&&SYNC.renderStatus(); }));
       ['patients','dentists','appointments'].forEach(subscribeCollection);
