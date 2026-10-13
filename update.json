@@ -1,13 +1,13 @@
 {
-  "version": "V65",
-  "notes": "به‌روزرسانی درون‌برنامه‌ای V65: نسخه تثبیت‌شده شامل متن معرفی دنت‌یار، اصلاحات نمایش اعداد فارسی و حفظ قابلیت‌های موجود. جمع‌های اکسل از قبل حل شده‌اند و در این تغییر دوباره دست‌کاری نشده‌اند.",
+  "version": "V67",
+  "notes": "به‌روزرسانی درون‌برنامه‌ای V67: APK امضاشده با کلید ثابت دنت‌یار، اصلاح مسیر به‌روزرسانی اندروید و حفظ اصلاحات نمایش اعداد فارسی و تاریخ شمسی.",
   "android": {
-    "version": "V63",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v63-final/DENTYAR-V63.apk",
-    "fileName": "DENTYAR-V63.apk"
+    "version": "V67",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v67-final/DENTYAR-V67.apk",
+    "fileName": "DENTYAR-V67.apk"
   },
   "web": {
-    "version": "V65",
+    "version": "V67",
     "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
   }
 }

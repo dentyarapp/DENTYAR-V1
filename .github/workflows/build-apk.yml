@@ -1,8 +1,9 @@
-name: Build DENTYAR V65 APK
-# Trigger V65 release workflow
+name: Build DENTYAR V67 APK
+# Trigger V67 signed release workflow
 
 permissions:
   contents: write
+  actions: read
 
 on:
   workflow_dispatch:
@@ -34,7 +35,7 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "65.0.0",
+            "version": "67.0.0",
             "private": true,
             "scripts": {
               "build": "echo DENTYAR V65"
@@ -51,7 +52,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYA" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -61,8 +62,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 65', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "65.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 67', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "67.0.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android V65 versionCode/versionName")
           p.write_text(s)
@@ -109,6 +110,10 @@ jobs:
           import java.io.OutputStream;
           import java.io.File;
           import java.io.FileOutputStream;
+          import java.io.FileInputStream;
+          import java.io.InputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
 
           @CapacitorPlugin(name = "DentyarNative")
           public class DentyarNativePlugin extends Plugin {
@@ -231,6 +236,79 @@ jobs:
                       call.reject("Could not open Android package installer: " + e.getMessage(), e);
                   }
               }
+
+              @PluginMethod
+              public void downloadAndInstallApk(PluginCall call) {
+                  String url = call.getString("url", "");
+                  String fileName = call.getString("filename", "DENTYAR-update.apk");
+                  fileName = fileName.replace("/", "_").replace("\\", "_").replace(":", "_").replace("?", "_").replace("*", "_").replace("\"", "_").replace("<", "_").replace(">", "_").replace("|", "_");
+                  if (!fileName.toLowerCase().endsWith(".apk")) fileName = fileName + ".apk";
+                  if (url == null || !url.startsWith("https://github.com/dentyarapp/DENTYAR-V1/releases/download/")) {
+                      call.reject("Untrusted DENTYAR update URL");
+                      return;
+                  }
+                  final String safeName = fileName;
+                  new Thread(() -> {
+                      HttpURLConnection connection = null;
+                      File apk = new File(getContext().getCacheDir(), safeName);
+                      try {
+                          URL source = new URL(url);
+                          connection = (HttpURLConnection) source.openConnection();
+                          connection.setInstanceFollowRedirects(true);
+                          connection.setConnectTimeout(20000);
+                          connection.setReadTimeout(45000);
+                          connection.setRequestProperty("User-Agent", "DENTYAR-Updater/1.0");
+                          int status = connection.getResponseCode();
+                          if (status != HttpURLConnection.HTTP_OK) throw new Exception("HTTP " + status);
+                          long total = 0;
+                          byte[] buffer = new byte[8192];
+                          try (InputStream in = connection.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
+                              int count;
+                              while ((count = in.read(buffer)) != -1) {
+                                  total += count;
+                                  if (total > 100L * 1024L * 1024L) throw new Exception("APK exceeds 100 MB");
+                                  out.write(buffer, 0, count);
+                              }
+                              out.flush();
+                          }
+                          if (total < 1000000L) throw new Exception("Downloaded file is too small to be a valid APK");
+                          try (FileInputStream in = new FileInputStream(apk)) {
+                              byte[] magic = new byte[4];
+                              if (in.read(magic) != 4 || magic[0] != 'P' || magic[1] != 'K' || magic[2] != 3 || magic[3] != 4) {
+                                  throw new Exception("Downloaded file is not an APK ZIP archive");
+                              }
+                          }
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                              !getContext().getPackageManager().canRequestPackageInstalls()) {
+                              Intent settings = new Intent(
+                                  Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                  Uri.parse("package:" + getContext().getPackageName())
+                              );
+                              settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              getContext().startActivity(settings);
+                              call.reject("اجازه نصب برنامه از این منبع را فعال کنید و دوباره تلاش کنید.");
+                              return;
+                          }
+                          Uri apkUri = FileProvider.getUriForFile(
+                              getContext(),
+                              getContext().getPackageName() + ".fileprovider",
+                              apk
+                          );
+                          Intent intent = new Intent(Intent.ACTION_VIEW);
+                          intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                          intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                          getContext().startActivity(intent);
+                          JSObject result = new JSObject();
+                          result.put("opened", true);
+                          result.put("fileName", safeName);
+                          call.resolve(result);
+                      } catch (Exception e) {
+                          call.reject("DENTYAR update download/install failed: " + e.getMessage(), e);
+                      } finally {
+                          if (connection != null) connection.disconnect();
+                      }
+                  }).start();
+              }
           }
           EOF
 
@@ -287,11 +365,12 @@ jobs:
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
-          grep -q "DENTYAR V65 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V65"' www/index.html
+          grep -q "DENTYAR V67 FIX" www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V67"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -336,15 +415,24 @@ jobs:
         env:
           DENTYAR_KEYSTORE_BASE64: ${{ secrets.DENTYAR_KEYSTORE_BASE64 }}
           DENTYAR_KEYSTORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
-          DENTYAR_KEY_ALIAS: ${{ secrets.DENTYAR_KEY_ALIAS }}
-          DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEY_PASSWORD }}
+          DENTYAR_KEY_ALIAS: dentyar-release
+          DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "$DENTYAR_KEYSTORE_BASE64" ] || [ -z "$DENTYAR_KEYSTORE_PASSWORD" ] || [ -z "$DENTYAR_KEY_ALIAS" ] || [ -z "$DENTYAR_KEY_PASSWORD" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Stable signing secrets are not configured; only a debug APK will be built and it will not be published as an update."
-            exit 0
+          set -euo pipefail
+          if [ -z "$DENTYAR_KEYSTORE_PASSWORD" ]; then
+            echo "ERROR: DENTYAR_KEYSTORE_PASSWORD is missing."
+            exit 1
           fi
-          printf '%s' "$DENTYAR_KEYSTORE_BASE64" | base64 --decode > android/app/dentyar-release.keystore
+          mkdir -p "$RUNNER_TEMP/dentyar-signing"
+          if [ -n "$DENTYAR_KEYSTORE_BASE64" ]; then
+            printf '%s' "$DENTYAR_KEYSTORE_BASE64" | base64 --decode > android/app/dentyar-release.keystore
+          else
+            gh run download 38471109738 --repo "$GITHUB_REPOSITORY" --name DENTYAR-SIGNING-KEY-PRIVATE --dir "$RUNNER_TEMP/dentyar-signing"
+            test -s "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore"
+            cp "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore" android/app/dentyar-release.keystore
+          fi
+          keytool -list -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release
           python - <<'PY'
           from pathlib import Path
           p = Path("android/app/build.gradle")
@@ -358,7 +446,7 @@ jobs:
                       keyPassword System.getenv("DENTYAR_KEY_PASSWORD")
                   }
               }
-          
+
               buildTypes {""", 1)
           if "signingConfig signingConfigs.release" not in s:
               s = s.replace("        release {", "        release {\n            signingConfig signingConfigs.release", 1)
@@ -378,7 +466,7 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: نام‌گذاری خروجی APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V65.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DENTYAR-V67.apk
 
       - name: جایگزینی با APK دارای امضای ثابت
         if: ${{ steps.signing.outputs.available == 'true' }}
@@ -387,19 +475,19 @@ jobs:
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V65-APK
+          name: DENTYAR-V67-APK
           path: DENTYAR-V65.apk
           if-no-files-found: error
 
       - name: انتشار نسخه اصلاحی V65 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v65]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V65 release workflow fix')) }}
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v67]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V67 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v65-final
-          name: DENTYAR V65 Persian Digits and SMS Fix
+          tag_name: v67-final
+          name: DENTYAR V67 Signed APK and In-App Update Fix
           body: |
-            نسخه اصلاحی دنت‌یار V65 برای تثبیت نمایش اعداد فارسی و تاریخ شمسی.
-            این نسخه با اصلاح اجباری نمایش اعداد فارسی و تاریخ‌های شمسی در رابط کاربری بسته‌بندی شده است.
+            نسخه امضاشده دنت‌یار V67 با اصلاح مسیر به‌روزرسانی درون‌برنامه‌ای اندروید و حفظ اصلاحات اعداد فارسی.
+            این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
           files: DENTYAR-V65.apk
           make_latest: true
           fail_on_unmatched_files: true
