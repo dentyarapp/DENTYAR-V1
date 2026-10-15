@@ -1,13 +1,13 @@
 {
-  "version": "V68",
-  "notes": "به‌روزرسانی دنت‌یار V68: اصلاح صفحه‌کلید ورود رمز همگام‌سازی برای پذیرش حروف و اعداد؛ بازگردانی ورود حساب ایمیل/رمز عبور Firebase.",
+  "version": "V69",
+  "notes": "به‌روزرسانی دنت‌یار V69: اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ رمز عبور فقط در حافظه موقت برنامه برای تلاش‌های مجدد نگه‌داری می‌شود و در اطلاعات ذخیره‌شده ثبت نمی‌شود.",
   "android": {
-    "version": "V68",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v68-final/DENTYAR-V68.apk",
-    "fileName": "DENTYAR-V68.apk"
+    "version": "V69",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v69-final/DENTYAR-V69.apk",
+    "fileName": "DENTYAR-V69.apk"
   },
   "web": {
-    "version": "V68",
+    "version": "V69",
     "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
   }
 }
