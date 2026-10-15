@@ -1,5 +1,5 @@
 name: Build DENTYAR V69 APK
-# Trigger V69 signed release workflow
+# Trigger V69 signed release workflow; publish only after the V69 APK path is verified.
 
 permissions:
   contents: write
