@@ -1,5 +1,5 @@
 name: Build DENTYAR V69 APK
-# Trigger V68 signed release workflow
+# Trigger V69 signed release workflow
 
 permissions:
   contents: write
@@ -482,10 +482,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V69-APK
-          path: DENTYAR-V68.apk
+          path: DENTYAR-V69.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V68 در Release
+      - name: انتشار نسخه اصلاحی V69 در Release
         if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v69]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V69 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
@@ -494,7 +494,7 @@ jobs:
           body: |
             نسخه امضاشده دنت‌یار V69 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V68.apk
+          files: DENTYAR-V69.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
