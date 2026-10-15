@@ -1,5 +1,5 @@
-name: Build DENTYAR V67 APK
-# Trigger V67 signed release workflow
+name: Build DENTYAR V68 APK
+# Trigger V68 signed release workflow
 
 permissions:
   contents: write
@@ -36,10 +36,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "67.0.0",
+            "version": "68.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V65"
+              "build": "echo DENTYAR V68"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -57,16 +57,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V65 package.
+          # Set an explicit Android version code/name for the V68 package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 67', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "67.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 68', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "68.0.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V65 versionCode/versionName")
+              raise SystemExit("Could not set Android V68 versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -366,8 +366,8 @@ jobs:
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
-          grep -q "DENTYAR V67 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V67"' www/index.html
+          grep -q "DENTYAR V68 FIX" www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V68"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
@@ -475,25 +475,25 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V67.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V68.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V67-APK
-          path: DENTYAR-V67.apk
+          name: DENTYAR-V68-APK
+          path: DENTYAR-V68.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V67 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v67]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V67 signed release')) }}
+      - name: انتشار نسخه اصلاحی V68 در Release
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v68]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V68 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v67-final
-          name: DENTYAR V67 Signed APK and In-App Update Fix
+          tag_name: v68-final
+          name: DENTYAR V68 Signed APK and In-App Update Fix
           body: |
-            نسخه امضاشده دنت‌یار V67 با اصلاح مسیر به‌روزرسانی درون‌برنامه‌ای اندروید و حفظ اصلاحات اعداد فارسی.
+            نسخه امضاشده دنت‌یار V68 با اصلاح مسیر به‌روزرسانی درون‌برنامه‌ای اندروید و حفظ اصلاحات اعداد فارسی.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V67.apk
+          files: DENTYAR-V68.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
