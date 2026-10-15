@@ -5316,28 +5316,45 @@ document.addEventListener('focus',e=>{
     retryCount=Math.min(retryCount+1,6);
     const wait=requested!==null?requested:Math.min(3000*Math.pow(2,retryCount-1),60000);
     retryTimerDelay=wait;
-    retryTimer=setTimeout(function(){ retryTimer=null; retryTimerDelay=0; SYNC.connect(); },wait);
+    retryTimer=setTimeout(function(){ retryTimer=null; retryTimerDelay=0; SYNC.connect(SYNC._sessionCredentials); },wait);
   }
 
+  // Keep credentials in memory only for retries during this app session; never save passwords in STATE/localStorage.
+  SYNC._sessionCredentials = SYNC._sessionCredentials || null;
   SYNC.connect = async function(credentials){
     const cfg = SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig){ return; }
+    if(credentials && credentials.email && credentials.password){
+      SYNC._sessionCredentials = { email:String(credentials.email).trim(), password:String(credentials.password) };
+    }
+    credentials = credentials || SYNC._sessionCredentials;
     if(started && connected) return;
-    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     try{
       await loadSdk();
-      if(fbApp){ try{ await fb.deleteApp(fbApp); }catch(_){} }
-      fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
+      // Reuse the existing Firebase app/auth instance. Deleting and recreating it on every
+      // retry can race with persistence restoration and make a valid login appear missing.
+      if(!fbApp) fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
       auth = fa.getAuth(fbApp);
-      await fa.setPersistence(auth, fa.browserLocalPersistence);
+      try{
+        await fa.setPersistence(auth, fa.browserLocalPersistence);
+      }catch(persistenceError){
+        console.warn('Local auth persistence unavailable; trying session persistence:', persistenceError);
+        try{ await fa.setPersistence(auth, fa.browserSessionPersistence); }
+        catch(sessionPersistenceError){
+          console.warn('Session auth persistence unavailable; using in-memory persistence:', sessionPersistenceError);
+          await fa.setPersistence(auth, fa.inMemoryPersistence);
+        }
+      }
       if(typeof auth.authStateReady === 'function') await auth.authStateReady();
       if(!auth.currentUser){
         const email = String((credentials&&credentials.email)||cfg.accountEmail||'').trim();
         const password = String((credentials&&credentials.password)||'');
-        if(!email || !password) throw new Error('برای ورود به حساب همگام‌سازی، ایمیل و رمز عبور را در همین بخش وارد کنید.');
+        if(!email || !password) throw new Error('برای ورود به حساب همگام‌سازی، یک‌بار ایمیل و رمز عبور را در همین بخش وارد کنید.');
         await fa.signInWithEmailAndPassword(auth,email,password);
       }
       db = dbm.getDatabase(fbApp);
+      try{ dbm.goOnline(db); }catch(_){}
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       ensureDeviceId();
       dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
@@ -5349,7 +5366,7 @@ document.addEventListener('focus',e=>{
       ['patients','dentists','appointments'].forEach(subscribeTombstones);
       started=true;
       retryCount=0;
-      if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
+      if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
       SYNC.renderStatus&&SYNC.renderStatus();
       toast('همگام‌سازی چنددستگاهی فعال شد');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
@@ -5360,8 +5377,10 @@ document.addEventListener('focus',e=>{
       connected=false;
       SYNC.renderStatus&&SYNC.renderStatus();
       const needsLogin = !auth || !auth.currentUser;
+      const authFailure = e && /^auth\/(invalid-credential|wrong-password|user-not-found|invalid-email|too-many-requests)/.test(String(e.code||''));
+      if(authFailure) SYNC._sessionCredentials = null;
       toast(needsLogin ? (e.message || 'ورود به حساب همگام‌سازی انجام نشد؛ ایمیل و رمز عبور را بررسی کنید.') : 'اتصال همگام‌سازی ناموفق بود؛ اتصال اینترنت و دسترسی به سرویس همگام‌سازی بررسی شود.');
-      if(!needsLogin && !(e && /^auth\/(invalid-credential|wrong-password|user-not-found|invalid-email|too-many-requests)/.test(String(e.code||'')))) scheduleReconnect();
+      if(!needsLogin && !authFailure) scheduleReconnect();
     }
   };
 
@@ -5369,8 +5388,8 @@ document.addEventListener('focus',e=>{
     if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     clearSubs();
     if(db){ try{ dbm.goOffline(db); }catch(_){} }
-    if(fbApp){ try{ fb.deleteApp(fbApp); }catch(_){} }
-    fbApp=null; db=null; rootRef=null; started=false; connected=false;
+    // Keep Firebase Auth/app alive so the signed-in session is not destroyed during a reconnect.
+    rootRef=null; started=false; connected=false;
     SYNC.renderStatus&&SYNC.renderStatus();
   };
 
@@ -5547,7 +5566,7 @@ document.addEventListener('focus',e=>{
   });
   window.addEventListener('offline',function(){ connected=false; SYNC.renderStatus&&SYNC.renderStatus(); });
   window.DentyarSync = SYNC;
-  function autoStart(){ const c=SYNC.cfg(); if(c&&c.enabled){ SYNC.connect(); } }
+  function autoStart(){ const c=SYNC.cfg(); if(c&&c.enabled){ SYNC.connect(SYNC._sessionCredentials); } }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoStart, {once:true});
   else autoStart();
 })();
