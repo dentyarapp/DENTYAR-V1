@@ -5271,7 +5271,7 @@ document.addEventListener('focus',e=>{
 <script>
 (function(){
   const SYNC = {};
-  let fb=null, dbm=null, fa=null, fbApp=null, auth=null, db=null, rootRef=null;
+  let fb=null, dbm=null, fa=null, fbApp=null, fbConfigKey=null, auth=null, db=null, rootRef=null;
   let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false, retryTimer=null, retryTimerDelay=0, retryCount=0;
   const FB_APP_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
@@ -5334,7 +5334,16 @@ document.addEventListener('focus',e=>{
       await loadSdk();
       // Reuse the existing Firebase app/auth instance. Deleting and recreating it on every
       // retry can race with persistence restoration and make a valid login appear missing.
-      if(!fbApp) fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
+      const requestedConfigKey = JSON.stringify(cfg.firebaseConfig);
+      if(fbApp && fbConfigKey !== requestedConfigKey){
+        if(db){ try{ dbm.goOffline(db); }catch(_){} }
+        try{ await fb.deleteApp(fbApp); }catch(deleteError){ console.warn('Could not dispose previous Firebase app:', deleteError); }
+        fbApp=null; auth=null; db=null; fbConfigKey=null;
+      }
+      if(!fbApp){
+        fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
+        fbConfigKey = requestedConfigKey;
+      }
       auth = fa.getAuth(fbApp);
       try{
         await fa.setPersistence(auth, fa.browserLocalPersistence);
@@ -5553,11 +5562,12 @@ document.addEventListener('focus',e=>{
     renderSettings();
   };
   SYNC.toggleOff = function(){
+    SYNC._sessionCredentials = null;
     if(STATE.meta.sync) STATE.meta.sync.enabled = false; saveState();
     SYNC.disconnect(); toast('همگام‌سازی قطع شد (داده‌های محلی نگه‌دری شد)'); renderSettings();
   };
   SYNC.removeConfig = function(){
-    modalConfirm('حذف تنظیمات همگام‌سازی','تنظیمات اتصال حذف شود؟ داده‌های محلی این دستگاه دست‌نخورده باقی می‌مانند.', function(){ STATE.meta.sync = { enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }; saveState(); SYNC.disconnect(); toast('تنظیمات همگام‌سازی حذف شد'); renderSettings(); });
+    modalConfirm('حذف تنظیمات همگام‌سازی','تنظیمات اتصال حذف شود؟ داده‌های محلی این دستگاه دست‌نخورده باقی می‌مانند.', function(){ SYNC._sessionCredentials = null; STATE.meta.sync = { enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }; saveState(); SYNC.disconnect(); toast('تنظیمات همگام‌سازی حذف شد'); renderSettings(); });
   };
 
   window.addEventListener('online',function(){
