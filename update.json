@@ -1,13 +1,13 @@
 {
-  "version": "V67",
-  "notes": "به‌روزرسانی درون‌برنامه‌ای V67: APK امضاشده با کلید ثابت دنت‌یار، اصلاح مسیر به‌روزرسانی اندروید و حفظ اصلاحات نمایش اعداد فارسی و تاریخ شمسی.",
+  "version": "V68",
+  "notes": "به‌روزرسانی دنت‌یار V68: بازگردانی ورود حساب ایمیل/رمز عبور برای همگام‌سازی Firebase؛ رمز عبور فقط برای ورود استفاده می‌شود و در تنظیمات برنامه ذخیره نمی‌شود.",
   "android": {
-    "version": "V67",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v67-final/DENTYAR-V67.apk",
-    "fileName": "DENTYAR-V67.apk"
+    "version": "V68",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v68-final/DENTYAR-V68.apk",
+    "fileName": "DENTYAR-V68.apk"
   },
   "web": {
-    "version": "V67",
+    "version": "V68",
     "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
   }
 }
