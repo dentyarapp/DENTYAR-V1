@@ -963,7 +963,7 @@ function faDigits(value){
 function formatAllNumericInputs(){
   document.querySelectorAll('input').forEach(el=>{
     const id=el.id||'';
-    const numericOnly=/(Nid|Phone|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|national|postal|economic|License|EmergencyPhone|Mobile|pin|Pass)/i.test(id);
+    const numericOnly=el.id!=='syncAccountPassword' && /(Nid|Phone|Postal|Birth|InsuranceNo|PolicyNo|CoverageCeiling|Franchise|Gross|Discount|Insurance|Cash|Card|Transfer|Other|Refund|Price|Amount|Cost|Paid|Balance|national|postal|economic|License|EmergencyPhone|Mobile|pin|Pass)/i.test(id);
     // HTML number inputs reject Persian glyphs; convert them to text/numeric-mode so
     // the displayed digits can be Persian while values are normalized before actions.
     if(el.type==='number'){
