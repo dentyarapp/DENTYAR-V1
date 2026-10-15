@@ -1,4 +1,4 @@
-name: Build DENTYAR V68 APK
+name: Build DENTYAR V69 APK
 # Trigger V68 signed release workflow
 
 permissions:
@@ -12,6 +12,7 @@ on:
       - main
       - fix/v59-safe-numeric-serial-20261009
       - test/dentyar-comprehensive-fixes-20261009
+      - fix/dentyar-sync-auth-session-20261015
 
 jobs:
   build-apk:
@@ -36,10 +37,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "68.0.0",
+            "version": "69.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V68"
+              "build": "echo DENTYAR V69"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -57,16 +58,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V68 package.
+          # Set an explicit Android version code/name for the V69 package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 68', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "68.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 69', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "69.0.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V68 versionCode/versionName")
+              raise SystemExit("Could not set Android V69 versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -367,7 +368,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V68"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V69"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
@@ -475,23 +476,23 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V68.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V69.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V68-APK
+          name: DENTYAR-V69-APK
           path: DENTYAR-V68.apk
           if-no-files-found: error
 
       - name: انتشار نسخه اصلاحی V68 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v68]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V68 signed release')) }}
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v69]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V69 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v68-final
-          name: DENTYAR V68 Signed APK and In-App Update Fix
+          tag_name: v69-final
+          name: DENTYAR V69 Signed APK — Firebase Sync Session Fix
           body: |
-            نسخه امضاشده دنت‌یار V68 با اصلاح مسیر به‌روزرسانی درون‌برنامه‌ای اندروید و حفظ اصلاحات اعداد فارسی.
+            نسخه امضاشده دنت‌یار V69 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
           files: DENTYAR-V68.apk
           make_latest: true
