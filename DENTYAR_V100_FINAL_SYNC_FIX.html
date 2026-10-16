@@ -5277,6 +5277,35 @@ document.addEventListener('focus',e=>{
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
   const FB_AUTH_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
   const PUSHED_KEY='dentyar_sync_pushed_ids';
+  let dentyarOriginalFetch = null;
+  function installTransportProxy(cfg){
+    const proxyText = String((cfg && cfg.networkProxyUrl) || '').trim();
+    if(!proxyText) return;
+    let proxy;
+    try{ proxy = new URL(proxyText); }catch(_){ throw new Error('آدرس مسیر ارتباطی معتبر نیست.'); }
+    if(proxy.protocol !== 'https:' || proxy.username || proxy.password || proxy.search || proxy.hash){
+      throw new Error('آدرس مسیر ارتباطی باید HTTPS معتبر باشد.');
+    }
+    if(!dentyarOriginalFetch) dentyarOriginalFetch = window.fetch.bind(window);
+    const dbHost = (()=>{ try{return new URL(String(cfg.firebaseConfig.databaseURL||'')).host;}catch(_){return '';} })();
+    const authHosts = new Set(['identitytoolkit.googleapis.com','securetoken.googleapis.com']);
+    const dbHosts = new Set(['dentyar-458d9-default-rtdb.firebaseio.com','dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app']);
+    if(dbHost && !dbHosts.has(dbHost)) throw new Error('مسیر ارتباطی فقط برای پایگاه داده رسمی دنت‌یار تعریف شده است.');
+    window.fetch = function(input, init){
+      let target=null;
+      try{
+        const raw = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
+        const u = new URL(raw);
+        if(authHosts.has(u.hostname)) target = new URL('/auth/'+u.hostname+u.pathname+u.search, proxy.origin);
+        else if(dbHost && u.hostname===dbHost) target = new URL('/db/'+u.hostname+u.pathname+u.search, proxy.origin);
+      }catch(_){}
+      if(!target) return dentyarOriginalFetch(input,init);
+      try{
+        const req = input instanceof Request ? new Request(target.href,input) : target.href;
+        return dentyarOriginalFetch(req,init);
+      }catch(e){ return Promise.reject(e); }
+    };
+  }
 
   SYNC.cfg = function(){ return (STATE && STATE.meta && STATE.meta.sync) ? STATE.meta.sync : null; };
   SYNC.isReady = function(){ return started && connected; };
@@ -5338,6 +5367,7 @@ document.addEventListener('focus',e=>{
     if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     try{
       connectStage='load-sdk'; SYNC._lastError=null; SYNC.renderStatus&&SYNC.renderStatus();
+      installTransportProxy(cfg);
       await loadSdk();
       // Reuse the existing Firebase app/auth instance. Deleting and recreating it on every
       // retry can race with persistence restoration and make a valid login appear missing.
@@ -5550,7 +5580,7 @@ document.addEventListener('focus',e=>{
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
       : '';
-    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(ready?'متصل':(cfg.enabled?'در حال اتصال…':'غیرفعال'))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی: '+esc(ls)+'</span>\n      </div>\n      <div id="syncDiagnostic" class="notice" style="font-size:11px;line-height:1.8;margin:6px 0">'+esc(SYNC.diagnosticText())+'</div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید (قوانین را روی auth!=null بگذارید) و مقادیر زیر را از تنظیمات وب Firebase کپی کنید.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
+    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(ready?'متصل':(cfg.enabled?'در حال اتصال…':'غیرفعال'))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی: '+esc(ls)+'</span>\n      </div>\n      <div id="syncDiagnostic" class="notice" style="font-size:11px;line-height:1.8;margin:6px 0">'+esc(SYNC.diagnosticText())+'</div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n        <label>مسیر ارتباطی بدون VPN (پس از راه‌اندازی)</label><input id="syncProxyUrl" type="url" inputmode="url" dir="ltr" value="'+esc(cfg.networkProxyUrl||'')+'" placeholder="https://نام-مسیر.workers.dev">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید (قوانین را روی auth!=null بگذارید) و مقادیر زیر را از تنظیمات وب Firebase کپی کنید.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
   };
 
   SYNC.genCode = function(){
@@ -5572,6 +5602,7 @@ document.addEventListener('focus',e=>{
     cfg.accountEmail = ((document.getElementById('syncAccountEmail')||{}).value||'firebase.dentyar.app@gmail.com').trim();
     cfg.clinicCode = ((document.getElementById('syncClinicCode')||{}).value||'').trim();
     cfg.deviceName = ((document.getElementById('syncDeviceName')||{}).value||'').trim();
+    cfg.networkProxyUrl = ((document.getElementById('syncProxyUrl')||{}).value||'').trim();
     cfg.firebaseConfig = firebaseConfig;
     return cfg;
   };
