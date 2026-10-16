@@ -5295,7 +5295,7 @@ document.addEventListener('focus',e=>{
       let target=null;
       try{
         const raw = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
-        const u = new URL(raw);
+        const u = new URL(raw, location.href);
         if(authHosts.has(u.hostname)) target = new URL('/auth/'+u.hostname+u.pathname+u.search, proxy.origin);
         else if(dbHost && u.hostname===dbHost) target = new URL('/db/'+u.hostname+u.pathname+u.search, proxy.origin);
       }catch(_){}
@@ -5305,6 +5305,21 @@ document.addEventListener('focus',e=>{
         return dentyarOriginalFetch(req,init);
       }catch(e){ return Promise.reject(e); }
     };
+    // Firebase Realtime Database long-poll transport can use XMLHttpRequest,
+    // so route those requests too; otherwise a fetch-only relay is incomplete.
+    if(window.XMLHttpRequest && !XMLHttpRequest.prototype.__dentyarRelayPatched){
+      const originalOpen = XMLHttpRequest.prototype.open;
+      Object.defineProperty(XMLHttpRequest.prototype,'__dentyarRelayPatched',{value:true});
+      XMLHttpRequest.prototype.open = function(method, url, ...rest){
+        let routedUrl = url;
+        try{
+          const u = new URL(String(url), location.href);
+          if(authHosts.has(u.hostname)) routedUrl = new URL('/auth/'+u.hostname+u.pathname+u.search, proxy.origin).href;
+          else if(dbHost && u.hostname===dbHost) routedUrl = new URL('/db/'+u.hostname+u.pathname+u.search, proxy.origin).href;
+        }catch(_){}
+        return originalOpen.call(this,method,routedUrl,...rest);
+      };
+    }
   }
 
   SYNC.cfg = function(){ return (STATE && STATE.meta && STATE.meta.sync) ? STATE.meta.sync : null; };
