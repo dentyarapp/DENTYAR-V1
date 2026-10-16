@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DENTYAR</title>
-<script>const DENTYAR_APP_VERSION = "V68";</script>
+<script>const DENTYAR_APP_VERSION = "V70";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -4416,7 +4416,7 @@ function renderContact(){
         <div style="flex:1;min-width:180px">
           <h2 style="margin:0;color:#0f766e;font-size:23px">دنت‌یار</h2>
           <div style="font-weight:800;color:#17324d;margin-top:5px">دستیار هوشمند دندان‌پزشکی شما</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V67</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه نهایی تثبیت‌شده V70</div>
         </div>
       </div>
     </div>
@@ -4453,7 +4453,7 @@ function renderContact(){
       </div>
     </div>    <div class="card">
       <h3>مشخصات نسخه</h3>
-      <div class="kv"><span>نسخه برنامه</span><b>V67 — نسخه نهایی تثبیت‌شده</b></div>
+      <div class="kv"><span>نسخه برنامه</span><b>V70 — نسخه نهایی تثبیت‌شده</b></div>
       <div class="kv"><span>طراح، مدیر فنی و پشتیبان</span><b>حمید آل کثیر</b></div>
     </div>
   `;
@@ -5271,7 +5271,7 @@ document.addEventListener('focus',e=>{
 <script>
 (function(){
   const SYNC = {};
-  let fb=null, dbm=null, fa=null, fbApp=null, auth=null, db=null, rootRef=null;
+  let fb=null, dbm=null, fa=null, fbApp=null, fbConfigKey=null, auth=null, db=null, rootRef=null;
   let subs=[], deviceId=null, pushTimer=null, merging=false, connected=false, started=false, retryTimer=null, retryTimerDelay=0, retryCount=0;
   const FB_APP_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
   const FB_DB_URL ='https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
@@ -5316,28 +5316,61 @@ document.addEventListener('focus',e=>{
     retryCount=Math.min(retryCount+1,6);
     const wait=requested!==null?requested:Math.min(3000*Math.pow(2,retryCount-1),60000);
     retryTimerDelay=wait;
-    retryTimer=setTimeout(function(){ retryTimer=null; retryTimerDelay=0; SYNC.connect(); },wait);
+    retryTimer=setTimeout(function(){ retryTimer=null; retryTimerDelay=0; SYNC.connect(SYNC._sessionCredentials); },wait);
   }
 
+  // Keep credentials in memory only for retries during this app session; never save passwords in STATE/localStorage.
+  SYNC._sessionCredentials = SYNC._sessionCredentials || null;
   SYNC.connect = async function(credentials){
     const cfg = SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig){ return; }
+    if(credentials && credentials.email && credentials.password){
+      SYNC._sessionCredentials = { email:String(credentials.email).trim(), password:String(credentials.password) };
+    }
+    credentials = credentials || SYNC._sessionCredentials;
     if(started && connected) return;
-    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
+    if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     try{
       await loadSdk();
-      if(fbApp){ try{ await fb.deleteApp(fbApp); }catch(_){} }
-      fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
+      // Reuse the existing Firebase app/auth instance. Deleting and recreating it on every
+      // retry can race with persistence restoration and make a valid login appear missing.
+      const requestedConfigKey = JSON.stringify(cfg.firebaseConfig);
+      if(fbApp && fbConfigKey !== requestedConfigKey){
+        if(db){ try{ dbm.goOffline(db); }catch(_){} }
+        try{ await fb.deleteApp(fbApp); }catch(deleteError){ console.warn('Could not dispose previous Firebase app:', deleteError); }
+        fbApp=null; auth=null; db=null; fbConfigKey=null;
+      }
+      if(!fbApp){
+        fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
+        fbConfigKey = requestedConfigKey;
+      }
       auth = fa.getAuth(fbApp);
-      await fa.setPersistence(auth, fa.browserLocalPersistence);
+      try{
+        // Persist the Firebase sign-in session (not the password) across app restarts.
+        await fa.setPersistence(auth, fa.indexedDBLocalPersistence);
+      }catch(indexedDbPersistenceError){
+        console.warn('IndexedDB auth persistence unavailable; trying browser local persistence:', indexedDbPersistenceError);
+        try{
+          await fa.setPersistence(auth, fa.browserLocalPersistence);
+        }catch(localPersistenceError){
+          console.warn('Browser local auth persistence unavailable; trying session persistence:', localPersistenceError);
+          try{
+            await fa.setPersistence(auth, fa.browserSessionPersistence);
+          }catch(sessionPersistenceError){
+            console.warn('Session auth persistence unavailable; using in-memory persistence:', sessionPersistenceError);
+            await fa.setPersistence(auth, fa.inMemoryPersistence);
+          }
+        }
+      }
       if(typeof auth.authStateReady === 'function') await auth.authStateReady();
       if(!auth.currentUser){
         const email = String((credentials&&credentials.email)||cfg.accountEmail||'').trim();
         const password = String((credentials&&credentials.password)||'');
-        if(!email || !password) throw new Error('برای ورود به حساب همگام‌سازی، ایمیل و رمز عبور را در همین بخش وارد کنید.');
+        if(!email || !password) throw new Error('برای ورود به حساب همگام‌سازی، یک‌بار ایمیل و رمز عبور را در همین بخش وارد کنید.');
         await fa.signInWithEmailAndPassword(auth,email,password);
       }
       db = dbm.getDatabase(fbApp);
+      try{ dbm.goOnline(db); }catch(_){}
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       ensureDeviceId();
       dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
@@ -5349,7 +5382,7 @@ document.addEventListener('focus',e=>{
       ['patients','dentists','appointments'].forEach(subscribeTombstones);
       started=true;
       retryCount=0;
-      if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; }
+      if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
       SYNC.renderStatus&&SYNC.renderStatus();
       toast('همگام‌سازی چنددستگاهی فعال شد');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
@@ -5360,8 +5393,10 @@ document.addEventListener('focus',e=>{
       connected=false;
       SYNC.renderStatus&&SYNC.renderStatus();
       const needsLogin = !auth || !auth.currentUser;
+      const authFailure = e && /^auth\/(invalid-credential|wrong-password|user-not-found|invalid-email|too-many-requests)/.test(String(e.code||''));
+      if(authFailure) SYNC._sessionCredentials = null;
       toast(needsLogin ? (e.message || 'ورود به حساب همگام‌سازی انجام نشد؛ ایمیل و رمز عبور را بررسی کنید.') : 'اتصال همگام‌سازی ناموفق بود؛ اتصال اینترنت و دسترسی به سرویس همگام‌سازی بررسی شود.');
-      if(!needsLogin && !(e && /^auth\/(invalid-credential|wrong-password|user-not-found|invalid-email|too-many-requests)/.test(String(e.code||'')))) scheduleReconnect();
+      if(!needsLogin && !authFailure) scheduleReconnect();
     }
   };
 
@@ -5369,8 +5404,8 @@ document.addEventListener('focus',e=>{
     if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     clearSubs();
     if(db){ try{ dbm.goOffline(db); }catch(_){} }
-    if(fbApp){ try{ fb.deleteApp(fbApp); }catch(_){} }
-    fbApp=null; db=null; rootRef=null; started=false; connected=false;
+    // Keep Firebase Auth/app alive so the signed-in session is not destroyed during a reconnect.
+    rootRef=null; started=false; connected=false;
     SYNC.renderStatus&&SYNC.renderStatus();
   };
 
@@ -5496,7 +5531,7 @@ document.addEventListener('focus',e=>{
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
       : '';
-    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(ready?'متصل':(cfg.enabled?'در حال اتصال…':'غیرفعال'))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی: '+esc(ls)+'</span>\n      </div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور فقط برای ورود</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="رمز حساب همگام‌سازی">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید (قوانین را روی auth!=null بگذارید) و مقادیر زیر را از تنظیمات وب Firebase کپی کنید.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
+    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(ready?'متصل':(cfg.enabled?'در حال اتصال…':'غیرفعال'))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی: '+esc(ls)+'</span>\n      </div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید (قوانین را روی auth!=null بگذارید) و مقادیر زیر را از تنظیمات وب Firebase کپی کنید.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
   };
 
   SYNC.genCode = function(){
@@ -5524,21 +5559,22 @@ document.addEventListener('focus',e=>{
   SYNC.saveAndConnect = async function(){
     const cfg = SYNC.readForm();
     const accountPassword = ((document.getElementById('syncAccountPassword')||{}).value||'');
-    if(!cfg.accountEmail || !accountPassword){ toast('ایمیل و رمز عبور حساب همگام‌سازی را وارد کنید.'); return; }
+    if(!cfg.accountEmail){ toast('ایمیل حساب همگام‌سازی را وارد کنید.'); return; }
     if(!cfg.clinicCode){ toast('کد مطب را وارد کنید یا «تولید کد» را بزنید'); return; }
     if(!cfg.firebaseConfig.apiKey || !cfg.firebaseConfig.databaseURL || !cfg.firebaseConfig.appId){ toast('تنظیمات Firebase ناقص است (apiKey، databaseURL، appId الزامی است)'); return; }
     STATE.meta.sync = Object.assign({ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }, cfg, { enabled:true, pairedAt: Date.now() });
     saveState();
     SYNC.disconnect();
-    await SYNC.connect({email:cfg.accountEmail,password:accountPassword});
+    await SYNC.connect(accountPassword ? {email:cfg.accountEmail,password:accountPassword} : null);
     renderSettings();
   };
   SYNC.toggleOff = function(){
+    SYNC._sessionCredentials = null;
     if(STATE.meta.sync) STATE.meta.sync.enabled = false; saveState();
     SYNC.disconnect(); toast('همگام‌سازی قطع شد (داده‌های محلی نگه‌دری شد)'); renderSettings();
   };
   SYNC.removeConfig = function(){
-    modalConfirm('حذف تنظیمات همگام‌سازی','تنظیمات اتصال حذف شود؟ داده‌های محلی این دستگاه دست‌نخورده باقی می‌مانند.', function(){ STATE.meta.sync = { enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }; saveState(); SYNC.disconnect(); toast('تنظیمات همگام‌سازی حذف شد'); renderSettings(); });
+    modalConfirm('حذف تنظیمات همگام‌سازی','تنظیمات اتصال حذف شود؟ داده‌های محلی این دستگاه دست‌نخورده باقی می‌مانند.', function(){ SYNC._sessionCredentials = null; STATE.meta.sync = { enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }; saveState(); SYNC.disconnect(); toast('تنظیمات همگام‌سازی حذف شد'); renderSettings(); });
   };
 
   window.addEventListener('online',function(){
@@ -5547,7 +5583,7 @@ document.addEventListener('focus',e=>{
   });
   window.addEventListener('offline',function(){ connected=false; SYNC.renderStatus&&SYNC.renderStatus(); });
   window.DentyarSync = SYNC;
-  function autoStart(){ const c=SYNC.cfg(); if(c&&c.enabled){ SYNC.connect(); } }
+  function autoStart(){ const c=SYNC.cfg(); if(c&&c.enabled){ SYNC.connect(SYNC._sessionCredentials); } }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', autoStart, {once:true});
   else autoStart();
 })();
