@@ -82,3 +82,5 @@ export default {
     }
   }
 };
+
+// Deployment trigger after GitHub Cloudflare secrets were updated.
