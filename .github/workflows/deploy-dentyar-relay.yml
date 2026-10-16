@@ -49,5 +49,4 @@ jobs:
         run: |
           npx --yes wrangler@4 deploy cloudflare/dentyar-sync-relay.js \
             --name dentyar-sync-relay \
-            --compatibility-date 2026-10-16 \
-            --account-id "$CLOUDFLARE_ACCOUNT_ID"
+            --compatibility-date 2026-10-16
