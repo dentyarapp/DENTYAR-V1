@@ -13,9 +13,10 @@ const AUTH_HOSTS = new Set([
 ]);
 const DATABASE_HOSTS = new Set([
   "dentyar-458d9-default-rtdb.firebaseio.com",
-  "dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app",
   "dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app"
 ]);
+const SDK_HOST = "www.gstatic.com";
+const SDK_PREFIX = "/firebasejs/10.12.5/";
 
 function cors(origin) {
   return {
@@ -36,13 +37,14 @@ export default {
     }
 
     const parts = incoming.pathname.split("/").filter(Boolean);
-    if (parts.length < 2 || !["auth", "db"].includes(parts[0])) {
+    if (parts.length < 2 || !["auth", "db", "sdk"].includes(parts[0])) {
       return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
     }
 
     const kind = parts.shift();
     const host = parts.shift();
-    const allowed = kind === "auth" ? AUTH_HOSTS.has(host) : DATABASE_HOSTS.has(host);
+    const remainingPath = "/" + parts.join("/");
+    const allowed = kind === "auth" ? AUTH_HOSTS.has(host) : kind === "db" ? DATABASE_HOSTS.has(host) : (host === SDK_HOST && remainingPath.startsWith(SDK_PREFIX));
     if (!allowed) {
       return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
     }
