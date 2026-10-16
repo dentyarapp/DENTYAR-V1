@@ -370,6 +370,10 @@ jobs:
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
           grep -q 'DENTYAR_APP_VERSION = "V100"' www/index.html
+          grep -q "installTransportProxy" www/index.html
+          grep -q "networkProxyUrl" www/index.html
+          test -s cloudflare/dentyar-sync-relay.js
+          node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
