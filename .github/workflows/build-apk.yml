@@ -1,5 +1,5 @@
-name: Build DENTYAR V70 APK
-# Trigger V70 signed release workflow; publish only after the V70 APK path is verified.
+name: Build DENTYAR TEST V100 APK
+# Test-only workflow: build a separately installable DENTYAR TEST APK; never publish a release.
 
 permissions:
   contents: write
@@ -13,6 +13,7 @@ on:
       - fix/v59-safe-numeric-serial-20261009
       - test/dentyar-comprehensive-fixes-20261009
       - fix/dentyar-sync-auth-session-20261015
+      - fix/dentyar-v100-sync-transport-20261016
 
 jobs:
   build-apk:
@@ -32,15 +33,15 @@ jobs:
       - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
         run: |
           mkdir -p www
-          cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html www/index.html
+          cp DENTYAR_V100_FINAL_SYNC_FIX.html www/index.html
 
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "70.0.0",
+            "version": "100.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V70"
+              "build": "echo DENTYAR TEST V100"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -54,20 +55,20 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR TEST" "com.dentyar.dentyartest" --web-dir www
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V70 package.
+          # Set an explicit Android version code/name for the side-by-side V100 test package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 70', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "70.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 100', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.0.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V70 versionCode/versionName")
+              raise SystemExit("Could not set Android V100 versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -87,10 +88,10 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/testapp
+          mkdir -p android/app/src/main/java/com/dentyar/dentyartest
 
-          cat > android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.dentyartest;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -316,8 +317,8 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/dentyartest/MainActivity.java <<'EOF'
+          package com.dentyar.dentyartest;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -364,15 +365,15 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V70"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V100"' www/index.html
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
-          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -476,25 +477,25 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V70.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-TEST-V100.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V70-APK
-          path: DENTYAR-V70.apk
+          name: DENTYAR-TEST-V100-APK
+          path: DENTYAR-TEST-V100.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V70 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v70]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V70 signed release')) }}
+      - name: انتشار عمومی غیرفعال است (نسخه آزمایشی)
+        if: ${{ false }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v70-final
-          name: DENTYAR V70 Signed APK — Firebase Sync Session Fix
+          tag_name: v100-test-disabled
+          name: DENTYAR TEST V100 (disabled test release)
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V70.apk
+          files: DENTYAR-TEST-V100.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
