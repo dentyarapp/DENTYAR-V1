@@ -1,5 +1,6 @@
 name: Deploy DENTYAR Firebase Relay
 
+# Deploy uses CLOUDFLARE_ACCOUNT_ID from the environment; do not pass unsupported --account-id CLI flag.
 on:
   workflow_dispatch:
   push:
