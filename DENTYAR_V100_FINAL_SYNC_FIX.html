@@ -5407,22 +5407,23 @@ document.addEventListener('focus',e=>{
         fbConfigKey = requestedConfigKey;
       }
       connectStage='auth-persistence'; SYNC.renderStatus&&SYNC.renderStatus();
-      auth = fa.getAuth(fbApp);
+      // Initialize Auth with a persistence fallback list. This is more reliable in
+      // Android WebView/Capacitor than calling setPersistence repeatedly after getAuth().
       try{
-        // Persist the Firebase sign-in session (not the password) across app restarts.
-        await fa.setPersistence(auth, fa.indexedDBLocalPersistence);
-      }catch(indexedDbPersistenceError){
-        console.warn('IndexedDB auth persistence unavailable; trying browser local persistence:', indexedDbPersistenceError);
-        try{
-          await fa.setPersistence(auth, fa.browserLocalPersistence);
-        }catch(localPersistenceError){
-          console.warn('Browser local auth persistence unavailable; trying session persistence:', localPersistenceError);
-          try{
-            await fa.setPersistence(auth, fa.browserSessionPersistence);
-          }catch(sessionPersistenceError){
-            console.warn('Session auth persistence unavailable; using in-memory persistence:', sessionPersistenceError);
-            await fa.setPersistence(auth, fa.inMemoryPersistence);
-          }
+        auth = fa.initializeAuth(fbApp, {
+          persistence: [
+            fa.indexedDBLocalPersistence,
+            fa.browserLocalPersistence,
+            fa.browserSessionPersistence,
+            fa.inMemoryPersistence
+          ]
+        });
+      }catch(initializeAuthError){
+        // If this Auth instance already exists, reuse it rather than failing persistence setup.
+        if(initializeAuthError && initializeAuthError.code === 'auth/already-initialized'){
+          auth = fa.getAuth(fbApp);
+        }else{
+          throw initializeAuthError;
         }
       }
       if(typeof auth.authStateReady === 'function') await auth.authStateReady();
