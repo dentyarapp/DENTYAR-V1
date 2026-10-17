@@ -36,6 +36,30 @@ export default {
       return new Response(null, { status: 204, headers: cors(origin) });
     }
 
+    // A privacy-preserving connectivity probe: request only a deliberately
+    // nonexistent path and return status codes, never Firebase response data.
+    // This distinguishes a reachable Worker from a Worker that can reach RTDB.
+    if (incoming.pathname === "/health/firebase" && request.method === "GET") {
+      const checks = await Promise.all([...DATABASE_HOSTS].map(async (host) => {
+        try {
+          const upstream = await fetch("https://" + host + "/__dentyar_relay_probe_404__.json");
+          const status = upstream.status;
+          try { await upstream.body?.cancel(); } catch (_) {}
+          return { host, status, reachable: status !== 502 && status !== 504 };
+        } catch (_) {
+          return { host, status: 0, reachable: false };
+        }
+      }));
+      return new Response(JSON.stringify({
+        relay: "ok",
+        firebaseTransport: checks.every((item) => item.reachable) ? "reachable" : "unreachable",
+        checks
+      }), {
+        status: 200,
+        headers: { ...cors(origin), "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }
+      });
+    }
+
     const parts = incoming.pathname.split("/").filter(Boolean);
     if (parts.length < 2 || !["auth", "db", "sdk"].includes(parts[0])) {
       return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
