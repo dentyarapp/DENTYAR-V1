@@ -61,19 +61,47 @@ export default {
     }
 
     const parts = incoming.pathname.split("/").filter(Boolean);
-    if (parts.length < 2 || !["auth", "db", "sdk"].includes(parts[0])) {
-      return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
+    const kind = parts[0] || "";
+    let host = "";
+    let upstreamPath = incoming.pathname;
+
+    if (kind === "auth") {
+      if (parts.length < 2 || !AUTH_HOSTS.has(parts[1])) {
+        return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
+      }
+      host = parts[1];
+      upstreamPath = "/" + parts.slice(2).join("/");
+    } else if (kind === "db") {
+      if (parts.length < 2 || !DATABASE_HOSTS.has(parts[1])) {
+        return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
+      }
+      host = parts[1];
+      upstreamPath = "/" + parts.slice(2).join("/");
+    } else if (kind === "sdk") {
+      if (parts.length < 3 || parts[1] !== SDK_HOST || !("/" + parts.slice(2).join("/")).startsWith(SDK_PREFIX)) {
+        return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
+      }
+      host = SDK_HOST;
+      upstreamPath = "/" + parts.slice(2).join("/");
+    } else {
+      // Firebase Realtime Database SDK uses script/iframe long-poll requests
+      // and may use WebSocket URLs. Those requests do not pass through fetch/XHR
+      // hooks inside the page, so the app points databaseURL directly at this
+      // Worker and this default route proxies only the known DENTYAR database.
+      const ns = incoming.searchParams.get("ns") || "";
+      if (ns !== "dentyar-458d9-default-rtdb") {
+        if (incoming.pathname === "/" && !incoming.search) {
+          return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
+        }
+        return new Response("Database namespace is not allowed", { status: 403, headers: cors(origin) });
+      }
+      host = "dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app";
+      if (!DATABASE_HOSTS.has(host)) {
+        return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
+      }
     }
 
-    const kind = parts.shift();
-    const host = parts.shift();
-    const remainingPath = "/" + parts.join("/");
-    const allowed = kind === "auth" ? AUTH_HOSTS.has(host) : kind === "db" ? DATABASE_HOSTS.has(host) : (host === SDK_HOST && remainingPath.startsWith(SDK_PREFIX));
-    if (!allowed) {
-      return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
-    }
-
-    const target = new URL("https://" + host + "/" + parts.join("/") + incoming.search);
+    const target = new URL("https://" + host + upstreamPath + incoming.search);
     const headers = new Headers(request.headers);
     headers.delete("Host");
     headers.delete("Origin");
