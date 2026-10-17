@@ -69,6 +69,29 @@ export default {
       responseHeaders.delete("content-security-policy");
       responseHeaders.delete("content-security-policy-report-only");
       responseHeaders.delete("x-frame-options");
+
+      // Firebase CDN ESM files can reference firebase-app.js by an absolute
+      // gstatic URL. If that import bypasses this relay, the app/auth modules
+      // load separate Firebase component registries and Auth reports:
+      // "Component auth has not been registered yet". Keep every SDK module
+      // on this exact relay origin so all imports share one module instance.
+      if (kind === "sdk" && upstream.ok && /javascript|ecmascript/.test(responseHeaders.get("content-type") || "")) {
+        let source = await upstream.text();
+        const publicSdkBase = "https://www.gstatic.com/firebasejs/10.12.5/";
+        const relaySdkBase = incoming.origin + "/sdk/www.gstatic.com/firebasejs/10.12.5/";
+        source = source.split(publicSdkBase).join(relaySdkBase);
+        responseHeaders.delete("content-length");
+        responseHeaders.delete("content-encoding");
+        responseHeaders.delete("etag");
+        responseHeaders.delete("content-md5");
+        responseHeaders.set("content-type", "text/javascript; charset=utf-8");
+        return new Response(source, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: responseHeaders
+        });
+      }
+
       return new Response(upstream.body, {
         status: upstream.status,
         statusText: upstream.statusText,
