@@ -5407,34 +5407,33 @@ document.addEventListener('focus',e=>{
         fbConfigKey = requestedConfigKey;
       }
       connectStage='auth-persistence'; SYNC.renderStatus&&SYNC.renderStatus();
-      // Initialize Auth with a persistence fallback list. This is more reliable in
-      // Android WebView/Capacitor than calling setPersistence repeatedly after getAuth().
-      try{
-        auth = fa.initializeAuth(fbApp, {
-          persistence: [
-            fa.indexedDBLocalPersistence,
-            fa.browserLocalPersistence,
-            fa.browserSessionPersistence,
-            fa.inMemoryPersistence
-          ]
-        });
-      }catch(initializeAuthError){
-        // Android WebView may reject an Auth persistence implementation. Reuse or
-        // initialize the default Auth instance instead of stopping the whole sync.
-        console.warn('initializeAuth persistence fallback:', initializeAuthError);
-        try{
-          auth = fa.getAuth(fbApp);
-        }catch(getAuthError){
-          console.warn('getAuth fallback failed:', getAuthError);
-          throw new Error('auth-initialization-failed');
+      // Use the standard Firebase Auth instance first. initializeAuth() can partially
+      // register the Auth component before an IndexedDB/WebView persistence failure;
+      // calling getAuth() as a fallback after that can then fail with a generic Error.
+      auth = fa.getAuth(fbApp);
+      // Select persistence one implementation at a time, from strongest to safest.
+      // A failure in browser storage must never prevent authentication from starting.
+      let persistenceSet = false;
+      for (const persistence of [
+        fa.indexedDBLocalPersistence,
+        fa.browserLocalPersistence,
+        fa.browserSessionPersistence,
+        fa.inMemoryPersistence
+      ]) {
+        try {
+          await fa.setPersistence(auth, persistence);
+          persistenceSet = true;
+          break;
+        } catch (persistenceError) {
+          console.warn('Firebase persistence option unavailable:', persistenceError && (persistenceError.code || persistenceError.name) || 'unknown');
         }
       }
+      if (!persistenceSet) throw new Error('firebase-auth-persistence-unavailable');
       if(typeof auth.authStateReady === 'function'){
         try{
           await auth.authStateReady();
         }catch(authStateError){
-          // A failed persistence restore should not prevent a fresh explicit sign-in.
-          console.warn('Auth state restore failed; continuing to sign-in if needed:', authStateError);
+          console.warn('Auth state restore failed; continuing to sign-in if needed:', authStateError && (authStateError.code || authStateError.name) || 'unknown');
         }
       }
       if(!auth.currentUser){
@@ -5469,7 +5468,7 @@ document.addEventListener('focus',e=>{
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
     }catch(e){
       console.error('DentyarSync connect failed', e);
-      SYNC._lastError={stage:connectStage,code:String((e&&e.code)||(e&&e.name)||'unknown').replace(/[^a-zA-Z0-9_./-]/g,'').slice(0,80)||'unknown'};
+      SYNC._lastError={stage:connectStage,code:String((e&&e.code)||(e&&e.message)||(e&&e.name)||'unknown').replace(/[^a-zA-Z0-9_./-]/g,'').slice(0,80)||'unknown'};
       connectStage='error';
       clearSubs();
       started=false;
