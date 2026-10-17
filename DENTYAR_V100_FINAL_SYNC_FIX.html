@@ -5407,7 +5407,22 @@ document.addEventListener('focus',e=>{
         fbApp=null; auth=null; db=null; fbConfigKey=null;
       }
       if(!fbApp){
-        fbApp = fb.initializeApp(cfg.firebaseConfig, 'dentyar-sync');
+        // Point the Realtime Database SDK itself at the relay origin. The RTDB
+        // long-poll transport uses script/iframe requests that fetch/XHR hooks
+        // cannot reliably redirect. Keep the user-entered Firebase config intact.
+        const effectiveFirebaseConfig = Object.assign({}, cfg.firebaseConfig);
+        const originalDbUrl = new URL(String(cfg.firebaseConfig.databaseURL || ""));
+        const allowedDbHosts = new Set([
+          "dentyar-458d9-default-rtdb.firebaseio.com",
+          "dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app"
+        ]);
+        if(!allowedDbHosts.has(originalDbUrl.hostname)){
+          throw new Error("firebase-database-host-not-allowed");
+        }
+        const namespace = originalDbUrl.hostname.split(".")[0];
+        const relayOrigin = new URL(String(cfg.networkProxyUrl || DEFAULT_SYNC_PROXY_URL)).origin;
+        effectiveFirebaseConfig.databaseURL = relayOrigin + "/?ns=" + encodeURIComponent(namespace);
+        fbApp = fb.initializeApp(effectiveFirebaseConfig, 'dentyar-sync');
         fbConfigKey = requestedConfigKey;
       }
       connectStage='auth-persistence'; SYNC.renderStatus&&SYNC.renderStatus();
@@ -5466,7 +5481,9 @@ document.addEventListener('focus',e=>{
       retryCount=0;
       if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
       SYNC.renderStatus&&SYNC.renderStatus();
-      toast('همگام‌سازی چنددستگاهی فعال شد');
+      // Configuration is saved, but connection is not considered successful
+      // until the .info/connected listener confirms a live RTDB connection.
+      toast('تنظیمات ذخیره شد؛ در انتظار تأیید اتصال واقعی پایگاه داده');
       setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
     }catch(e){
       console.error('DentyarSync connect failed', e);
