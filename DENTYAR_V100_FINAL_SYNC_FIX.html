@@ -5356,6 +5356,10 @@ document.addEventListener('focus',e=>{
     if(!fb) fb = await import(appUrl);
     if(!dbm) dbm = await import(dbUrl);
     if(!fa) fa = await import(authUrl);
+    // Configure RTDB transport immediately after its SDK loads and before Auth,
+    // app initialization, or any database reference can initialize the transport.
+    // This avoids WebSocket attempts on networks where persistent sockets are blocked.
+    if(typeof dbm.forceLongPolling==='function') dbm.forceLongPolling();
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
   function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
@@ -5444,9 +5448,7 @@ document.addEventListener('focus',e=>{
         await fa.signInWithEmailAndPassword(auth,email,password);
       }
       connectStage='rtdb-transport'; SYNC.renderStatus&&SYNC.renderStatus();
-      // Prefer HTTPS long-polling over WebSockets for networks that block persistent socket connections.
-      // This cannot bypass a blocked Firebase Auth endpoint; the diagnostic stage below distinguishes that case.
-      if(typeof dbm.forceLongPolling==='function') dbm.forceLongPolling();
+      // Transport was configured directly after SDK import in loadSdk(), before initialization.
       db = dbm.getDatabase(fbApp);
       try{ dbm.goOnline(db); }catch(_){}
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
