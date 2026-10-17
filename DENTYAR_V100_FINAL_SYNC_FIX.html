@@ -5419,14 +5419,24 @@ document.addEventListener('focus',e=>{
           ]
         });
       }catch(initializeAuthError){
-        // If this Auth instance already exists, reuse it rather than failing persistence setup.
-        if(initializeAuthError && initializeAuthError.code === 'auth/already-initialized'){
+        // Android WebView may reject an Auth persistence implementation. Reuse or
+        // initialize the default Auth instance instead of stopping the whole sync.
+        console.warn('initializeAuth persistence fallback:', initializeAuthError);
+        try{
           auth = fa.getAuth(fbApp);
-        }else{
-          throw initializeAuthError;
+        }catch(getAuthError){
+          console.warn('getAuth fallback failed:', getAuthError);
+          throw new Error('auth-initialization-failed');
         }
       }
-      if(typeof auth.authStateReady === 'function') await auth.authStateReady();
+      if(typeof auth.authStateReady === 'function'){
+        try{
+          await auth.authStateReady();
+        }catch(authStateError){
+          // A failed persistence restore should not prevent a fresh explicit sign-in.
+          console.warn('Auth state restore failed; continuing to sign-in if needed:', authStateError);
+        }
+      }
       if(!auth.currentUser){
         connectStage='auth-login'; SYNC.renderStatus&&SYNC.renderStatus();
         const email = String((credentials&&credentials.email)||cfg.accountEmail||'').trim();
