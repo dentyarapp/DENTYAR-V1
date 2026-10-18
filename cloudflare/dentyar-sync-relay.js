@@ -41,14 +41,17 @@ export default {
 
     // RTDB is configured with the relay origin as its host. Route its root-relative
     // long-poll requests to the explicit, allow-listed Firebase database host.
-    const requestedDbHost = incoming.searchParams.get("dbHost");
-    const isRtdbRequest = DATABASE_HOSTS.has(requestedDbHost) &&
+    // The Firebase RTDB SDK consumes the "ns" query parameter to determine
+    // the database namespace and may discard other custom query parameters
+    // such as "dbHost". Therefore route by the fixed, allow-listed namespace
+    // instead of relying on a non-standard parameter surviving SDK parsing.
+    const isRtdbRequest =
       incoming.searchParams.get("ns") === "dentyar-458d9" &&
       !["auth", "sdk", "db"].includes(parts[0] || "");
 
     if (isRtdbRequest) {
       kind = "db";
-      host = requestedDbHost;
+      host = "dentyar-458d9-default-rtdb.firebaseio.com";
       targetPath = incoming.pathname;
     } else {
       if (parts.length < 2 || !["auth", "db", "sdk"].includes(parts[0])) {
@@ -66,7 +69,6 @@ export default {
 
     const target = new URL("https://" + host + targetPath);
     const forwardedSearch = new URLSearchParams(incoming.searchParams);
-    if (isRtdbRequest) forwardedSearch.delete("dbHost");
     target.search = forwardedSearch.toString() ? "?" + forwardedSearch.toString() : "";
     const headers = new Headers(request.headers);
     headers.delete("Host");
