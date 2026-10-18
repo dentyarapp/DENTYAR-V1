@@ -24,7 +24,7 @@ function cors(origin, requestedHeaders = "") {
   // instead of maintaining a brittle partial allowlist. This relay still
   // restricts every upstream host/path below; CORS does not bypass Firebase
   // Authentication or Realtime Database rules.
-  const validHeaderList = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+(?:\\s*,\\s*[!#$%&'*+.^_`|~0-9A-Za-z-]+)*$/;
+  const validHeaderList = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+(?:\s*,\s*[!#$%&'*+.^_`|~0-9A-Za-z-]+)*$/;
   const allowHeaders = requestedHeaders && validHeaderList.test(requestedHeaders)
     ? requestedHeaders
     : "Authorization,Content-Type,X-Firebase-AppCheck,X-Client-Version,X-Firebase-GMPID,X-Firebase-Client,X-Firebase-Locale";
