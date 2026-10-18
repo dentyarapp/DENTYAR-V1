@@ -5423,7 +5423,7 @@ document.addEventListener('focus',e=>{
         }
         const namespace = originalDbUrl.hostname.split(".")[0];
         const relayOrigin = new URL(String(cfg.networkProxyUrl || DEFAULT_SYNC_PROXY_URL)).origin;
-        effectiveFirebaseConfig.databaseURL = relayOrigin + "/?ns=" + encodeURIComponent(namespace);
+        effectiveFirebaseConfig.databaseURL = relayOrigin + "/?ns=" + encodeURIComponent(namespace) + "&dbHost=" + encodeURIComponent(originalDbUrl.hostname);
         fbApp = fb.initializeApp(effectiveFirebaseConfig, 'dentyar-sync');
         fbConfigKey = requestedConfigKey;
       }
