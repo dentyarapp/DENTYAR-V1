@@ -18,11 +18,20 @@ const DATABASE_HOSTS = new Set([
 const SDK_HOST = "www.gstatic.com";
 const SDK_PREFIX = "/firebasejs/10.12.5/";
 
-function cors(origin) {
+function cors(origin, requestedHeaders = "") {
+  // Firebase Auth's SDK may add headers that vary by operation/version.
+  // Echo only syntactically valid header names requested by the browser,
+  // instead of maintaining a brittle partial allowlist. This relay still
+  // restricts every upstream host/path below; CORS does not bypass Firebase
+  // Authentication or Realtime Database rules.
+  const validHeaderList = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+(?:\\s*,\\s*[!#$%&'*+.^_`|~0-9A-Za-z-]+)*$/;
+  const allowHeaders = requestedHeaders && validHeaderList.test(requestedHeaders)
+    ? requestedHeaders
+    : "Authorization,Content-Type,X-Firebase-AppCheck,X-Client-Version,X-Firebase-GMPID,X-Firebase-Client,X-Firebase-Locale";
   return {
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD",
-    "Access-Control-Allow-Headers": "Authorization,Content-Type,X-Firebase-AppCheck,X-Client-Version,X-Firebase-GMPID",
+    "Access-Control-Allow-Headers": allowHeaders,
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
   };
@@ -33,7 +42,10 @@ export default {
     const incoming = new URL(request.url);
     const origin = request.headers.get("Origin") || "*";
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: cors(origin) });
+      return new Response(null, {
+        status: 204,
+        headers: cors(origin, request.headers.get("Access-Control-Request-Headers") || "")
+      });
     }
 
     // A privacy-preserving connectivity probe: request only a deliberately
