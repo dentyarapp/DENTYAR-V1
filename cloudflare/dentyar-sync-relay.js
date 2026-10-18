@@ -52,7 +52,7 @@ export default {
     // nonexistent path and return status codes, never Firebase response data.
     // This distinguishes a reachable Worker from a Worker that can reach RTDB.
     if (incoming.pathname === "/health/firebase" && request.method === "GET") {
-      const checks = await Promise.all([...DATABASE_HOSTS].map(async (host) => {
+      const checks = await Promise.all(["dentyar-458d9-default-rtdb.firebaseio.com"].map(async (host) => {
         try {
           const upstream = await fetch("https://" + host + "/__dentyar_relay_probe_404__.json");
           const status = upstream.status;
@@ -107,7 +107,7 @@ export default {
         }
         return new Response("Database namespace is not allowed", { status: 403, headers: cors(origin) });
       }
-      host = "dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app";
+      host = "dentyar-458d9-default-rtdb.firebaseio.com";
       if (!DATABASE_HOSTS.has(host)) {
         return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
       }
