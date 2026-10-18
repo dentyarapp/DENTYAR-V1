@@ -37,19 +37,37 @@ export default {
     }
 
     const parts = incoming.pathname.split("/").filter(Boolean);
-    if (parts.length < 2 || !["auth", "db", "sdk"].includes(parts[0])) {
-      return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
+    let kind, host, targetPath;
+
+    // RTDB is configured with the relay origin as its host. Route its root-relative
+    // long-poll requests to the explicit, allow-listed Firebase database host.
+    const requestedDbHost = incoming.searchParams.get("dbHost");
+    const isRtdbRequest = DATABASE_HOSTS.has(requestedDbHost) &&
+      incoming.searchParams.get("ns") === "dentyar-458d9" &&
+      !["auth", "sdk", "db"].includes(parts[0] || "");
+
+    if (isRtdbRequest) {
+      kind = "db";
+      host = requestedDbHost;
+      targetPath = incoming.pathname;
+    } else {
+      if (parts.length < 2 || !["auth", "db", "sdk"].includes(parts[0])) {
+        return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
+      }
+      kind = parts.shift();
+      host = parts.shift();
+      targetPath = "/" + parts.join("/");
     }
 
-    const kind = parts.shift();
-    const host = parts.shift();
-    const remainingPath = "/" + parts.join("/");
-    const allowed = kind === "auth" ? AUTH_HOSTS.has(host) : kind === "db" ? DATABASE_HOSTS.has(host) : (host === SDK_HOST && remainingPath.startsWith(SDK_PREFIX));
+    const allowed = kind === "auth" ? AUTH_HOSTS.has(host) : kind === "db" ? DATABASE_HOSTS.has(host) : (host === SDK_HOST && targetPath.startsWith(SDK_PREFIX));
     if (!allowed) {
       return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
     }
 
-    const target = new URL("https://" + host + "/" + parts.join("/") + incoming.search);
+    const target = new URL("https://" + host + targetPath);
+    const forwardedSearch = new URLSearchParams(incoming.searchParams);
+    if (isRtdbRequest) forwardedSearch.delete("dbHost");
+    target.search = forwardedSearch.toString() ? "?" + forwardedSearch.toString() : "";
     const headers = new Headers(request.headers);
     headers.delete("Host");
     headers.delete("Origin");
