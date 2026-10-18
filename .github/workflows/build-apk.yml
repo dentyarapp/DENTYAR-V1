@@ -1,5 +1,5 @@
-name: Build DENTYAR V100 build 223 APK
-# Build V100 sync transport test build 223; retain the existing app ID and signing key.
+name: Build DENTYAR V100 build 227 APK
+# Build V100 sync transport test build 227; retain the existing app ID and signing key.
 
 permissions:
   contents: write
@@ -37,10 +37,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "100.223.0",
+            "version": "100.227.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V70"
+              "build": "echo DENTYAR V100"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -58,16 +58,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V70 package.
+          # Set an explicit Android version code/name for the V100 package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 223', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.223.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 227', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.227.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android build 223 versionCode/versionName")
+              raise SystemExit("Could not set Android build 227 versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -476,25 +476,25 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-223.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-227.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V100-223-APK
-          path: DENTYAR-V100-223.apk
+          name: DENTYAR-V100-227-APK
+          path: DENTYAR-V100-227.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V70 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v100-223]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V100 build 223 signed release')) }}
+      - name: انتشار ساخت V100-227 در Release
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v100-227]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V100 build 227 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v223-final
-          name: DENTYAR V100 build 223 Signed APK — Sync Transport Fix
+          tag_name: v227-final
+          name: DENTYAR V100 build 227 Signed APK — Sync Transport Fix
           body: |
-            نسخه امضاشده دنت‌یار V100، ساخت 223، برای آزمون پایداری همگام‌سازی؛ با حفظ شناسه برنامه و کلید امضای ثابت.
+            نسخه امضاشده دنت‌یار V100، ساخت 227، برای آزمون پایداری همگام‌سازی؛ با حفظ شناسه برنامه و کلید امضای ثابت.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V100-223.apk
+          files: DENTYAR-V100-227.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
