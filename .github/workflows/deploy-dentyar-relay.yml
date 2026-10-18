@@ -50,4 +50,11 @@ jobs:
         run: |
           npx --yes wrangler@4 deploy cloudflare/dentyar-sync-relay.js \
             --name dentyar-sync-relay \
-            --compatibility-date 2026-10-16
+            --compatibility-date 2026-10-18
+
+      - name: Verify deployed relay health endpoint
+        if: steps.credentials.outputs.ready == 'true'
+        run: |
+          set -e
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://dentyar-sync-relay.dentyar-cloudflare.workers.dev/health/firebase
