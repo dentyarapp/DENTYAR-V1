@@ -140,7 +140,7 @@ export default {
       if (incoming.pathname === "/.lp" && upstream.ok) {
         let body = await upstream.text();
         const workerHost = incoming.host;
-        body = body.replace(/("h"\\s*:\\s*")s-[a-z0-9-]+\\.firebaseio\\.com(")/gi, "$1" + workerHost + "$2");
+        body = body.replace(/("h"\s*:\s*")s-[a-z0-9-]+\.firebaseio\.com(")/gi, "$1" + workerHost + "$2");
         responseHeaders.delete("content-length");
         responseHeaders.delete("content-encoding");
         responseHeaders.delete("etag");
