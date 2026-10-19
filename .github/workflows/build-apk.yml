@@ -66,8 +66,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 100', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 101', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.101.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android V100 versionCode/versionName")
           p.write_text(s)
