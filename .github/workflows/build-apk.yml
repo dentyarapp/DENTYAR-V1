@@ -1,5 +1,5 @@
-name: Build DENTYAR TEST V100 APK
-# Test-only workflow: build a separately installable DENTYAR TEST APK; never publish a release.
+name: Build DENTYAR V100-222 final baseline APK
+# Rebuild exact V100-222 source with the existing app ID and fixed signing key; only Android version code is bumped for in-place update.
 
 permissions:
   contents: write
@@ -14,6 +14,7 @@ on:
       - test/dentyar-comprehensive-fixes-20261009
       - fix/dentyar-sync-auth-session-20261015
       - fix/dentyar-v100-sync-transport-20261016
+      - rebuild/v100-222-final-baseline-238
 
 jobs:
   build-apk:
@@ -42,7 +43,7 @@ jobs:
             "version": "100.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR TEST V100"
+              "build": "echo DENTYAR V100-222 FINAL BASELINE"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -56,20 +57,20 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR TEST" "com.dentyar.dentyartest" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the side-by-side V100 test package.
+          # Set an explicit Android version code/name for the V100-222 baseline package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 100', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 238', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.238.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V100 versionCode/versionName")
+              raise SystemExit("Could not set Android V100-222 baseline versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -92,7 +93,7 @@ jobs:
           mkdir -p android/app/src/main/java/com/dentyar/dentyartest
 
           cat > android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.dentyartest;
+          package com.dentyar.testapp;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -319,7 +320,7 @@ jobs:
       - name: ثبت Native Plugin
         run: |
           cat > android/app/src/main/java/com/dentyar/dentyartest/MainActivity.java <<'EOF'
-          package com.dentyar.dentyartest;
+          package com.dentyar.testapp;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -482,13 +483,13 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-TEST-V100.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-222-BASELINE.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-TEST-V100-APK
-          path: DENTYAR-TEST-V100.apk
+          name: DENTYAR-V100-222-BASELINE-APK
+          path: DENTYAR-V100-222-BASELINE.apk
           if-no-files-found: error
 
       - name: انتشار عمومی غیرفعال است (نسخه آزمایشی)
@@ -496,11 +497,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v100-test-disabled
-          name: DENTYAR TEST V100 (disabled test release)
+          name: DENTYAR V100-222 baseline (release disabled)
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-TEST-V100.apk
+          files: DENTYAR-V100-222-BASELINE.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
