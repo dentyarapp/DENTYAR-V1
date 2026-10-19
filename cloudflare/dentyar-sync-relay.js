@@ -76,6 +76,7 @@ export default {
     const kind = parts[0] || "";
     let host = "";
     let upstreamPath = incoming.pathname;
+    let isDatabaseTransportRoute = false;
 
     if (kind === "auth") {
       if (parts.length < 2 || !AUTH_HOSTS.has(parts[1])) {
@@ -114,9 +115,17 @@ export default {
         return new Response("Database namespace or host is not allowed", { status: 403, headers: cors(origin) });
       }
       host = requestedDbHost;
+      isDatabaseTransportRoute = true;
     }
 
-    const target = new URL("https://" + host + upstreamPath + incoming.search);
+    const target = new URL("https://" + host + upstreamPath);
+    const upstreamParams = new URLSearchParams(incoming.searchParams);
+    if (isDatabaseTransportRoute) {
+      // ns/dbHost are relay-only routing parameters, not Firebase RTDB query parameters.
+      upstreamParams.delete("ns");
+      upstreamParams.delete("dbHost");
+    }
+    target.search = upstreamParams.toString();
     const headers = new Headers(request.headers);
     headers.delete("Host");
     headers.delete("Origin");
