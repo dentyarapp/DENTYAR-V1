@@ -1,0 +1,28 @@
+name: Deploy DENTYAR sync relay
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/dentyar-v100-230-regional-relay-20261019
+    paths:
+      - "cloudflare/dentyar-sync-relay.js"
+      - "wrangler.toml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: دریافت کد پروژه
+        uses: actions/checkout@v4
+
+      - name: استقرار مسیر ارتباطی دنت‌یار
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.toml
