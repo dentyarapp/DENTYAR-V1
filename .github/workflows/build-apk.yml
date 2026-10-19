@@ -1,5 +1,5 @@
-name: Build DENTYAR V100 build 229 APK
-# Build V100 sync transport test build 229; retain the existing app ID and signing key.
+name: Build DENTYAR V100 build 230 APK
+# Build V100 regional relay correction build 230; retain the existing app ID and signing key.
 
 permissions:
   contents: write
@@ -13,6 +13,7 @@ on:
       - fix/v59-safe-numeric-serial-20261009
       - test/dentyar-comprehensive-fixes-20261009
       - fix/dentyar-sync-auth-session-20261015
+      - fix/dentyar-v100-230-regional-relay-20261019
 
 jobs:
   build-apk:
@@ -37,7 +38,7 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "100.229.0",
+            "version": "100.230.0",
             "private": true,
             "scripts": {
               "build": "echo DENTYAR V100"
@@ -64,10 +65,10 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 229', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.229.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 230', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.230.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android build 229 versionCode/versionName")
+              raise SystemExit("Could not set Android build 230 versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -476,25 +477,25 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-229.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-230.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V100-229-APK
-          path: DENTYAR-V100-229.apk
+          name: DENTYAR-V100-230-APK
+          path: DENTYAR-V100-230.apk
           if-no-files-found: error
 
-      - name: انتشار ساخت V100-229 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v100-229]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V100 build 229 signed release')) }}
+      - name: انتشار ساخت V100-230 در Release
+        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v100-230]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V100 build 230 signed release')) }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v229-final
-          name: DENTYAR V100 build 229 Signed APK — Sync Transport Fix
+          tag_name: v230-final
+          name: DENTYAR V100 build 230 Signed APK — Regional Relay Fix
           body: |
-            نسخه امضاشده دنت‌یار V100، ساخت 229، برای آزمون پایداری همگام‌سازی؛ با حفظ شناسه برنامه و کلید امضای ثابت.
+            نسخه امضاشده دنت‌یار V100، ساخت 230، برای آزمون اصلاح مسیر منطقه‌ای همگام‌سازی؛ با حفظ شناسه برنامه و کلید امضای ثابت.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V100-229.apk
+          files: DENTYAR-V100-230.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
