@@ -90,9 +90,9 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/dentyartest
+          mkdir -p android/app/src/main/java/com/dentyar/testapp
 
-          cat > android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java <<'EOF'
+          cat > android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java <<'EOF'
           package com.dentyar.testapp;
 
           import android.content.ContentResolver;
@@ -319,7 +319,7 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/dentyartest/MainActivity.java <<'EOF'
+          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
           package com.dentyar.testapp;
 
           import android.os.Bundle;
@@ -367,7 +367,7 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
@@ -378,8 +378,8 @@ jobs:
           node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
-          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
