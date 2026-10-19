@@ -129,8 +129,12 @@ export default {
     const target = new URL("https://" + host + upstreamPath);
     const upstreamParams = new URLSearchParams(incoming.searchParams);
     if (isDatabaseTransportRoute) {
-      // ns/dbHost are relay-only routing parameters, not Firebase RTDB query parameters.
-      upstreamParams.delete("ns");
+      // dbHost is relay-only and must never reach Firebase. The RTDB long-poll
+      // protocol itself requires ns on /.lp requests, so preserve it there;
+      // ordinary REST endpoints identify the database from the upstream host.
+      if (!["/.lp", "/.ws"].includes(incoming.pathname)) {
+        upstreamParams.delete("ns");
+      }
       upstreamParams.delete("dbHost");
     }
     target.search = upstreamParams.toString();
