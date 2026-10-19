@@ -35,7 +35,6 @@ jobs:
         run: |
           mkdir -p www
           cp DENTYAR_V100_FINAL_SYNC_FIX.html www/index.html
-          cp dentyar-sync-probe.js www/dentyar-sync-probe.js
 
           cat > package.json <<'EOF'
           {
