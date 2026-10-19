@@ -64,6 +64,7 @@ export default {
       }));
       return new Response(JSON.stringify({
         relay: "ok",
+        relayVersion: "v100-230-regional-host-fix",
         firebaseTransport: checks.every((item) => item.reachable) ? "reachable" : "unreachable",
         checks
       }), {
