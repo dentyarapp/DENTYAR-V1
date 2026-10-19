@@ -103,11 +103,18 @@ export default {
       // hooks inside the page, so the app points databaseURL directly at this
       // Worker and this default route proxies only the known DENTYAR database.
       const ns = incoming.searchParams.get("ns") || "";
-      const requestedDbHost = incoming.searchParams.get("dbHost") || "";
+      // Firebase JS SDK preserves the ns query parameter on long-poll requests,
+      // but does not preserve arbitrary extra query parameters from databaseURL.
+      // Therefore dbHost may be absent even when the app configured the relay.
+      // For this one known database, default to its actual regional endpoint.
+      const requestedDbHost = incoming.searchParams.get("dbHost") ||
+        (ns === "dentyar-458d9-default-rtdb"
+          ? "dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app"
+          : "");
       if (incoming.pathname === "/" && !incoming.search && !ns && !requestedDbHost) {
         return new Response("DENTYAR relay ready", { status: 200, headers: cors(origin) });
       }
-      // Honor the original regional RTDB host supplied by the app, but only for this project.
+      // Only this exact Firebase namespace and its approved database hosts are allowed.
       if (
         ns !== "dentyar-458d9-default-rtdb" ||
         !DATABASE_HOSTS.has(requestedDbHost) ||
