@@ -134,6 +134,24 @@ export default {
       responseHeaders.delete("content-security-policy-report-only");
       responseHeaders.delete("x-frame-options");
 
+      // Firebase long-poll handshake advertises a sharded *.firebaseio.com host in
+      // the "h" field. Rewrite only that shard hostname to this Worker origin so
+      // follow-up /.lp requests continue through the relay instead of bypassing it.
+      if (incoming.pathname === "/.lp" && upstream.ok) {
+        let body = await upstream.text();
+        const workerHost = incoming.host;
+        body = body.replace(/("h"\\s*:\\s*")s-[a-z0-9-]+\\.firebaseio\\.com(")/gi, "$1" + workerHost + "$2");
+        responseHeaders.delete("content-length");
+        responseHeaders.delete("content-encoding");
+        responseHeaders.delete("etag");
+        responseHeaders.delete("content-md5");
+        return new Response(body, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: responseHeaders
+        });
+      }
+
       // Firebase CDN ESM files can reference firebase-app.js by an absolute
       // gstatic URL. If that import bypasses this relay, the app/auth modules
       // load separate Firebase component registries and Auth reports:
