@@ -5279,10 +5279,10 @@ document.addEventListener('focus',e=>{
   const FB_AUTH_URL='https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
   const PUSHED_KEY='dentyar_sync_pushed_ids';
   // Use the deployed DENTYAR relay by default so first-time and existing devices do not silently fall back to blocked Firebase endpoints.
-  const DEFAULT_SYNC_PROXY_URL='';
+  const DEFAULT_SYNC_PROXY_URL='https://dentyar-sync-relay.dentyar-cloudflare.workers.dev';
   let dentyarOriginalFetch = null;
   function installTransportProxy(cfg){
-    const proxyText = ''; // VPN-first recovery: bypass the relay and use direct Firebase transport.
+    const proxyText = 'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev'; // Use the deployed relay for Firebase Auth and Realtime Database transport.
     if(!proxyText) return;
     let proxy;
     try{ proxy = new URL(proxyText); }catch(_){ throw new Error('آدرس مسیر ارتباطی معتبر نیست.'); }
@@ -5346,7 +5346,7 @@ document.addEventListener('focus',e=>{
     return m;
   }
   async function loadSdk(){
-    const proxyText = ''; // VPN-first recovery: load Firebase SDK directly.
+    const proxyText = 'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev'; // Load Firebase SDK through the deployed relay.
     let appUrl=FB_APP_URL, dbUrl=FB_DB_URL, authUrl=FB_AUTH_URL;
     if(proxyText){
       const proxy=new URL(proxyText);
@@ -5657,7 +5657,7 @@ document.addEventListener('focus',e=>{
     cfg.accountEmail = ((document.getElementById('syncAccountEmail')||{}).value||'firebase.dentyar.app@gmail.com').trim();
     cfg.clinicCode = ((document.getElementById('syncClinicCode')||{}).value||'').trim();
     cfg.deviceName = ((document.getElementById('syncDeviceName')||{}).value||'').trim();
-    cfg.networkProxyUrl = ''; // Keep saved relay settings from affecting this VPN-first recovery build.
+    cfg.networkProxyUrl = 'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev'; // Keep this build on the verified DENTYAR relay.
     cfg.firebaseConfig = firebaseConfig;
     return cfg;
   };
