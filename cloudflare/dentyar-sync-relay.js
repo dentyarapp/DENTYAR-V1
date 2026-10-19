@@ -107,7 +107,7 @@ export default {
         }
         return new Response("Database namespace is not allowed", { status: 403, headers: cors(origin) });
       }
-      host = "dentyar-458d9-default-rtdb.firebaseio.com";
+      host = "dentyar-458d9-default-rtdb.firebaseio.com"; // Canonical host for root /.lp, /.ws and /.json requests; do not use regional firebasedatabase.app here.
       if (!DATABASE_HOSTS.has(host)) {
         return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
       }
