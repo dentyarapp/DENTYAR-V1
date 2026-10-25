@@ -5576,19 +5576,26 @@ document.addEventListener('focus',e=>{
     SYNC.renderStatus&&SYNC.renderStatus();
   };
 
+  function reportListenerError(error){
+    const code = error && (error.code || error.name) ? String(error.code || error.name) : 'unknown';
+    const message = error && error.message ? String(error.message) : '';
+    SYNC._lastSyncError = (code + (message ? ': ' + message : '')).slice(0,240);
+    console.warn('DentyarSync listener failed', code, message);
+    SYNC.renderStatus&&SYNC.renderStatus();
+  }
   function subscribeCollection(coll){
     const r = dbm.ref(db, base()+'/records/'+coll);
-    subs.push(dbm.onChildAdded(r, function(s){ mergeRecord(coll, s.key, s.val()); }));
-    subs.push(dbm.onChildChanged(r, function(s){ mergeRecord(coll, s.key, s.val()); }));
+    subs.push(dbm.onChildAdded(r, function(s){ mergeRecord(coll, s.key, s.val()); }, reportListenerError));
+    subs.push(dbm.onChildChanged(r, function(s){ mergeRecord(coll, s.key, s.val()); }, reportListenerError));
   }
   function subscribeTombstones(coll){
     const r = dbm.ref(db, base()+'/tombstones/'+coll);
-    subs.push(dbm.onChildAdded(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }));
-    subs.push(dbm.onChildChanged(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }));
+    subs.push(dbm.onChildAdded(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }, reportListenerError));
+    subs.push(dbm.onChildChanged(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }, reportListenerError));
   }
   function subscribeValue(name){
     const r = dbm.ref(db, base()+'/records/'+name);
-    subs.push(dbm.onValue(r, function(s){ mergeValue(name, s.val()); }));
+    subs.push(dbm.onValue(r, function(s){ mergeValue(name, s.val()); }, reportListenerError));
   }
 
   function mergeRecord(coll, id, val){
