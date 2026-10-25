@@ -1,4 +1,4 @@
-name: Build DENTYAR V100-222 final baseline APK
+name: Build DENTYAR V101-223 candidate APK
 # Rebuild exact V100-222 source with the existing app ID and fixed signing key; only Android version code is bumped for in-place update.
 
 permissions:
@@ -15,6 +15,7 @@ on:
       - fix/dentyar-sync-auth-session-20261015
       - fix/dentyar-v100-sync-transport-20261016
       - rebuild/v100-222-final-baseline-238
+      - fix/v100-223-sync-records-teeth-20261025
 
 jobs:
   build-apk:
@@ -42,7 +43,7 @@ jobs:
             "version": "100.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V100-222 FINAL BASELINE"
+              "build": "echo DENTYAR V101-223 CANDIDATE"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -66,10 +67,10 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 238', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "100.238.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 239', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.239.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V100-222 baseline versionCode/versionName")
+              raise SystemExit("Could not set Android V101-223 candidate versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -370,7 +371,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V100"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101"' www/index.html
           grep -q "installTransportProxy" www/index.html
           grep -q "networkProxyUrl" www/index.html
           test -s cloudflare/dentyar-sync-relay.js
@@ -482,13 +483,13 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-222-BASELINE.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223-CANDIDATE.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V100-222-BASELINE-APK
-          path: DENTYAR-V100-222-BASELINE.apk
+          name: DENTYAR-V101-223-CANDIDATE-APK
+          path: DENTYAR-V101-223-CANDIDATE.apk
           if-no-files-found: error
 
       - name: انتشار عمومی غیرفعال است (نسخه آزمایشی)
@@ -496,11 +497,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v100-test-disabled
-          name: DENTYAR V100-222 baseline (release disabled)
+          name: DENTYAR V101-223 candidate (release disabled)
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V100-222-BASELINE.apk
+          files: DENTYAR-V101-223-CANDIDATE.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
