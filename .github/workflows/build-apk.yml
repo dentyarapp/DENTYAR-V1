@@ -7,6 +7,9 @@ permissions:
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -483,13 +486,13 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223-CANDIDATE.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V101-223-CANDIDATE-APK
-          path: DENTYAR-V101-223-CANDIDATE.apk
+          path: DENTYAR-V101.apk
           if-no-files-found: error
 
       - name: انتشار عمومی غیرفعال است (نسخه آزمایشی)
@@ -501,7 +504,7 @@ jobs:
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V101-223-CANDIDATE.apk
+          files: DENTYAR-V101.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
