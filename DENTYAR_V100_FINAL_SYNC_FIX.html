@@ -5535,7 +5535,7 @@ document.addEventListener('focus',e=>{
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       connectStage='device-registration'; SYNC.renderStatus&&SYNC.renderStatus();
       ensureDeviceId();
-      dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
+      await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
       subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){connectStage='ready';SYNC._lastError=null;}else if(started){connectStage='waiting-rtdb';} SYNC.renderStatus&&SYNC.renderStatus(); }));
       ['patients','dentists','appointments'].forEach(subscribeCollection);
