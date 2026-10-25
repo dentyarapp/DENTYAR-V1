@@ -6,7 +6,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DENTYAR</title>
-<script>const DENTYAR_APP_VERSION = "V100";</script>
+<script>const DENTYAR_APP_VERSION = "V101";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -1910,7 +1910,7 @@ function syncFixedTopHeight(){
 }
 function navigate(pageId, params){
   closeModal();
-  if(pageId !== 'patients') openPatientId = null;
+  if(pageId !== 'patients') { openPatientId = null; sessionStorage.removeItem('dentyar_patient_files_unlocked'); }
   currentPage = pageId;
   pageParams = params || {};
   renderBottomNav();
@@ -2165,6 +2165,8 @@ function openRegisterForm(appointmentId){
       <label>خدمات درمانی (امکان انتخاب یک یا چند خدمت)</label>
       <div id="rgServices" class="servicePicker">${STATE.lists.treatmentTypes.map((t,i)=>`<label class="serviceOption"><input type="checkbox" value="${esc(t)}" onchange="setServicesGross('rg')" ${i===0?'checked':''}><span>${esc(t)}</span><b>${fmtMoney(getTreatmentPrice(t))}</b></label>`).join('')}</div>
       <input type="hidden" id="rgType" value="${esc(ap&&ap.treatmentType||STATE.lists.treatmentTypes[0]||'')}">
+      <label>شماره دندان درمان‌شده (سیستم FDI؛ مثال: ۱۶ یا ۱۶، ۲۶)</label>
+      <input type="text" id="rgToothNumbers" placeholder="مثلاً ۱۶، ۲۶" autocomplete="off">
       <label>نتیجه‌ی درمان</label>
       <select id="rgOutcome">${STATE.lists.outcomes.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
       <label>یادداشت درمان</label>
@@ -2249,6 +2251,7 @@ function saveRegisterForm(appointmentId){
       paymentType: document.getElementById('rgPaymentType').value,
       dentistId: document.getElementById('rgDentist').value,
       treatmentType: document.getElementById('rgType').value,
+      toothNumbers: document.getElementById('rgToothNumbers').value.trim(),
       treatmentServices: selectedServiceValues('rg'),
       serviceItems: selectedServiceValues('rg').map(name=>({name, price:getTreatmentPrice(name)})),
       outcome: document.getElementById('rgOutcome').value,
@@ -2474,7 +2477,6 @@ function renderPatients(){
           </div>
           <div class="row" style="gap:6px;flex-shrink:0">
             <span class="badge badge-muted">${(p.visits||[]).length} مراجعه</span>
-            <button type="button" class="iconBtn editPencil" title="ویرایش بیمار" aria-label="ویرایش بیمار" onclick="event.stopPropagation(); openPatientForm('${p.id}')">✎</button>
           </div>
         </div>
       </div>
@@ -2504,6 +2506,9 @@ function isValidIranianNationalId(nid){
 
 function openPatientForm(patientId, prefill){
   const editing = patientId ? STATE.patients.find(p=>p.id===patientId) : null;
+  if(editing && sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){
+    openPatientId=patientId; renderPatientFile(patientId); return;
+  }
   const p = editing || {name:'', nationalId:'', phone:'', gender:'', birthYear:'', address:'', notes:'', insuranceType:'', visitType:'نوبت اول', baseInsurance:'', supplementalInsurance:'ندارد', insuranceNumber:'', policyNumber:'', coverageCeiling:0, franchisePercent:0, ...(prefill||{})};
   showModal(`
     <h3>${editing? 'ویرایش بیمار' : 'ثبت بیمار جدید'}</h3>
@@ -2562,6 +2567,7 @@ function openPatientForm(patientId, prefill){
 }
 
 function savePatientForm(editingId){
+  if(editingId && sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=editingId; closeModal(); renderPatientFile(editingId); return; }
   const name = document.getElementById('pfName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
   const enteredNid=toEnDigits(document.getElementById('pfNid').value||'').trim();
@@ -2613,16 +2619,46 @@ function savePatientForm(editingId){
 }
 
 function deletePatient(id){
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=id; renderPatientFile(id); return; }
   modalConfirm('حذف بیمار','آیا از حذف کامل این بیمار و تاریخچه‌ی او مطمئن هستید؟ این عمل قابل بازگشت نیست.', ()=>{
     STATE.patients = STATE.patients.filter(p=>p.id!==id);
     saveState(); openPatientId=null; renderPatients(); toast('بیمار حذف شد');
   });
 }
 
+/* ---------- کنترل دسترسی پرونده بیمار ---------- */
+function unlockPatientFiles(){
+  const input=document.getElementById('patientFileGateInput');
+  const err=document.getElementById('patientFileGateError');
+  if(!input||!err) return;
+  if(toEnDigits(input.value.trim())===toEnDigits(String(STATE.meta.profilePassword||''))){
+    sessionStorage.setItem('dentyar_patient_files_unlocked','1');
+    renderPatientFile(openPatientId);
+  }else{ err.textContent='رمز مدیر مطب نادرست است.'; input.value=''; input.focus(); }
+}
+function lockPatientFiles(){
+  sessionStorage.removeItem('dentyar_patient_files_unlocked');
+  if(currentPage==='patients' && openPatientId) renderPatientFile(openPatientId);
+}
 /* ---------- پرونده‌ی بیمار ---------- */
 function renderPatientFile(id){
   const p = STATE.patients.find(x=>x.id===id);
   if(!p){ openPatientId=null; renderPatients(); return; }
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){
+    document.getElementById('pageContent').innerHTML = `
+      <div class="card" style="max-width:520px;margin:18px auto;text-align:center;padding:24px 16px">
+        <div class="iconCircle">${NAV_ICONS.reports}</div>
+        <h3>پرونده محرمانه بیمار</h3>
+        <p style="font-size:12px;line-height:1.9;color:var(--muted)">مشاهده جزئیات پرونده، سابقه درمان، مدارک و ویرایش بیمار فقط برای دندان‌پزشک یا مدیر مجاز مطب است. برای ورود، رمز مدیر مطب لازم است.</p>
+        <label for="patientFileGateInput">رمز مدیر مطب</label>
+        <input type="password" id="patientFileGateInput" autocomplete="off" style="text-align:center;letter-spacing:4px" placeholder="رمز مدیر مطب">
+        <div id="patientFileGateError" style="color:var(--danger);font-size:12px;margin-top:8px;min-height:18px"></div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="unlockPatientFiles()">ورود به پرونده</button>
+      </div>`;
+    const input=document.getElementById('patientFileGateInput');
+    if(input){ input.focus(); input.addEventListener('keydown',e=>{if(e.key==='Enter') unlockPatientFiles();}); }
+    return;
+  }
   const visits = [...(p.visits||[])].sort((a,b)=>b.date.localeCompare(a.date));
   const patientFinance = (p.visits||[]).reduce((a,v)=>{const f=financeOf(v); a.gross+=f.gross; a.discount+=f.discount; a.insurance+=f.insurance; a.net+=f.net; a.paid+=f.paid; a.balance+=f.balance; return a;},{gross:0,discount:0,insurance:0,net:0,paid:0,balance:0});
 
@@ -2705,6 +2741,8 @@ function renderPatientFile(id){
       <label>خدمات درمانی (امکان انتخاب یک یا چند خدمت)</label>
       <div id="vServices" class="servicePicker">${STATE.lists.treatmentTypes.map((t,i)=>`<label class="serviceOption"><input type="checkbox" value="${esc(t)}" onchange="setServicesGross('v')" ${i===0?'checked':''}><span>${esc(t)}</span><b>${fmtMoney(getTreatmentPrice(t))}</b></label>`).join('')}</div>
       <input type="hidden" id="vType" value="${esc(STATE.lists.treatmentTypes[0]||'')}">
+      <label>شماره دندان درمان‌شده (سیستم FDI؛ مثال: ۱۶ یا ۱۶، ۲۶)</label>
+      <input type="text" id="vToothNumbers" placeholder="مثلاً ۱۶، ۲۶" autocomplete="off">
       <label>نتیجه</label>
       <select id="vOutcome">${STATE.lists.outcomes.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
       <label>یادداشت</label>
@@ -2720,6 +2758,7 @@ function renderPatientFile(id){
           <span class="badge ${v.outcome==='تکمیل‌شده'?'badge-success':(v.outcome==='لغوشده'?'badge-danger':'badge-muted')}">${esc(v.outcome||'')}</span>
         </div>
         <div style="font-size:12.5px;color:var(--muted);margin-top:4px">${fmtDateFa(v.date)} ${v.dentistId? '· '+esc((STATE.dentists.find(d=>d.id===v.dentistId)||{}).name||''):''}</div>
+        ${v.toothNumbers? `<div class="kv"><span>دندان درمان‌شده</span><b>${esc(faDigits(v.toothNumbers))}</b></div>`:''}
         ${v.note? `<div style="font-size:13px;margin-top:6px">${esc(v.note)}</div>`:''}
         <div class="financeMini">
           ${(()=>{const f=financeOf(v); return `<span>ناخالص: <b>${fmtMoney(f.gross)}</b></span><span>تخفیف: <b>${fmtMoney(f.discount)}</b></span><span>بیمه: <b>${fmtMoney(f.insurance)}</b></span><span>خالص: <b>${fmtMoney(f.net)}</b></span><span>پرداختی: <b>${fmtMoney(f.paid)}</b></span><span>باقیمانده: <b>${fmtMoney(f.balance)}</b></span>`})()}
@@ -2835,6 +2874,7 @@ function showDentyarPrintOverlay(html){
 }
 
 function addVisit(patientId){
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=patientId; renderPatientFile(patientId); return; }
   const p = STATE.patients.find(x=>x.id===patientId);
   if(!p) return;
   p.visits = p.visits || [];
@@ -2856,6 +2896,7 @@ function addVisit(patientId){
     paymentType: document.getElementById('vPaymentType').value,
     dentistId: document.getElementById('vDentist').value,
     treatmentType: document.getElementById('vType').value,
+    toothNumbers: document.getElementById('vToothNumbers').value.trim(),
     treatmentServices: selectedServiceValues('v'),
     serviceItems: selectedServiceValues('v').map(name=>({name, price:getTreatmentPrice(name)})),
     outcome: document.getElementById('vOutcome').value,
@@ -2866,6 +2907,7 @@ function addVisit(patientId){
   renderPatientFile(patientId);
 }
 function deleteVisit(patientId, visitId){
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=patientId; renderPatientFile(patientId); return; }
   modalConfirm('حذف مرحله‌ی درمانی','آیا از حذف این رکورد مطمئن هستید؟', ()=>{
     const p = STATE.patients.find(x=>x.id===patientId);
     p.visits = (p.visits||[]).filter(v=>v.id!==visitId);
@@ -2873,6 +2915,7 @@ function deleteVisit(patientId, visitId){
   });
 }
 function handleFileAttach(patientId, fileList){
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=patientId; renderPatientFile(patientId); return; }
   const p = STATE.patients.find(x=>x.id===patientId);
   if(!p) return;
   p.files = p.files || [];
@@ -2889,6 +2932,7 @@ function handleFileAttach(patientId, fileList){
   });
 }
 function removePatientFile(patientId, idx){
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=patientId; renderPatientFile(patientId); return; }
   const p = STATE.patients.find(x=>x.id===patientId);
   modalConfirm('حذف فایل','آیا از حذف این فایل مطمئن هستید؟', ()=>{
     p.files.splice(idx,1);
@@ -5329,7 +5373,9 @@ document.addEventListener('focus',e=>{
   SYNC.cfg = function(){ return (STATE && STATE.meta && STATE.meta.sync) ? STATE.meta.sync : null; };
   SYNC.isReady = function(){ return started && connected; };
   SYNC._lastError = null;
+  SYNC._lastSyncError = null;
   SYNC.diagnosticText = function(){
+    if(SYNC._lastSyncError) return 'اتصال برقرار است، اما همگام‌سازی ناموفق شد: '+String(SYNC._lastSyncError).slice(0,220)+'؛ تاریخ آخرین همگام‌سازی موفق تغییر نکرده است.';
     if(SYNC._lastError) return 'خطا در مرحله «'+SYNC._lastError.stage+'»؛ کد: '+SYNC._lastError.code;
     const labels={idle:'آماده', 'load-sdk':'بارگذاری کتابخانه‌های اتصال', 'firebase-app':'آماده‌سازی Firebase', 'auth-persistence':'بازیابی نشست ورود', 'auth-login':'ورود به حساب Firebase', 'rtdb-transport':'آماده‌سازی ارتباط پایگاه داده', 'device-registration':'ثبت دستگاه و شنونده‌ها', 'waiting-rtdb':'انتظار برای پاسخ پایگاه داده', ready:'ارتباط پایگاه داده برقرار است', error:'اتصال ناموفق'};
     return 'وضعیت فنی: '+(labels[connectStage]||'در حال بررسی اتصال');
@@ -5616,14 +5662,21 @@ document.addEventListener('focus',e=>{
         nextIds[coll] = curIds;
       }
       localStorage.setItem(PUSHED_KEY, JSON.stringify(nextIds));
-      STATE.meta.sync.lastSyncAt = now; saveState();
+      STATE.meta.sync.lastSyncAt = now;
+      STATE.meta.sync.lastSyncDirection = 'ارسال موفق';
+      SYNC._lastSyncError = null;
+      saveState();
       SYNC.renderStatus&&SYNC.renderStatus();
-    }catch(e){ console.warn('DentyarSync push failed', e); }
+    }catch(e){
+      SYNC._lastSyncError = (e && (e.code || e.message)) ? String(e.code||'')+' '+String(e.message||'') : String(e||'خطای نامشخص');
+      console.warn('DentyarSync push failed', e);
+      SYNC.renderStatus&&SYNC.renderStatus();
+    }
   }
 
   SYNC.renderStatus = function(){
     const b=document.getElementById('syncStatusBadge');
-    if(b){ b.textContent = SYNC.isReady() ? 'متصل' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال'); }
+    if(b){ b.textContent = SYNC._lastSyncError ? 'متصل؛ خطای همگام‌سازی' : (SYNC.isReady() ? 'اتصال برقرار' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال')); }
     const d=document.getElementById('syncDiagnostic');
     if(d) d.textContent=SYNC.diagnosticText();
   };
@@ -5636,7 +5689,7 @@ document.addEventListener('focus',e=>{
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
       : '';
-    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(ready?'متصل':(cfg.enabled?'در حال اتصال…':'غیرفعال'))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی: '+esc(ls)+'</span>\n      </div>\n      <div id="syncDiagnostic" class="notice" style="font-size:11px;line-height:1.8;margin:6px 0">'+esc(SYNC.diagnosticText())+'</div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n        <label>مسیر ارتباطی بدون VPN (پس از راه‌اندازی)</label><input id="syncProxyUrl" type="url" inputmode="url" dir="ltr" value="'+esc(cfg.networkProxyUrl||'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev')+'" placeholder="https://نام-مسیر.workers.dev">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید (قوانین را روی auth!=null بگذارید) و مقادیر زیر را از تنظیمات وب Firebase کپی کنید.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
+    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(SYNC._lastSyncError?'متصل؛ خطای همگام‌سازی':(ready?'اتصال برقرار':(cfg.enabled?'در حال اتصال…':'غیرفعال')))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی موفق: '+esc(ls)+'</span>\n      </div>\n      <div id="syncDiagnostic" class="notice" style="font-size:11px;line-height:1.8;margin:6px 0">'+esc(SYNC.diagnosticText())+'</div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n        <label>مسیر ارتباطی بدون VPN (پس از راه‌اندازی)</label><input id="syncProxyUrl" type="url" inputmode="url" dir="ltr" value="'+esc(cfg.networkProxyUrl||'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev')+'" placeholder="https://نام-مسیر.workers.dev">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید (قوانین را روی auth!=null بگذارید) و مقادیر زیر را از تنظیمات وب Firebase کپی کنید.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
   };
 
   SYNC.genCode = function(){
