@@ -2204,6 +2204,8 @@ function saveRegisterForm(appointmentId){
   if(samePatient){ modalAlert('احتمال ثبت تکراری','بیماری با همین نام و شماره تماس قبلاً ثبت شده است (پرونده '+esc(samePatient.fileNo)+'). اطلاعات قبلی را بررسی کنید.'); return; }
   const missingCustom=getFormFields('register').find(f=>f.custom&&f.required&&f.visible!==false&&!(document.getElementById('rgCustom_'+f.key.replace(/[^A-Za-z0-9_]/g,'_'))?.value||'').trim());
   if(missingCustom){ modalAlert('خطا',`فیلد «${esc(missingCustom.label)}» الزامی است.`); return; }
+  const toothResult=normalizeFDIToothNumbers(document.getElementById('rgToothNumbers').value);
+  if(!toothResult.ok){ modalAlert('شماره دندان نامعتبر',toothResult.error); return; }
   const patient = {
     id: uid('pt'), fileNo: nextFileNo(), createdAt: Date.now(),
     name,
@@ -2251,7 +2253,7 @@ function saveRegisterForm(appointmentId){
       paymentType: document.getElementById('rgPaymentType').value,
       dentistId: document.getElementById('rgDentist').value,
       treatmentType: document.getElementById('rgType').value,
-      toothNumbers: document.getElementById('rgToothNumbers').value.trim(),
+      toothNumbers: toothResult.value,
       treatmentServices: selectedServiceValues('rg'),
       serviceItems: selectedServiceValues('rg').map(name=>({name, price:getTreatmentPrice(name)})),
       outcome: document.getElementById('rgOutcome').value,
@@ -2441,6 +2443,17 @@ function convertAppointment(id){
 /* ===================== بیماران ===================== */
 let patientSearchTerm = '';
 let openPatientId = null;
+let pendingPatientEditId = null;
+
+function requestPatientEdit(id){
+  if(sessionStorage.getItem('dentyar_patient_files_unlocked') === '1'){
+    openPatientForm(id);
+    return;
+  }
+  pendingPatientEditId = id;
+  openPatientId = id;
+  renderPatientFile(id);
+}
 
 function renderPatients(){
   if(pageParams.openNewWith){
@@ -2477,6 +2490,7 @@ function renderPatients(){
           </div>
           <div class="row" style="gap:6px;flex-shrink:0">
             <span class="badge badge-muted">${(p.visits||[]).length} مراجعه</span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation(); requestPatientEdit('${p.id}')">ویرایش</button>
           </div>
         </div>
       </div>
@@ -2633,7 +2647,13 @@ function unlockPatientFiles(){
   if(!input||!err) return;
   if(toEnDigits(input.value.trim())===toEnDigits(String(STATE.meta.profilePassword||''))){
     sessionStorage.setItem('dentyar_patient_files_unlocked','1');
-    renderPatientFile(openPatientId);
+    if(pendingPatientEditId){
+      const id=pendingPatientEditId;
+      pendingPatientEditId=null;
+      openPatientForm(id);
+    }else{
+      renderPatientFile(openPatientId);
+    }
   }else{ err.textContent='رمز مدیر مطب نادرست است.'; input.value=''; input.focus(); }
 }
 function lockPatientFiles(){
@@ -2670,7 +2690,6 @@ function renderPatientFile(id){
           <h3 style="margin:0">${esc(p.name)}</h3>
           <span style="font-size:12.5px;color:var(--muted)">پرونده #${p.fileNo}</span>
         </div>
-        <button class="btn btn-outline btn-sm" onclick="openPatientForm('${p.id}')">ویرایش</button>
       </div>
       <hr>
       <div class="kv"><span>کد ملی</span><b>${esc(faDigits(p.nationalId||'-'))}</b></div>
@@ -2873,10 +2892,29 @@ function showDentyarPrintOverlay(html){
   document.getElementById('dentyarPdfFrame').srcdoc=html;
 }
 
+function normalizeFDIToothNumbers(value){
+  const raw=toEnDigits(String(value||'')).trim();
+  if(!raw) return {ok:true,value:''};
+  const tokens=raw.split(/[،,;؛/\s]+/).filter(Boolean);
+  const valid=n=>{
+    if(!/^\\d{2}$/.test(n)) return false;
+    const q=Number(n[0]), pos=Number(n[1]);
+    if(q>=1&&q<=4) return pos>=1&&pos<=8;
+    if(q>=5&&q<=8) return pos>=1&&pos<=5;
+    return false;
+  };
+  const normalized=tokens.map(t=>t.replace(/[^0-9]/g,''));
+  if(normalized.some(n=>!valid(n))) return {ok:false,error:'شماره دندان باید مطابق سیستم FDI باشد؛ دندان دائمی مانند ۱۶ و دندان شیری مانند ۵۴ وارد شود.'};
+  if(new Set(normalized).size!==normalized.length) return {ok:false,error:'شماره یک دندان بیش از یک‌بار وارد شده است.'};
+  return {ok:true,value:normalized.join('، ')};
+}
+
 function addVisit(patientId){
   if(sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=patientId; renderPatientFile(patientId); return; }
   const p = STATE.patients.find(x=>x.id===patientId);
   if(!p) return;
+  const toothResult=normalizeFDIToothNumbers(document.getElementById('vToothNumbers').value);
+  if(!toothResult.ok){ modalAlert('شماره دندان نامعتبر',toothResult.error); return; }
   p.visits = p.visits || [];
   p.visits.push({
     id: uid('vs'),
@@ -2896,7 +2934,7 @@ function addVisit(patientId){
     paymentType: document.getElementById('vPaymentType').value,
     dentistId: document.getElementById('vDentist').value,
     treatmentType: document.getElementById('vType').value,
-    toothNumbers: document.getElementById('vToothNumbers').value.trim(),
+    toothNumbers: toothResult.value,
     treatmentServices: selectedServiceValues('v'),
     serviceItems: selectedServiceValues('v').map(name=>({name, price:getTreatmentPrice(name)})),
     outcome: document.getElementById('vOutcome').value,
