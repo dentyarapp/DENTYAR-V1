@@ -1,4 +1,4 @@
-name: Build DENTYAR V101-223 candidate APK
+name: Build DENTYAR V100-222 APK
 # Rebuild exact V100-222 source with the existing app ID and fixed signing key; only Android version code is bumped for in-place update.
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
             "version": "100.0.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-223 CANDIDATE"
+              "build": "echo DENTYAR V100-222"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -73,7 +73,7 @@ jobs:
           s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 239', s, count=1)
           s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.239.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V101-223 candidate versionCode/versionName")
+              raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -506,12 +506,12 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-222.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-223-CANDIDATE-APK
+          name: DENTYAR-V100-222-APK
           path: DENTYAR-V101.apk
           if-no-files-found: error
 
@@ -520,7 +520,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v100-test-disabled
-          name: DENTYAR V101-223 candidate (release disabled)
+          name: DENTYAR V100-222 (release disabled)
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
