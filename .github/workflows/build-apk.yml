@@ -512,7 +512,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V100-222-APK
-          path: DENTYAR-V101.apk
+          path: DENTYAR-V100-222.apk
           if-no-files-found: error
 
       - name: انتشار عمومی غیرفعال است (نسخه آزمایشی)
@@ -524,7 +524,7 @@ jobs:
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V101.apk
+          files: DENTYAR-V100-222.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
