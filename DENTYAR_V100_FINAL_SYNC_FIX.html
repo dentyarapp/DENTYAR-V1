@@ -2897,7 +2897,7 @@ function normalizeFDIToothNumbers(value){
   if(!raw) return {ok:true,value:''};
   const tokens=raw.split(/[،,;؛/\s]+/).filter(Boolean);
   const valid=n=>{
-    if(!/^\\d{2}$/.test(n)) return false;
+    if(!/^\d{2}$/.test(n)) return false;
     const q=Number(n[0]), pos=Number(n[1]);
     if(q>=1&&q<=4) return pos>=1&&pos<=8;
     if(q>=5&&q<=8) return pos>=1&&pos<=5;
