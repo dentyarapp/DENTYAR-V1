@@ -1,13 +1,13 @@
 {
   "version": "V70",
-  "notes": "دنت‌یار V101: اصلاح ثبت شماره دندان بر اساس FDI، انتقال دسترسی ویرایش پرونده به فهرست بیماران با حفظ رمز مدیر، و نمایش مرحله/کد خطای همگام‌سازی.",
+  "notes": "دنت‌یار V70: حفظ نشست امن Firebase روی هر دستگاه پس از اتصال اولیه؛ همگام‌سازی خودکار در مراجعات بعدی بدون درخواست مکرر رمز. رمز عبور در برنامه ذخیره نمی‌شود.",
   "android": {
     "version": "V70",
     "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v70-final/DENTYAR-V70.apk",
     "fileName": "DENTYAR-V70.apk"
   },
   "web": {
-    "version": "V101",
-    "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/fix/v100-223-sync-records-teeth-20261025/DENTYAR_V100_FINAL_SYNC_FIX.html"
+    "version": "V70",
+    "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
   }
 }
