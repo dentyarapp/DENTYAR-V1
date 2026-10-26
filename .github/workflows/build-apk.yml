@@ -438,7 +438,27 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/dentyar-signing"
           if [ -n "$DENTYAR_KEYSTORE_BASE64" ]; then
-            printf '%s' "$DENTYAR_KEYSTORE_BASE64" | base64 --decode > android/app/dentyar-release.keystore
+            # Accept standard base64 with line breaks, URL-safe base64, or a data-URI prefix.
+            # Never write a partially decoded keystore: validate the complete payload first.
+            export DENTYAR_KEYSTORE_BASE64
+            python - <<'PY'
+          import base64, os, re, sys
+          raw = os.environ.get("DENTYAR_KEYSTORE_BASE64", "").strip()
+          raw = re.sub(r"^data:[^,]*;base64,", "", raw, flags=re.IGNORECASE)
+          raw = re.sub(r"\s+", "", raw).replace("-", "+").replace("_", "/")
+          raw += "=" * ((-len(raw)) % 4)
+          try:
+              decoded = base64.b64decode(raw, validate=True)
+          except Exception:
+              print("ERROR: DENTYAR_KEYSTORE_BASE64 is not valid base64. The keystore was not written.")
+              sys.exit(2)
+          if len(decoded) < 1024:
+              print("ERROR: decoded keystore is unexpectedly small; refusing to use it.")
+              sys.exit(3)
+          with open("android/app/dentyar-release.keystore", "wb") as f:
+              f.write(decoded)
+          print("Keystore payload decoded and structurally sized; validating alias/password next.")
+          PY
           else
             gh run download 38471109738 --repo "$GITHUB_REPOSITORY" --name DENTYAR-SIGNING-KEY-PRIVATE --dir "$RUNNER_TEMP/dentyar-signing"
             test -s "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore"
