@@ -7,6 +7,9 @@ permissions:
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - test/dentyar-isolated-trial-app-20261027
 
 jobs:
   build-apk:
