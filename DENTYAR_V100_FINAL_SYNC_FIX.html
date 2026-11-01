@@ -2546,7 +2546,7 @@ function isValidIranianNationalId(nid){
 
 function openPatientForm(patientId, prefill){
   const editing = patientId ? STATE.patients.find(p=>p.id===patientId) : null;
-  if(editing && sessionStorage.getItem('dentyar_patient_edit_unlocked') !== '1'){ requestPatientEdit(patientId); return; }
+  if(editing && editing.isFinalized !== false && sessionStorage.getItem('dentyar_patient_edit_unlocked') !== '1'){ requestPatientEdit(patientId); return; }
   const p = editing || {name:'', nationalId:'', phone:'', gender:'', birthYear:'', address:'', notes:'', insuranceType:'', visitType:'نوبت اول', baseInsurance:'', supplementalInsurance:'ندارد', insuranceNumber:'', policyNumber:'', coverageCeiling:0, franchisePercent:0, ...(prefill||{})};
   showModal(`
     <h3>${editing? 'ویرایش بیمار' : 'ثبت بیمار جدید'}</h3>
@@ -2610,7 +2610,8 @@ function cancelPatientFormEdit(){
 }
 
 function savePatientForm(editingId){
-  if(editingId && sessionStorage.getItem('dentyar_patient_edit_unlocked') !== '1'){ closeModal(); requestPatientEdit(editingId); return; }
+  const targetPatient=editingId?STATE.patients.find(x=>x.id===editingId):null;
+  if(editingId && targetPatient && targetPatient.isFinalized !== false && sessionStorage.getItem('dentyar_patient_edit_unlocked') !== '1'){ closeModal(); requestPatientEdit(editingId); return; }
   const name = document.getElementById('pfName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
   const enteredNid=toEnDigits(document.getElementById('pfNid').value||'').trim();
