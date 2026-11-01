@@ -2208,6 +2208,7 @@ function saveRegisterForm(appointmentId){
   if(!toothResult.ok){ modalAlert('شماره دندان نامعتبر',toothResult.error); return; }
   const patient = {
     id: uid('pt'), fileNo: nextFileNo(), createdAt: Date.now(),
+    isFinalized: true, finalizedAt: Date.now(),
     name,
     nationalId: document.getElementById('rgNid').value.trim(),
     phone: document.getElementById('rgPhone').value.trim(),
@@ -2446,13 +2447,37 @@ let openPatientId = null;
 let pendingPatientEditId = null;
 
 function requestPatientEdit(id){
-  if(sessionStorage.getItem('dentyar_patient_files_unlocked') === '1'){
+  const patient=STATE.patients.find(x=>x.id===id);
+  if(!patient) return;
+  pendingPatientEditId=id;
+  showModal(`
+    <h3>ویرایش نهایی پرونده</h3>
+    <p style="font-size:12px;line-height:1.9;color:var(--muted)">این پرونده ثبت نهایی شده است. ویرایش اطلاعات فقط برای دندان‌پزشک یا مدیر مجاز مطب و پس از تأیید رمز مدیر امکان‌پذیر است.</p>
+    <label for="finalPatientEditPin">رمز مدیر مطب (۸ رقم)</label>
+    <input type="password" id="finalPatientEditPin" maxlength="8" inputmode="numeric" autocomplete="off" style="text-align:center;letter-spacing:4px" placeholder="••••••••">
+    <div id="finalPatientEditError" style="color:var(--danger);font-size:12px;min-height:18px;margin-top:8px"></div>
+    <div class="modalBtns">
+      <button class="btn btn-outline" onclick="pendingPatientEditId=null;closeModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="unlockFinalPatientEdit()">تأیید رمز و ویرایش</button>
+    </div>`);
+  const input=document.getElementById('finalPatientEditPin');
+  if(input){input.focus();input.addEventListener('keydown',e=>{if(e.key==='Enter')unlockFinalPatientEdit();});}
+}
+function unlockFinalPatientEdit(){
+  const input=document.getElementById('finalPatientEditPin');
+  const error=document.getElementById('finalPatientEditError');
+  if(!input||!error||!pendingPatientEditId) return;
+  if(toEnDigits(input.value.trim())===toEnDigits(String(STATE.meta.profilePassword||''))){
+    const id=pendingPatientEditId;
+    pendingPatientEditId=null;
+    sessionStorage.setItem('dentyar_patient_edit_unlocked','1');
+    closeModal();
     openPatientForm(id);
-    return;
+  }else{
+    error.textContent='رمز مدیر مطب نادرست است.';
+    input.value='';
+    input.focus();
   }
-  pendingPatientEditId = id;
-  openPatientId = id;
-  renderPatientFile(id);
 }
 
 function renderPatients(){
@@ -2490,7 +2515,6 @@ function renderPatients(){
           </div>
           <div class="row" style="gap:6px;flex-shrink:0">
             <span class="badge badge-muted">${(p.visits||[]).length} مراجعه</span>
-            <button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation(); requestPatientEdit('${p.id}')">ویرایش</button>
           </div>
         </div>
       </div>
@@ -2520,9 +2544,7 @@ function isValidIranianNationalId(nid){
 
 function openPatientForm(patientId, prefill){
   const editing = patientId ? STATE.patients.find(p=>p.id===patientId) : null;
-  if(editing && sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){
-    openPatientId=patientId; renderPatientFile(patientId); return;
-  }
+  if(editing && sessionStorage.getItem('dentyar_patient_edit_unlocked') !== '1'){ requestPatientEdit(patientId); return; }
   const p = editing || {name:'', nationalId:'', phone:'', gender:'', birthYear:'', address:'', notes:'', insuranceType:'', visitType:'نوبت اول', baseInsurance:'', supplementalInsurance:'ندارد', insuranceNumber:'', policyNumber:'', coverageCeiling:0, franchisePercent:0, ...(prefill||{})};
   showModal(`
     <h3>${editing? 'ویرایش بیمار' : 'ثبت بیمار جدید'}</h3>
@@ -2581,7 +2603,7 @@ function openPatientForm(patientId, prefill){
 }
 
 function savePatientForm(editingId){
-  if(editingId && sessionStorage.getItem('dentyar_patient_files_unlocked') !== '1'){ openPatientId=editingId; closeModal(); renderPatientFile(editingId); return; }
+  if(editingId && sessionStorage.getItem('dentyar_patient_edit_unlocked') !== '1'){ closeModal(); requestPatientEdit(editingId); return; }
   const name = document.getElementById('pfName').value.trim();
   if(!name){ modalAlert('خطا','نام بیمار الزامی است.'); return; }
   const enteredNid=toEnDigits(document.getElementById('pfNid').value||'').trim();
@@ -2628,6 +2650,7 @@ function savePatientForm(editingId){
   }
   saveState();
   closeModal();
+  if(editingId) sessionStorage.removeItem('dentyar_patient_edit_unlocked');
   toast('اطلاعات بیمار ذخیره شد');
   renderPatients();
 }
@@ -2709,6 +2732,11 @@ function renderPatientFile(id){
       <div class="kv"><span>خالص قابل پرداخت</span><b class="costTag">${fmtMoney(patientFinance.net)}</b></div>
       <div class="kv"><span>کل پرداختی</span><b>${fmtMoney(patientFinance.paid)}</b></div>
       <div class="kv"><span>باقیمانده</span><b>${fmtMoney(patientFinance.balance)}</b></div>
+      <div class="notice" style="margin-top:12px;line-height:1.9">
+        <b>ویرایش نهایی پرونده — دسترسی محدود</b>
+        <div style="font-size:12px">پرونده ثبت‌شده قابل ویرایش عادی نیست. برای اصلاح مشخصات، فقط دندان‌پزشک یا مدیر مجاز می‌تواند با رمز مدیر وارد بخش ویرایش نهایی شود.</div>
+        <button class="btn btn-outline btn-block" style="margin-top:9px" onclick="requestPatientEdit('${p.id}')">ورود به ویرایش نهایی با رمز</button>
+      </div>
       <button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="deletePatient('${p.id}')">حذف بیمار</button>
     </div>
 
@@ -2834,6 +2862,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1
 <tr><td>نام بیمار</td><td>${esc(p.name||'-')}</td><td>شماره پرونده</td><td>${esc(faDigits(p.fileNo||'-'))}</td></tr>
 <tr><td>کد ملی</td><td>${esc(faDigits(p.nationalId||'-'))}</td><td>تلفن</td><td>${esc(faDigits(p.phone||'-'))}</td></tr>
 <tr><td>نوع درمان</td><td>${esc(v.treatmentType||'-')}</td><td>دندان‌پزشک</td><td>${esc(dentistName||'-')}</td></tr>
+<tr><td>شماره دندان (FDI)</td><td colspan="3">${esc(faDigits(v.toothNumbers||'ثبت نشده'))}</td></tr>
 </tbody></table>
 <div class="section">ریز محاسبات مالی</div>
 <table><thead><tr><th>شرح</th><th class="money">مبلغ (تومان)</th></tr></thead><tbody>
@@ -5742,6 +5771,12 @@ document.addEventListener('focus',e=>{
     if(b){ b.textContent = SYNC._lastSyncError ? 'متصل؛ خطای همگام‌سازی' : (SYNC.isReady() ? 'اتصال برقرار' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال')); }
     const d=document.getElementById('syncDiagnostic');
     if(d) d.textContent=SYNC.diagnosticText();
+    const last=document.getElementById('syncLastSuccess');
+    if(last){
+      const ts=STATE&&STATE.meta&&STATE.meta.sync&&STATE.meta.sync.lastSyncAt;
+      const label=ts?(()=>{const dt=new Date(ts);return fmtDateFa(dt.getTime())+' '+faDigits(String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0'));})():'—';
+      last.textContent='آخرین همگام‌سازی موفق: '+label;
+    }
   };
 
   SYNC.settingsCardHtml = function(){
@@ -5752,7 +5787,7 @@ document.addEventListener('focus',e=>{
     const qr = (cfg.clinicCode && cfg.enabled)
       ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent('DENTYAR:'+cfg.clinicCode)+'" width="120" height="120" alt="QR" style="margin:6px auto;display:block;border:1px solid var(--border);border-radius:8px" onerror="this.style.display=\'none\'">'
       : '';
-    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(SYNC._lastSyncError?'متصل؛ خطای همگام‌سازی':(ready?'اتصال برقرار':(cfg.enabled?'در حال اتصال…':'غیرفعال')))+'</span>\n        <span style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی موفق: '+esc(ls)+'</span>\n      </div>\n      <div id="syncDiagnostic" class="notice" style="font-size:11px;line-height:1.8;margin:6px 0">'+esc(SYNC.diagnosticText())+'</div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n        <label>مسیر ارتباطی بدون VPN (پس از راه‌اندازی)</label><input id="syncProxyUrl" type="url" inputmode="url" dir="ltr" value="'+esc(cfg.networkProxyUrl||'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev')+'" placeholder="https://نام-مسیر.workers.dev">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید و مقادیر زیر را از تنظیمات وب Firebase کپی کنید. نکته امنیتی: قوانین پایگاه داده را به‌صورت عمومی یا صرفاً با auth!=null باز نکنید؛ این کار می‌تواند اطلاعات همه مطب‌ها را در معرض دسترسی حساب‌های دیگر قرار دهد. قوانین بسته، همگام‌سازی را متوقف می‌کند؛ پیش از فعال‌سازی دسترسی باید مجوز اختصاصی و قابل‌اعتماد هر مطب پیاده‌سازی شود.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
+    return '\n    <div class="card">\n      <h3>همگام‌سازی چنددستگاهی (آنلاین)</h3>\n      <p style="font-size:12px;color:var(--muted);line-height:1.9">با فعال‌کردن این قابلیت، اطلاعات مطب (بیمار، نوبت، دندان‌پزشک، تنظیمات) به‌صورت آنی روی حداقل ۳ دستگاه هم‌زمان همگام می‌شود. برنامه آفلاین-اول باقی می‌ماند؛ رمزهای ورود و تنظیمات مدیر همگام نمی‌شوند. سرویس رایگان Firebase استفاده می‌شود. پس از اتصال اولیه هر دستگاه، نشست امن ورود حفظ می‌شود و برای همگام‌سازی‌های بعدی معمولاً نیازی به واردکردن دوباره رمز نیست. رمز عبور در دنت‌یار ذخیره نمی‌شود.</p>\n      <div class="row" style="align-items:center;gap:8px;margin:6px 0">\n        <span id="syncStatusBadge" class="updateBadge" style="margin:0">'+(SYNC._lastSyncError?'متصل؛ خطای همگام‌سازی':(ready?'اتصال برقرار':(cfg.enabled?'در حال اتصال…':'غیرفعال')))+'</span>\n        <span id="syncLastSuccess" style="font-size:11px;color:var(--muted)">آخرین همگام‌سازی موفق: '+esc(ls)+'</span>\n      </div>\n      <div id="syncDiagnostic" class="notice" style="font-size:11px;line-height:1.8;margin:6px 0">'+esc(SYNC.diagnosticText())+'</div>\n      <div class="grid2">\n        <label>ایمیل حساب کاربری</label><input id="syncAccountEmail" type="email" inputmode="email" autocomplete="username" dir="ltr" value="'+esc(cfg.accountEmail||'firebase.dentyar.app@gmail.com')+'" placeholder="ایمیل حساب Firebase">\n        <label>رمز عبور (فقط اتصال اولیه یا ورود مجدد)</label><input id="syncAccountPassword" type="password" inputmode="text" autocomplete="current-password" dir="ltr" autocapitalize="off" spellcheck="false" placeholder="فقط اتصال اولیه؛ در صورت نیاز">\n        <label>کد مطب (Clinic Code)</label>\n        <input id="syncClinicCode" value="'+esc(cfg.clinicCode||'')+'" placeholder="مثلاً AB12CD34" style="font-family:var(--font-mono)">\n        <label>نام این دستگاه</label>\n        <input id="syncDeviceName" value="'+esc(cfg.deviceName||'')+'" placeholder="مثلاً منشی-کامپیوتر">\n        <label>مسیر ارتباطی بدون VPN (پس از راه‌اندازی)</label><input id="syncProxyUrl" type="url" inputmode="url" dir="ltr" value="'+esc(cfg.networkProxyUrl||'https://dentyar-sync-relay.dentyar-cloudflare.workers.dev')+'" placeholder="https://نام-مسیر.workers.dev">\n      </div>\n      <div class="sectionTitle" style="margin-top:10px">تنظیمات Firebase (رایگان)</div>\n      <p style="font-size:11px;color:var(--muted)">یک پروژه‌ی Firebase بسازید، Realtime Database را فعال کنید و مقادیر زیر را از تنظیمات وب Firebase کپی کنید. نکته امنیتی: قوانین پایگاه داده را به‌صورت عمومی یا صرفاً با auth!=null باز نکنید؛ این کار می‌تواند اطلاعات همه مطب‌ها را در معرض دسترسی حساب‌های دیگر قرار دهد. قوانین بسته، همگام‌سازی را متوقف می‌کند؛ پیش از فعال‌سازی دسترسی باید مجوز اختصاصی و قابل‌اعتماد هر مطب پیاده‌سازی شود.</p>\n      <div class="grid2">\n        <label>apiKey</label><input id="fb_apiKey" value="'+esc(fbCfg.apiKey||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>authDomain</label><input id="fb_authDomain" value="'+esc(fbCfg.authDomain||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>databaseURL</label><input id="fb_databaseURL" value="'+esc(fbCfg.databaseURL||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>projectId</label><input id="fb_projectId" value="'+esc(fbCfg.projectId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>storageBucket</label><input id="fb_storageBucket" value="'+esc(fbCfg.storageBucket||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>messagingSenderId</label><input id="fb_messagingSenderId" value="'+esc(fbCfg.messagingSenderId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n        <label>appId</label><input id="fb_appId" value="'+esc(fbCfg.appId||'')+'" style="font-family:var(--font-mono);font-size:11px">\n      </div>\n      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">\n        <button class="btn btn-primary" onclick="DentyarSync.saveAndConnect()">اتصال و فعال‌سازی</button>\n        <button class="btn btn-outline" onclick="DentyarSync.genCode()">تولید کد مطب جدید</button>\n        '+(cfg.enabled?'<button class="btn btn-outline" onclick="DentyarSync.toggleOff()">قطع اتصال</button>':'')+'\n        '+(cfg.enabled?'<button class="btn btn-danger" onclick="DentyarSync.removeConfig()">حذف تنظیمات همگام‌سازی</button>':'')+'\n      </div>\n      '+(cfg.enabled&&cfg.clinicCode?'<div class="notice" style="margin-top:10px"><b>اتصال دستگاه جدید:</b> روی دستگاه دیگر به همین بخش بیایید، همین تنظیمات Firebase و همین «کد مطب» را وارد کنید و «اتصال و فعال‌سازی» را بزنید. '+qr+' کد مطب: <b dir="ltr">'+esc(cfg.clinicCode)+'</b></div>':'')+'\n    </div>';
   };
 
   SYNC.genCode = function(){
