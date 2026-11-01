@@ -2880,7 +2880,24 @@ table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1
 .signs{display:flex;gap:28px;margin-top:44px}.sign{flex:1;border-top:1px solid #aab9b9;padding-top:8px;text-align:center;font-size:12px;color:#617278}
 .footer{margin-top:24px;padding-top:12px;border-top:1px solid #e3ebea;text-align:center;color:#687b80;font-size:10px;line-height:1.8}
 @media print{body{padding:0}.sheet{border:0;border-radius:0;padding:10mm;max-width:none}}
-</style></head><body><main class="sheet">
+</style><style id="dentyar-final-brand-polish">
+/* Final brand lockup: high-contrast navy slogan under the main logo */
+#topHeader .appSlogan{
+  color:#12305e!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+  letter-spacing:0!important;
+  text-shadow:0 1px 0 rgba(18,48,94,.08);
+}
+@media(max-width:480px){
+  #topHeader .appSlogan{font-size:9.5px!important;max-width:100%!important;}
+}
+@media(max-width:420px){
+  #topHeader .appSlogan{font-size:8.8px!important;max-width:calc(100vw - 150px)!important;}
+}
+</style>
+</head><body><main class="sheet">
 <header class="head"><img class="logo" src="${esc(logo)}" alt="لوگوی مطب"><div class="clinic"><h1>${esc(clinicName)}</h1>
 <p>${esc(clinic.address||'')}</p><p>${clinicPhone?'تلفن: '+esc(clinicPhone):''}${clinic.licenseNo?' | شماره مجوز: '+esc(clinic.licenseNo):''}</p></div></header>
 <div class="doc"><span><b>${esc(title)}</b></span><span>شماره سند / پرونده: <b>${esc(faDigits(docNo))}</b></span><span>تاریخ: <b>${esc(fmtDateFa(v.date))}</b></span></div>
