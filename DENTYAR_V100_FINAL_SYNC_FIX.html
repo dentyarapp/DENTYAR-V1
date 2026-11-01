@@ -2449,6 +2449,7 @@ let pendingPatientEditId = null;
 function requestPatientEdit(id){
   const patient=STATE.patients.find(x=>x.id===id);
   if(!patient) return;
+  if(patient.isFinalized===false){ openPatientForm(id); return; }
   pendingPatientEditId=id;
   showModal(`
     <h3>ویرایش نهایی پرونده</h3>
@@ -2515,6 +2516,7 @@ function renderPatients(){
           </div>
           <div class="row" style="gap:6px;flex-shrink:0">
             <span class="badge badge-muted">${(p.visits||[]).length} مراجعه</span>
+            ${p.isFinalized===false?'<button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();requestPatientEdit(\''+p.id+'\')">ویرایش پرونده</button>':''}
           </div>
         </div>
       </div>
@@ -2650,7 +2652,7 @@ function savePatientForm(editingId){
     const visits = cost > 0 ? [{id:uid('v'), date:todayISO(), treatmentType:STATE.lists.treatmentTypes[0]||'مشاوره', dentistId:'', outcome:STATE.lists.outcomes[0]||'تکمیل‌شده', cost, note:'', createdAt:Date.now()}] : [];
     STATE.patients.push({
       id: uid('pt'), fileNo: nextFileNo(), createdAt: Date.now(),
-      visits, files: [], ...data
+      isFinalized: false, visits, files: [], ...data
     });
   }
   saveState();
@@ -2737,11 +2739,17 @@ function renderPatientFile(id){
       <div class="kv"><span>خالص قابل پرداخت</span><b class="costTag">${fmtMoney(patientFinance.net)}</b></div>
       <div class="kv"><span>کل پرداختی</span><b>${fmtMoney(patientFinance.paid)}</b></div>
       <div class="kv"><span>باقیمانده</span><b>${fmtMoney(patientFinance.balance)}</b></div>
+      ${p.isFinalized===false?`
+      <div class="notice" style="margin-top:12px;line-height:1.9">
+        <b>پرونده در مرحله تکمیل</b>
+        <div style="font-size:12px">تا پیش از ثبت نهایی، ویرایش اطلاعات طبق دسترسی عادی امکان‌پذیر است.</div>
+        <button class="btn btn-outline btn-block" style="margin-top:9px" onclick="requestPatientEdit('${p.id}')">ویرایش پرونده</button>
+      </div>`:`
       <div class="notice" style="margin-top:12px;line-height:1.9">
         <b>ویرایش نهایی پرونده — دسترسی محدود</b>
-        <div style="font-size:12px">پرونده ثبت‌شده قابل ویرایش عادی نیست. برای اصلاح مشخصات، فقط دندان‌پزشک یا مدیر مجاز می‌تواند با رمز مدیر وارد بخش ویرایش نهایی شود.</div>
+        <div style="font-size:12px">این پرونده نهایی شده است. اصلاح مشخصات فقط برای دندان‌پزشک یا مدیر مجاز و با رمز مدیر امکان‌پذیر است.</div>
         <button class="btn btn-outline btn-block" style="margin-top:9px" onclick="requestPatientEdit('${p.id}')">ورود به ویرایش نهایی با رمز</button>
-      </div>
+      </div>`}
       <button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="deletePatient('${p.id}')">حذف بیمار</button>
     </div>
 
