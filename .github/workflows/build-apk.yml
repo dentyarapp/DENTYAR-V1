@@ -1,5 +1,5 @@
-name: Build DENTYAR V100-222 APK
-# Rebuild exact V100-222 source with the existing app ID and fixed signing key; only Android version code is bumped for in-place update.
+name: Build DENTYAR V101-223 Trial APK
+# Build corrected V101-223 as an update to the separate trial app; production DENTYAR remains untouched.
 
 permissions:
   contents: write
@@ -60,7 +60,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR آزمایشی" "com.dentyar.trial" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -70,8 +70,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 239', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.239.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 72', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "72.0.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -93,10 +93,10 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/testapp
+          mkdir -p android/app/src/main/java/com/dentyar/trial
 
-          cat > android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/trial/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.trial;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -322,8 +322,8 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/trial/MainActivity.java <<'EOF'
+          package com.dentyar.trial;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -370,7 +370,7 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/trial/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
@@ -381,8 +381,8 @@ jobs:
           node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
-          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/trial/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/trial/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -506,13 +506,13 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V100-222.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223-TRIAL.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V100-222-APK
-          path: DENTYAR-V100-222.apk
+          name: DENTYAR-V101-223-TRIAL-APK
+          path: DENTYAR-V101-223-TRIAL.apk
           if-no-files-found: error
 
       - name: انتشار عمومی غیرفعال است (نسخه آزمایشی)
@@ -524,7 +524,7 @@ jobs:
           body: |
             نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
             این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V100-222.apk
+          files: DENTYAR-V101-223-TRIAL.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
