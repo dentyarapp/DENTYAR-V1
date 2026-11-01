@@ -1,5 +1,6 @@
 name: Build DENTYAR V101-223 Trial APK
 # Build corrected V101-223 as an update to the separate trial app; production DENTYAR remains untouched.
+# Includes the explicit draft-to-finalized patient transition and manager-PIN edit gate.
 
 permissions:
   contents: write
