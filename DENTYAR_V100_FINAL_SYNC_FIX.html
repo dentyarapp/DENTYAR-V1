@@ -2589,7 +2589,7 @@ function openPatientForm(patientId, prefill){
     <textarea id="pfNotes">${esc(p.notes||'')}</textarea>
     <div id="pfDupWarning" style="color:var(--danger);font-size:12.5px;margin-top:6px;"></div>
     <div class="modalBtns">
-      <button class="btn btn-outline" onclick="closeModal()">انصراف</button>
+      <button class="btn btn-outline" onclick="cancelPatientFormEdit()">انصراف</button>
       <button class="btn btn-primary" onclick="savePatientForm(${editing? `'${editing.id}'`:'null'})">ذخیره</button>
     </div>
   `);
@@ -2600,6 +2600,11 @@ function openPatientForm(patientId, prefill){
     else if(v && !isValidIranianNationalId(v)){ document.getElementById('pfDupWarning').textContent = '⚠ کد ملی معتبر به نظر نمی‌رسد.'; }
     else { document.getElementById('pfDupWarning').textContent = ''; }
   });
+}
+
+function cancelPatientFormEdit(){
+  sessionStorage.removeItem('dentyar_patient_edit_unlocked');
+  closeModal();
 }
 
 function savePatientForm(editingId){
