@@ -2446,6 +2446,18 @@ let patientSearchTerm = '';
 let openPatientId = null;
 let pendingPatientEditId = null;
 
+function finalizePatientRecord(id){
+  const patient=STATE.patients.find(x=>x.id===id);
+  if(!patient) return;
+  modalConfirm('نهایی‌سازی پرونده','پس از نهایی‌سازی، ویرایش مشخصات این پرونده فقط با رمز مدیر و از بخش «ویرایش نهایی» امکان‌پذیر خواهد بود. آیا پرونده را نهایی می‌کنید؟',()=>{
+    patient.isFinalized=true;
+    patient.finalizedAt=Date.now();
+    saveState();
+    toast('پرونده نهایی شد؛ ویرایش بعدی فقط با رمز مدیر امکان‌پذیر است.');
+    renderPatientFile(id);
+  });
+}
+
 function requestPatientEdit(id){
   const patient=STATE.patients.find(x=>x.id===id);
   if(!patient) return;
@@ -2745,6 +2757,7 @@ function renderPatientFile(id){
         <b>پرونده در مرحله تکمیل</b>
         <div style="font-size:12px">تا پیش از ثبت نهایی، ویرایش اطلاعات طبق دسترسی عادی امکان‌پذیر است.</div>
         <button class="btn btn-outline btn-block" style="margin-top:9px" onclick="requestPatientEdit('${p.id}')">ویرایش پرونده</button>
+        <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="finalizePatientRecord('${p.id}')">نهایی‌سازی پرونده</button>
       </div>`:`
       <div class="notice" style="margin-top:12px;line-height:1.9">
         <b>ویرایش نهایی پرونده — دسترسی محدود</b>
