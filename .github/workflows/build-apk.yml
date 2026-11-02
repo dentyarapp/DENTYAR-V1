@@ -538,7 +538,7 @@ jobs:
           from pathlib import Path
           report = Path(__import__("os").environ["RUNNER_TEMP"] + "/dentyar-apk-signature.txt").read_text()
           expected = "9DFF5F46570C491DE88AD86A669C6B823AF0D42ACF6BA17BAD33AF580BD92FB2"
-          found = re.findall(r"certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)", report, re.I)
+          found = re.findall(r"certificate SHA-256 digest:\s*([0-9a-fA-F:]+)", report, re.I)
           normalized = [re.sub(r"[^0-9a-f]", "", value).upper() for value in found]
           if expected not in normalized:
               raise SystemExit("APK signer certificate does not match the established DENTYAR release key")
