@@ -492,7 +492,7 @@ jobs:
                       // Keep all Android APK signature schemes enabled for broad installer compatibility.
                       v1SigningEnabled true
                       v2SigningEnabled true
-                      v3SigningEnabled true
+                      enableV3Signing true
                   }
               }
 
