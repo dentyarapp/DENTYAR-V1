@@ -1,11 +1,11 @@
-name: Deploy DENTYAR Firebase Relay
+name: Deploy DENTYAR V101 Firebase Relay
 
 # Deploy uses CLOUDFLARE_ACCOUNT_ID from the environment; do not pass unsupported --account-id CLI flag.
 on:
   workflow_dispatch:
   push:
     branches:
-      - fix/dentyar-v100-sync-transport-20261016
+      - build/v101-parallel-app-20261102
     paths:
       - "cloudflare/dentyar-sync-relay.js"
       - ".github/workflows/deploy-dentyar-relay.yml"
@@ -34,7 +34,7 @@ jobs:
         if: steps.credentials.outputs.ready == 'true'
         uses: actions/checkout@v4
         with:
-          ref: fix/dentyar-v100-sync-transport-20261016
+          ref: build/v101-parallel-app-20261102
 
       - name: Set up Node.js
         if: steps.credentials.outputs.ready == 'true'
