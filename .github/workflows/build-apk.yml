@@ -63,17 +63,17 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.dentyartest" --web-dir www
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V100-222 baseline package.
+          # Set an explicit Android version code/name for the V100-222 installed package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 71', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 223', s, count=1)
           s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
@@ -96,10 +96,10 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/parallelv101
+          mkdir -p android/app/src/main/java/com/dentyar/dentyartest
 
-          cat > android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.testapp;
+          cat > android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.dentyartest;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -330,7 +330,7 @@ jobs:
           find android/app/src/main/java -name MainActivity.java -delete
           mkdir -p android/app/src/main/java/com/dentyar/testapp
           cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
-          package com.dentyar.testapp;
+          package com.dentyar.dentyartest;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -377,7 +377,7 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
@@ -388,8 +388,8 @@ jobs:
           node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
-          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -551,7 +551,7 @@ jobs:
           if not match:
               raise SystemExit("Could not read APK package/version metadata")
           package, code, name = match.groups()
-          if (package, code, name) != ("com.dentyar.testapp", "71", "101.223.0"):
+          if (package, code, name) != ("com.dentyar.dentyartest", "223", "101.223.0"):
               raise SystemExit(f"Unexpected APK metadata: {package} {code} {name}")
           PY
           echo "APK archive, alignment, signing certificate, package ID and version metadata verified."
