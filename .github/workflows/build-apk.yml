@@ -21,6 +21,7 @@ on:
       - rebuild/v100-222-final-baseline-238
       - fix/v100-223-sync-records-teeth-20261025
       - build/v101-parallel-app-20261102
+      - fix/v101-sync-root-diagnostics-20261102
 
 jobs:
   build-apk:
