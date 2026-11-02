@@ -489,10 +489,9 @@ jobs:
                       storePassword System.getenv("DENTYAR_KEYSTORE_PASSWORD")
                       keyAlias System.getenv("DENTYAR_KEY_ALIAS")
                       keyPassword System.getenv("DENTYAR_KEY_PASSWORD")
-                      // Keep all Android APK signature schemes enabled for broad installer compatibility.
+                      // Keep the established V1/V2 signing settings; use Android Gradle Plugin defaults for newer schemes.
                       v1SigningEnabled true
                       v2SigningEnabled true
-                      enableV3Signing true
                   }
               }
 
@@ -555,7 +554,7 @@ jobs:
           if (package, code, name) != ("com.dentyar.testapp", "71", "101.223.0"):
               raise SystemExit(f"Unexpected APK metadata: {package} {code} {name}")
           PY
-          echo "APK archive, alignment, v1/v2/v3 signature, release certificate, package ID and version metadata verified."
+          echo "APK archive, alignment, signing certificate, package ID and version metadata verified."
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
