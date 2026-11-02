@@ -63,7 +63,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.parallelv101" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.testapp" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -73,8 +73,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 1', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0-parallel"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 71', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -99,7 +99,7 @@ jobs:
           mkdir -p android/app/src/main/java/com/dentyar/parallelv101
 
           cat > android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.parallelv101;
+          package com.dentyar.testapp;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -326,7 +326,7 @@ jobs:
       - name: ثبت Native Plugin
         run: |
           cat > android/app/src/main/java/com/dentyar/parallelv101/MainActivity.java <<'EOF'
-          package com.dentyar.parallelv101;
+          package com.dentyar.testapp;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -468,10 +468,10 @@ jobs:
             cp "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore" android/app/dentyar-release.keystore
           fi
           keytool -list -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release
-          # Refuse to publish an APK signed with any certificate other than the parallel V101 build.
+          # Refuse to publish an APK signed with the established DENTYAR release certificate.
           keytool -list -v -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release > "$RUNNER_TEMP/dentyar-signing/certificate.txt"
           if ! grep -qi 'SHA256: 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
-            echo "::error::Signing certificate mismatch. Expected the parallel V101 signing certificate SHA-256 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49. Build stopped to protect existing installations."
+            echo "::error::Signing certificate mismatch. Expected the established DENTYAR release certificate SHA-256 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2. Build stopped to protect existing installations."
             exit 1
           fi
           python - <<'PY'
