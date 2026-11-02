@@ -489,6 +489,10 @@ jobs:
                       storePassword System.getenv("DENTYAR_KEYSTORE_PASSWORD")
                       keyAlias System.getenv("DENTYAR_KEY_ALIAS")
                       keyPassword System.getenv("DENTYAR_KEY_PASSWORD")
+                      // Keep all Android APK signature schemes enabled for broad installer compatibility.
+                      v1SigningEnabled true
+                      v2SigningEnabled true
+                      v3SigningEnabled true
                   }
               }
 
@@ -519,7 +523,22 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223.apk
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223.apk
+          test -s DENTYAR-V101-223.apk
+          unzip -t DENTYAR-V101-223.apk >/dev/null
+          BUILD_TOOLS="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/zipalign"
+          "$BUILD_TOOLS/zipalign" -c -v 4 DENTYAR-V101-223.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs DENTYAR-V101-223.apk | tee "$RUNNER_TEMP/dentyar-apk-signature.txt"
+          grep -qi '9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' "$RUNNER_TEMP/dentyar-apk-signature.txt"
+          "$BUILD_TOOLS/apkanalyzer" manifest application-id DENTYAR-V101-223.apk | tee "$RUNNER_TEMP/dentyar-apk-package.txt"
+          grep -qx 'com.dentyar.testapp' "$RUNNER_TEMP/dentyar-apk-package.txt"
+          "$BUILD_TOOLS/apkanalyzer" manifest version-code DENTYAR-V101-223.apk | grep -qx '71'
+          "$BUILD_TOOLS/apkanalyzer" manifest version-name DENTYAR-V101-223.apk | grep -qx '101.223.0'
+          echo "APK archive, alignment, v1/v2/v3 signature, release certificate, package ID and version metadata verified."
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
