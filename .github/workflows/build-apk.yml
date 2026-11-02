@@ -543,10 +543,18 @@ jobs:
           if expected not in normalized:
               raise SystemExit("APK signer certificate does not match the established DENTYAR release key")
           PY
-          "$BUILD_TOOLS/apkanalyzer" manifest application-id DENTYAR-V101-223.apk | tee "$RUNNER_TEMP/dentyar-apk-package.txt"
-          grep -qx 'com.dentyar.testapp' "$RUNNER_TEMP/dentyar-apk-package.txt"
-          "$BUILD_TOOLS/apkanalyzer" manifest version-code DENTYAR-V101-223.apk | grep -qx '71'
-          "$BUILD_TOOLS/apkanalyzer" manifest version-name DENTYAR-V101-223.apk | grep -qx '101.223.0'
+          "$BUILD_TOOLS/aapt" dump badging DENTYAR-V101-223.apk | tee "$RUNNER_TEMP/dentyar-apk-manifest.txt"
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          report = Path(__import__("os").environ["RUNNER_TEMP"] + "/dentyar-apk-manifest.txt").read_text()
+          match = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']*)'", report, re.M)
+          if not match:
+              raise SystemExit("Could not read APK package/version metadata")
+          package, code, name = match.groups()
+          if (package, code, name) != ("com.dentyar.testapp", "71", "101.223.0"):
+              raise SystemExit(f"Unexpected APK metadata: {package} {code} {name}")
+          PY
           echo "APK archive, alignment, v1/v2/v3 signature, release certificate, package ID and version metadata verified."
 
       - name: بارگذاری APK
