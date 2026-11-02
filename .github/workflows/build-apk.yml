@@ -20,6 +20,7 @@ on:
       - fix/dentyar-v100-sync-transport-20261016
       - rebuild/v100-222-final-baseline-238
       - fix/v100-223-sync-records-teeth-20261025
+      - build/v101-parallel-app-20261102
 
 jobs:
   build-apk:
@@ -61,7 +62,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.dentyartest" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.parallelv101" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -71,8 +72,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 239', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 1', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0-parallel"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -94,10 +95,10 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/dentyartest
+          mkdir -p android/app/src/main/java/com/dentyar/parallelv101
 
-          cat > android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.dentyartest;
+          cat > android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.parallelv101;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -323,8 +324,8 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/dentyartest/MainActivity.java <<'EOF'
-          package com.dentyar.dentyartest;
+          cat > android/app/src/main/java/com/dentyar/parallelv101/MainActivity.java <<'EOF'
+          package com.dentyar.parallelv101;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -371,7 +372,7 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
@@ -382,8 +383,8 @@ jobs:
           node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
-          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/dentyartest/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -466,10 +467,10 @@ jobs:
             cp "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore" android/app/dentyar-release.keystore
           fi
           keytool -list -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release
-          # Refuse to publish an APK signed with any certificate other than the installed V100-222 baseline.
+          # Refuse to publish an APK signed with any certificate other than the parallel V101 build.
           keytool -list -v -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release > "$RUNNER_TEMP/dentyar-signing/certificate.txt"
-          if ! grep -qi 'SHA256: 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
-            echo "::error::Signing certificate mismatch. Expected the installed V100-222 certificate SHA-256 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49. Build stopped to protect existing installations."
+          if ! grep -qi 'SHA256: 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
+            echo "::error::Signing certificate mismatch. Expected the parallel V101 signing certificate SHA-256 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49. Build stopped to protect existing installations."
             exit 1
           fi
           python - <<'PY'
