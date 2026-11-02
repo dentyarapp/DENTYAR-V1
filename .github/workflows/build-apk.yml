@@ -325,7 +325,11 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/parallelv101/MainActivity.java <<'EOF'
+          # Capacitor creates a default MainActivity during cap add android.
+          # Replace that file instead of creating a second class with the same package/name.
+          find android/app/src/main/java -name MainActivity.java -delete
+          mkdir -p android/app/src/main/java/com/dentyar/testapp
+          cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
           package com.dentyar.testapp;
 
           import android.os.Bundle;
