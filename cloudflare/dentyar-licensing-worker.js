@@ -20,6 +20,28 @@ const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).re
 const json = (data, status=200) => new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
 const fail = (code, status=400) => json({ ok:false, error:code }, status);
 const now = () => Date.now();
+async function readJsonLimited(request, maxBytes=16384) {
+  const reader=request.body && request.body.getReader();
+  if(!reader) throw new Error("invalid-json");
+  const chunks=[];
+  let total=0;
+  while(true) {
+    const {done,value}=await reader.read();
+    if(done) break;
+    total+=value.byteLength;
+    if(total>maxBytes) {
+      try { await reader.cancel(); } catch {}
+      const error=new Error("request-too-large");
+      error.code="request-too-large";
+      throw error;
+    }
+    chunks.push(value);
+  }
+  const bytes=new Uint8Array(total);
+  let offset=0;
+  for(const chunk of chunks) { bytes.set(chunk,offset); offset+=chunk.byteLength; }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
 const randomHex = (n=24) => [...crypto.getRandomValues(new Uint8Array(n))].map(x=>x.toString(16).padStart(2,"0")).join("");
 async function digest(value) {
   return b64url(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
@@ -120,9 +142,9 @@ export default {
     if (request.method==="OPTIONS") return new Response(null,{status:204,headers:{ ...JSON_HEADERS, "access-control-allow-methods":"GET,POST,OPTIONS", "access-control-allow-headers":"authorization,content-type", "access-control-max-age":"600" }});
     if (url.pathname==="/health" && request.method==="GET") return json({ ok:true, service:"dentyar-licensing", version:1 });
     if (request.method!=="POST") return fail("method-not-allowed",405);
-    const declaredLength = Number(request.headers.get("content-length") || 0);
-    if (declaredLength > 16384) return fail("request-too-large",413);
-    let body; try { body=await request.json(); } catch { return fail("invalid-json"); }
+    let body;
+    try { body=await readJsonLimited(request,16384); }
+    catch (error) { return error && error.code==="request-too-large" ? fail("request-too-large",413) : fail("invalid-json"); }
     if (!body || typeof body !== "object" || Array.isArray(body)) return fail("invalid-request-body");
     if (url.pathname==="/v1/activation/request") {
       const clinicCode=String(body.clinicCode||"").trim().toUpperCase();
