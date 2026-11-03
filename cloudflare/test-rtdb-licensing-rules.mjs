@@ -34,6 +34,10 @@ try {
     role:"clinic-device",clinicCode,deviceId,licenseId:"another_license"
   }).database();
   await assertFails(get(ref(wrongLicense,"licenses/"+licenseId)));
+  const wrongDeviceLicense=env.authenticatedContext("dy_test_device",{
+    role:"clinic-device",clinicCode,deviceId:"other_device_123",licenseId
+  }).database();
+  await assertFails(get(ref(wrongDeviceLicense,"licenses/"+licenseId)));
 
   const unauthenticated=env.unauthenticatedContext().database();
   await assertFails(get(ref(unauthenticated,"clinics/"+clinicCode+"/records/meta")));
