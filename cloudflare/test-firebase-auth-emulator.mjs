@@ -21,7 +21,9 @@ const response=await fetch("http://127.0.0.1:9099/identitytoolkit.googleapis.com
 const result=await response.json();
 assert.equal(response.status,200,JSON.stringify(result));
 assert.ok(result.idToken,"Firebase Auth emulator must exchange the custom token for an ID token");
-assert.equal(result.localId,"dy_emulator-license-001");
+const idClaims=JSON.parse(Buffer.from(result.idToken.split(".")[1],"base64url").toString("utf8"));
+console.log("Auth emulator identity claims:",JSON.stringify({localId:result.localId,sub:idClaims.sub,user_id:idClaims.user_id,role:idClaims.role,claims:idClaims}));
+assert.equal(idClaims.sub||idClaims.user_id,"dy_emulator-license-001");
 const idTokenClaims=JSON.parse(Buffer.from(result.idToken.split(".")[1],"base64url").toString("utf8"));
 assert.equal(idTokenClaims.role,"clinic-device");
 assert.equal(idTokenClaims.licenseId,license.id);
