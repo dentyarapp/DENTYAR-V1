@@ -7,6 +7,7 @@ on:
     paths:
       - 'cloudflare/dentyar-licensing-worker.js'
       - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'cloudflare/licensing-panel/**'
       - 'wrangler.licensing.toml'
       - 'firebase-database.rules.template.json'
       - '.github/workflows/validate-licensing-worker.yml'
@@ -56,5 +57,8 @@ jobs:
           grep -q 'class RedemptionLock' cloudflare/dentyar-licensing-worker.js
           grep -q 'class ActivationRateLimiter' cloudflare/dentyar-licensing-worker.js
           grep -q 'ACTIVATION_LIMITS' cloudflare/dentyar-licensing-worker.js
+          grep -q 'env.ASSETS.fetch' cloudflare/dentyar-licensing-worker.js
+          grep -q 'binding = "ASSETS"' wrangler.licensing.toml
+          test -s cloudflare/licensing-panel/owner.html
           grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
           grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
