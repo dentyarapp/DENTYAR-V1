@@ -5652,11 +5652,15 @@ document.addEventListener('focus',e=>{
           await fa.signInWithCustomToken(auth,SYNC._licenseCustomToken);
           SYNC._licenseCustomToken=null;
         }else{
-          const email = String((credentials&&credentials.email)||cfg.accountEmail||'').trim();
-          const password = String((credentials&&credentials.password)||'');
-          if(!email || !password) throw new Error('برای اتصال دارای مجوز، کد فعال‌سازی لازم است؛ یا ورود حساب همگام‌سازی قبلی را انجام دهید.');
-          await fa.signInWithEmailAndPassword(auth,email,password);
+          throw new Error('برای اتصال این دستگاه، دریافت و ثبت مجوز اختصاصی دنت‌یار الزامی است.');
         }
+      }
+      const expectedDeviceId=ensureDeviceId();
+      const idTokenResult=await auth.currentUser.getIdTokenResult(true);
+      const claims=idTokenResult.claims||{};
+      if(claims.role!=='clinic-device' || !claims.licenseId || claims.clinicCode!==cfg.clinicCode || claims.deviceId!==expectedDeviceId){
+        await fa.signOut(auth);
+        throw new Error('مجوز این دستگاه معتبر نیست یا با کد مطب و شناسه دستگاه مطابقت ندارد. درخواست مجوز را دوباره ثبت کنید.');
       }
       connectStage='rtdb-transport'; SYNC.renderStatus&&SYNC.renderStatus();
       // Transport was configured directly after SDK import in loadSdk(), before initialization.
