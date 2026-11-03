@@ -69,12 +69,13 @@ async function verifyOwner(request, env) {
   return !!(user && user.emailVerified && String(user.email).toLowerCase()===String(env.OWNER_EMAIL).toLowerCase());
 }
 async function sendOwnerEmail(env, subject, body) {
-  if (!env.RESEND_API_KEY || !env.RESEND_FROM) return;
-  await fetch("https://api.resend.com/emails", {
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM) return false;
+  const response = await fetch("https://api.resend.com/emails", {
     method:"POST",
     headers:{ authorization:"Bearer "+env.RESEND_API_KEY, "content-type":"application/json" },
     body:JSON.stringify({ from:env.RESEND_FROM, to:[env.OWNER_EMAIL], subject, text:body })
   });
+  return response.ok;
 }
 async function makeCustomToken(env, license) {
   const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
@@ -116,8 +117,9 @@ export default {
       const item={ id:requestId, clinicCode, deviceId, deviceName, appVersion:String(body.appVersion||"").slice(0,40), status:"pending", createdAt:now() };
       await env.LICENSES.put("request:"+requestId,JSON.stringify(item),{expirationTtl:60*60*24*30});
       await env.LICENSES.put("request-index:"+requestId,requestId,{expirationTtl:60*60*24*30});
-      await sendOwnerEmail(env,"درخواست فعال‌سازی دنت‌یار", "درخواست جدید دستگاه دنت‌یار\nمطب: "+clinicCode+"\nدستگاه: "+deviceName+"\nشناسه درخواست: "+requestId+"\nبرای بررسی، پنل مالک را باز کنید.");
-      return json({ ok:true, requestId, status:"pending" },202);
+      let emailNotified=false;
+      try { emailNotified=await sendOwnerEmail(env,"درخواست فعال‌سازی دنت‌یار", "درخواست جدید دستگاه دنت‌یار\nمطب: "+clinicCode+"\nدستگاه: "+deviceName+"\nشناسه درخواست: "+requestId+"\nبرای بررسی، پنل مالک را باز کنید."); } catch (emailError) { console.error("Owner notification failed",emailError); }
+      return json({ ok:true, requestId, status:"pending", emailNotified },202);
     }
     if (url.pathname==="/v1/activation/redeem") return redeem(env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
