@@ -89,3 +89,12 @@ jobs:
           args=(--config wrangler.licensing.toml --var "OWNER_EMAIL:$OWNER_EMAIL" --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "FIREBASE_DATABASE_URL:$FIREBASE_DATABASE_URL" --var "FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY")
           if [ -n "$RESEND_FROM" ]; then args+=(--var "RESEND_FROM:$RESEND_FROM"); fi
           wrangler deploy "${args[@]}"
+
+      - name: Verify deployed API and owner panel
+        run: |
+          set -euo pipefail
+          HEALTH=$(curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/health)
+          echo "$HEALTH" | jq -e '.ok == true and .service == "dentyar-licensing"'
+          curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner | grep -q 'پنل مدیریت مالک دنت‌یار'
+          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X OPTIONS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/v1/activation/redeem)
+          test "$STATUS" = "204"
