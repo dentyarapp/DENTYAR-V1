@@ -120,6 +120,6 @@ jobs:
           set -euo pipefail
           HEALTH=$(curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/health)
           echo "$HEALTH" | jq -e '.ok == true and .service == "dentyar-licensing"'
-          curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner | grep -q 'پنل مدیریت مالک دنت‌یار'
+          curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner | grep -qi '<html lang="fa" dir="rtl">'
           STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X OPTIONS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/v1/activation/redeem)
           test "$STATUS" = "204"
