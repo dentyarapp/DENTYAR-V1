@@ -31,7 +31,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;
 <h2>ورود مالک</h2>
 <div class="grid"><div><label for="email">ایمیل مالک</label><input id="email" type="email" autocomplete="username" dir="ltr"></div>
 <div><label for="password">رمز عبور حساب Firebase</label><input id="password" type="password" autocomplete="current-password" dir="ltr"></div></div>
-<button id="loginBtn">ورود امن</button><button id="resetBtn" class="secondary" type="button">بازیابی رمز عبور</button><div id="loginStatus" class="status" role="status">برای ورود، از حساب مالک تأییدشده استفاده کنید.</div>
+<button id="loginBtn">ورود امن</button><button id="diagnoseBtn" class="secondary" type="button">آزمایش اتصال و تنظیمات</button><button id="resetBtn" class="secondary" type="button">بازیابی رمز عبور</button><div id="loginStatus" class="status" role="status">برای ورود، از حساب مالک تأییدشده استفاده کنید.</div>
 </section>
 <section id="dashboard" class="hidden">
 <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2>درخواست‌های فعال‌سازی</h2><div><button id="refreshBtn" class="secondary">به‌روزرسانی</button><button id="logoutBtn" class="danger">خروج</button></div></div>
@@ -58,6 +58,37 @@ async function refreshOwnerToken(){if(!refreshToken)throw new Error("نشست م
 async function ensureFreshToken(){if(!idToken)throw new Error("ابتدا وارد پنل مالک شوید.");if(!tokenExpiresAt||Date.now()>=tokenExpiresAt-300000)await refreshOwnerToken();}
 async function apiPost(path,body){await ensureFreshToken();const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+idToken},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||"درخواست ناموفق بود.");return d;}
 function makeTable(headers){const table=el("table"),thead=el("thead"),tr=el("tr");headers.forEach(h=>tr.append(el("th",h)));thead.append(tr);table.append(thead);table.append(el("tbody"));return table;}
+async function diagnoseConnection(){
+ const button=$("diagnoseBtn");button.disabled=true;
+ status("loginStatus","۱) بررسی اتصال اینترنت و پنل…");
+ const timeout=(ms)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error("مهلت پاسخ‌گویی تمام شد؛ اتصال ناپایدار یا مسدود است.")),ms));
+ const get=async(url)=>Promise.race([fetch(url,{cache:"no-store"}),timeout(12000)]);
+ try{
+  if(navigator.onLine===false)throw new Error("گوشی وضعیت آفلاین دارد؛ ابتدا اتصال اینترنت را برقرار کنید.");
+  const health=await get(API+"/health");
+  if(!health.ok)throw new Error("سرور پنل پاسخ سالم نداد؛ HTTP "+health.status);
+  const h=await health.json();
+  if(!h.ok||h.service!=="dentyar-licensing")throw new Error("پاسخ سلامت سرور معتبر نیست.");
+  status("loginStatus","۲) سرور پنل متصل است؛ بررسی تنظیمات Firebase…");
+  const response=await get(API+"/v1/owner/config");
+  if(!response.ok)throw new Error("دریافت تنظیمات Firebase از سرور ناموفق بود؛ HTTP "+response.status);
+  const cfg=await response.json();
+  if(cfg.projectId!=="dentyar-458d9")throw new Error("شناسه پروژه اشتباه است: "+String(cfg.projectId||"خالی"));
+  if(!cfg.apiKey)throw new Error("کلید عمومی Firebase به سرور پنل نرسیده است.");
+  status("loginStatus","۳) سرور و شناسه پروژه صحیح‌اند؛ آزمایش دسترسی به سرویس احراز هویت Firebase…");
+  const auth=await Promise.race([fetch("https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key="+encodeURIComponent(cfg.apiKey),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({identifier:$("email").value.trim()||"owner@example.com",continueUri:location.origin})}),timeout(15000)]);
+  let data={};try{data=await auth.json();}catch(_){}
+  if(!auth.ok){
+   const code=data&&data.error&&data.error.message?data.error.message:"HTTP_"+auth.status;
+   const map={"API_KEY_INVALID":"کلید Web API نامعتبر است یا Firebase آن را نمی‌پذیرد.","INVALID_API_KEY":"کلید Web API نامعتبر است.","OPERATION_NOT_ALLOWED":"روش ورود موردنیاز در Firebase فعال نیست.","PROJECT_NOT_FOUND":"پروژه Firebase با این کلید پیدا نشد."};
+   throw new Error("ارتباط با Google برقرار شد، اما آزمون Firebase رد شد: "+(map[code]||code)+" | HTTP "+auth.status);
+  }
+  const providers=Array.isArray(data.allProviders)?data.allProviders:[];
+  const passwordEnabled=providers.includes("password")||(Array.isArray(data.signinMethods)&&data.signinMethods.includes("password"));
+  status("loginStatus","آزمایش اتصال موفق بود: اینترنت، سرور پنل، دریافت تنظیمات و ارتباط با Firebase برقرار است. پروژه: "+cfg.projectId+(passwordEnabled?"؛ روش Email/Password در پاسخ Firebase موجود است.":"؛ پاسخ Firebase روش password را اعلام نکرد؛ تنظیمات Authentication باید بررسی شود.")+"\nاگر ورود هنوز INVALID_LOGIN_CREDENTIALS می‌دهد، علت به احتمال زیاد در حساب/اعتبارنامه یا تنظیمات همان پروژه است، نه قطع ارتباط.",!passwordEnabled);
+ }catch(e){status("loginStatus","آزمایش اتصال کامل نشد: "+(e.message||"خطای نامشخص") ,true);}
+ finally{button.disabled=false;}
+}
 async function resetPassword(){const button=$("resetBtn");button.disabled=true;try{if(!apiKey)await getConfig();const email=$("email").value.trim();if(!email)throw new Error("ابتدا نشانی ایمیل مالک را وارد کنید.");await firebasePost("accounts:sendOobCode",{requestType:"PASSWORD_RESET",email});status("loginStatus","اگر این ایمیل در Firebase ثبت شده باشد، پیام بازیابی رمز عبور برای آن ارسال می‌شود. صندوق ورودی و پوشه هرزنامه را بررسی کنید.");}catch(e){status("loginStatus",e.message||"ارسال پیام بازیابی انجام نشد.",true);}finally{button.disabled=false;}}
 async function login(){
  $("loginBtn").disabled=true;
@@ -121,7 +152,7 @@ async function refreshLicenses(){
 }
 async function refreshAll(){if(refreshInFlight)return;refreshInFlight=true;try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}finally{refreshInFlight=false;}}
 function logout(){idToken="";refreshToken="";tokenExpiresAt=0;ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
-$("loginBtn").addEventListener("click",login);$("resetBtn").addEventListener("click",resetPassword);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
+$("loginBtn").addEventListener("click",login);$("diagnoseBtn").addEventListener("click",diagnoseConnection);$("resetBtn").addEventListener("click",resetPassword);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
 $("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);
 getConfig().catch(e=>status("loginStatus",e.message,true));
 setInterval(()=>{if(idToken)refreshAll();},30000);
