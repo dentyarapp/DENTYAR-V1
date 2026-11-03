@@ -73,6 +73,43 @@ test("concurrent owner approvals reuse one license ID and one activation code", 
   assert.equal(records[0].licenseExpiresAt,records[1].licenseExpiresAt);
 });
 
+test("owner approval and rejection are mutually exclusive under concurrent requests", async () => {
+  const lock=new RedemptionLock(makeState());
+  const approve=()=>lock.fetch(new Request("https://redemption-lock/approve",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({licenseId:"a".repeat(32),activationCode:"A".repeat(16),expiryDays:365})
+  }));
+  const reject=()=>lock.fetch(new Request("https://redemption-lock/reject",{method:"POST"}));
+  const results=await Promise.all([approve(),reject()]);
+  assert.deepEqual(results.map(response=>response.status).sort(),[200,409]);
+});
+
+test("owner rejection is idempotent and permanently blocks later approval", async () => {
+  const lock=new RedemptionLock(makeState());
+  const reject=()=>lock.fetch(new Request("https://redemption-lock/reject",{method:"POST"}));
+  assert.equal((await reject()).status,200);
+  assert.equal((await reject()).status,200);
+  const approve=await lock.fetch(new Request("https://redemption-lock/approve",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({licenseId:"b".repeat(32),activationCode:"B".repeat(16),expiryDays:365})
+  }));
+  assert.equal(approve.status,409);
+});
+
+test("approval-code expiry preserves the approved license lock against later rejection", async () => {
+  const state=makeState();
+  const lock=new RedemptionLock(state);
+  await state.storage.put("approval",{
+    licenseId:"c".repeat(32),activationCode:"C".repeat(16),expiryDays:365,
+    licenseExpiresAt:Date.now()+86400000,expiresAt:0
+  });
+  await lock.alarm();
+  const approval=await state.storage.get("approval");
+  assert.equal(approval.licenseId,"c".repeat(32));
+  assert.equal(approval.activationCode,null);
+  assert.equal((await lock.fetch(new Request("https://redemption-lock/reject",{method:"POST"}))).status,409);
+});
+
 test("only POST /claim is accepted", async () => {
   const lock = new RedemptionLock(makeState());
   const response = await lock.fetch(new Request("https://redemption-lock/other", { method: "POST" }));
@@ -203,6 +240,15 @@ test("activation rate limiter allows five requests and blocks the sixth", async 
     responses.push(await limiter.fetch(new Request("https://activation-limit/check",{method:"POST"})));
   }
   assert.deepEqual(responses.map(response=>response.status),[200,200,200,200,200,429]);
+});
+
+test("activation rate limiter allows only five concurrent requests per window", async () => {
+  const limiter=new ActivationRateLimiter(makeState());
+  const responses=await Promise.all(Array.from({length:12},()=>limiter.fetch(
+    new Request("https://activation-limit/check",{method:"POST"})
+  )));
+  assert.equal(responses.filter(response=>response.status===200).length,5);
+  assert.equal(responses.filter(response=>response.status===429).length,7);
 });
 
 test("activation rate limiter rejects unsupported methods and paths", async () => {
