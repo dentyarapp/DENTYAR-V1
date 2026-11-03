@@ -128,7 +128,10 @@ async function redeem(env, body) {
   catch (error) { console.error("Custom token preparation failed",error); return fail("activation-temporarily-unavailable",503); }
   const lockId = env.REDEMPTION_LOCKS.idFromName(codeHash);
   const lock = env.REDEMPTION_LOCKS.get(lockId);
-  const claim = await lock.fetch("https://redemption-lock/claim", { method:"POST" });
+  const claim = await lock.fetch("https://redemption-lock/claim", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body:JSON.stringify({deviceId:license.deviceId})
+  });
   if (!claim.ok) return fail("invalid-or-used-code",401);
   license.redeemedAt = now();
   await env.LICENSES.put("license:"+id, JSON.stringify(license));
@@ -233,9 +236,14 @@ export class RedemptionLock {
   constructor(state) { this.state = state; }
   async fetch(request) {
     if (request.method !== "POST" || new URL(request.url).pathname !== "/claim") return new Response("not-found",{status:404});
+    let body;
+    try { body=await request.json(); } catch { return new Response("invalid-request",{status:400}); }
+    const deviceId=String(body.deviceId||"");
+    if(!/^[A-Za-z0-9_-]{12,100}$/.test(deviceId)) return new Response("invalid-device",{status:400});
     const claimed = await this.state.storage.transaction(async txn => {
-      if (await txn.get("used")) return false;
-      await txn.put("used", true);
+      const existing=await txn.get("claim");
+      if(existing) return existing.deviceId===deviceId;
+      await txn.put("claim",{deviceId,claimedAt:now()});
       return true;
     });
     return new Response(claimed ? "claimed" : "already-used", { status: claimed ? 200 : 409 });
