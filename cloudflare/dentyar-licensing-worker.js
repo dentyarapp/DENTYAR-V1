@@ -198,10 +198,20 @@ export default {
     if (url.pathname==="/v1/owner/approve") {
       const item=await env.LICENSES.get("request:"+String(body.requestId||""),"json");
       if (!item || item.status!=="pending") return fail("request-not-pending",404);
-      const id=randomHex(16), code=randomHex(8).toUpperCase();
       const requestedExpiry = body.expiryDays === undefined ? 365 : Number(body.expiryDays);
       if (!Number.isInteger(requestedExpiry) || requestedExpiry < 1 || requestedExpiry > 3650) return fail("invalid-expiry-days",400);
       const expiryDays = requestedExpiry;
+      // Claim an idempotent approval record before external writes. Parallel clicks and
+      // retries reuse the same license ID and activation code instead of minting duplicates.
+      const approvalLockId=env.REDEMPTION_LOCKS.idFromName("approval:"+item.id);
+      const approvalLock=env.REDEMPTION_LOCKS.get(approvalLockId);
+      const proposed={licenseId:randomHex(16),activationCode:randomHex(8).toUpperCase()};
+      const approvalResponse=await approvalLock.fetch("https://redemption-lock/approve",{
+        method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proposed)
+      });
+      if(!approvalResponse.ok) return fail("approval-lock-failed",503);
+      const approval=await approvalResponse.json();
+      const id=approval.licenseId, code=approval.activationCode;
       const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:now()+expiryDays*24*60*60*1000, requestId:item.id };
       await dbWrite(env,"licenses/"+id,{ status:"active", clinicCode:item.clinicCode, deviceId:item.deviceId, expiresAt:license.expiresAt });
       await env.LICENSES.put("license:"+id,JSON.stringify(license));
@@ -239,9 +249,25 @@ export default {
 export class RedemptionLock {
   constructor(state) { this.state = state; }
   async fetch(request) {
-    if (request.method !== "POST" || new URL(request.url).pathname !== "/claim") return new Response("not-found",{status:404});
+    if(request.method!=="POST") return new Response("not-found",{status:404});
+    const path=new URL(request.url).pathname;
     let body;
     try { body=await request.json(); } catch { return new Response("invalid-request",{status:400}); }
+    if(path==="/approve") {
+      const licenseId=String(body.licenseId||"");
+      const activationCode=String(body.activationCode||"");
+      if(!/^[a-f0-9]{32}$/.test(licenseId) || !/^[A-F0-9]{16}$/.test(activationCode)) return new Response("invalid-approval",{status:400});
+      const approval=await this.state.storage.transaction(async txn=>{
+        const existing=await txn.get("approval");
+        if(existing && existing.expiresAt>now()) return existing;
+        const next={licenseId,activationCode,expiresAt:now()+7*24*60*60*1000};
+        await txn.put("approval",next);
+        return next;
+      });
+      await this.state.storage.setAlarm(approval.expiresAt);
+      return new Response(JSON.stringify(approval),{status:200,headers:{"content-type":"application/json"}});
+    }
+    if(path!=="/claim") return new Response("not-found",{status:404});
     const deviceId=String(body.deviceId||"");
     if(!/^[A-Za-z0-9_-]{12,100}$/.test(deviceId)) return new Response("invalid-device",{status:400});
     const claimed = await this.state.storage.transaction(async txn => {
@@ -251,6 +277,10 @@ export class RedemptionLock {
       return true;
     });
     return new Response(claimed ? "claimed" : "already-used", { status: claimed ? 200 : 409 });
+  }
+  async alarm() {
+    const approval=await this.state.storage.get("approval");
+    if(approval && approval.expiresAt<=now()) await this.state.storage.delete("approval");
   }
 }
 
