@@ -98,11 +98,15 @@ async function redeem(env, body) {
   const license = await env.LICENSES.get("license:"+id, "json");
   if (!license || license.status!=="active" || license.deviceId!==body.deviceId || license.clinicCode!==body.clinicCode) return fail("license-not-active-for-this-device", 403);
   if (license.expiresAt && license.expiresAt<now()) return fail("license-expired", 403);
+  // Prepare the token before the irreversible one-time claim. A signing/configuration
+  // failure must not consume an otherwise valid activation code.
+  let customToken;
+  try { customToken = await makeCustomToken(env,license); }
+  catch (error) { console.error("Custom token preparation failed",error); return fail("activation-temporarily-unavailable",503); }
   const lockId = env.REDEMPTION_LOCKS.idFromName(codeHash);
   const lock = env.REDEMPTION_LOCKS.get(lockId);
   const claim = await lock.fetch("https://redemption-lock/claim", { method:"POST" });
   if (!claim.ok) return fail("invalid-or-used-code",401);
-  const customToken = await makeCustomToken(env,license);
   license.redeemedAt = now();
   await env.LICENSES.put("license:"+id, JSON.stringify(license));
   await env.LICENSES.delete("code:"+codeHash);
