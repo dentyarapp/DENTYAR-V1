@@ -9,7 +9,8 @@
  *   RESEND_API_KEY (optional; required for owner email notifications)
  *
  * Variables:
- *   OWNER_EMAIL = verified Firebase owner email
+ *   OWNER_EMAIL = primary verified Firebase owner email
+ *   OWNER_EMAILS = comma-separated verified owner email allowlist (primary + backup)
  *   FIREBASE_PROJECT_ID = dentyar-458d9
  *   FIREBASE_DATABASE_URL = https://dentyar-458d9-default-rtdb.firebaseio.com
  *   RESEND_FROM = verified sender, e.g. DENTYAR <licenses@your-verified-domain>
@@ -57,6 +58,12 @@ async function signJwt(payload, privateKeyPem) {
   return input+"."+b64url(signature);
 }
 let cachedAccess = null;
+function ownerEmails(env) {
+  const values=[env.OWNER_EMAIL, ...(String(env.OWNER_EMAILS||"").split(","))]
+    .map(value=>String(value||"").trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set(values)];
+}
 function databaseBase(env) {
   const projectId=String(env.FIREBASE_PROJECT_ID||"");
   const configured=String(env.FIREBASE_DATABASE_URL||"");
@@ -100,14 +107,14 @@ async function verifyOwner(request, env) {
   if (!response.ok) return false;
   const data = await response.json();
   const user = data.users && data.users[0];
-  return !!(user && user.emailVerified && !user.disabled && String(user.email).toLowerCase()===String(env.OWNER_EMAIL).toLowerCase());
+  return !!(user && user.emailVerified && !user.disabled && ownerEmails(env).includes(String(user.email||"").trim().toLowerCase()));
 }
 async function sendOwnerEmail(env, subject, body) {
   if (!env.RESEND_API_KEY || !env.RESEND_FROM) return false;
   const response = await fetch("https://api.resend.com/emails", {
     method:"POST",
     headers:{ authorization:"Bearer "+env.RESEND_API_KEY, "content-type":"application/json" },
-    body:JSON.stringify({ from:env.RESEND_FROM, to:[env.OWNER_EMAIL], subject, text:body })
+    body:JSON.stringify({ from:env.RESEND_FROM, to:ownerEmails(env), subject, text:body })
   });
   return response.ok;
 }
