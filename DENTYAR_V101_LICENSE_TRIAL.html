@@ -5889,7 +5889,7 @@ document.addEventListener('focus',e=>{
       if(!/^[A-Z0-9_-]{4,32}$/.test(cfg.clinicCode)){toast('کد مطب معتبر نیست.');return;}
       if(!cfg.deviceName){toast('نام این دستگاه را وارد کنید.');return;}
       if(!cfg.firebaseConfig.apiKey || !cfg.firebaseConfig.databaseURL || !cfg.firebaseConfig.appId){toast('ابتدا تنظیمات Firebase را کامل کنید.');return;}
-      if(cfg.firebaseConfig.projectId!=='dentyar-458d9' || cfg.firebaseConfig.databaseURL.replace(/\\/$/,'')!=='https://dentyar-458d9-default-rtdb.firebaseio.com'){toast('این مجوز فقط برای پروژه رسمی Firebase دنت‌یار صادر می‌شود.');return;}
+      if(cfg.firebaseConfig.projectId!=='dentyar-458d9' || cfg.firebaseConfig.databaseURL.replace(/\/$/,'')!=='https://dentyar-458d9-default-rtdb.firebaseio.com'){toast('این مجوز فقط برای پروژه رسمی Firebase دنت‌یار صادر می‌شود.');return;}
       cfg.clinicCode=cfg.clinicCode.toUpperCase();
       STATE.meta.sync=Object.assign({enabled:false,clinicCode:'',deviceName:'',firebaseConfig:null,lastSyncAt:null,pairedAt:null},cfg,{enabled:false});
       saveState();
@@ -5907,7 +5907,7 @@ document.addEventListener('focus',e=>{
       const code=String((document.getElementById('syncActivationCode')||{}).value||'').trim().toUpperCase();
       if(!/^[A-F0-9]{16}$/.test(code)){toast('کد فعال‌سازی باید ۱۶ نویسه انگلیسی معتبر باشد.');return;}
       if(!cfg.clinicCode || !cfg.deviceName || !cfg.firebaseConfig.apiKey || !cfg.firebaseConfig.databaseURL || !cfg.firebaseConfig.appId){toast('اطلاعات مطب، دستگاه و Firebase را کامل کنید.');return;}
-      if(cfg.firebaseConfig.projectId!=='dentyar-458d9' || cfg.firebaseConfig.databaseURL.replace(/\\/$/,'')!=='https://dentyar-458d9-default-rtdb.firebaseio.com'){toast('این مجوز فقط برای پروژه رسمی Firebase دنت‌یار صادر می‌شود.');return;}
+      if(cfg.firebaseConfig.projectId!=='dentyar-458d9' || cfg.firebaseConfig.databaseURL.replace(/\/$/,'')!=='https://dentyar-458d9-default-rtdb.firebaseio.com'){toast('این مجوز فقط برای پروژه رسمی Firebase دنت‌یار صادر می‌شود.');return;}
       cfg.clinicCode=cfg.clinicCode.toUpperCase();
       STATE.meta.sync=Object.assign({enabled:false,clinicCode:'',deviceName:'',firebaseConfig:null,lastSyncAt:null,pairedAt:null},cfg,{enabled:false,pairedAt:null});
       saveState();
