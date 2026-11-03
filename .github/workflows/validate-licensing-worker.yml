@@ -35,6 +35,33 @@ jobs:
             .github/workflows/build-licensing-trial-apk.yml
       - name: Syntax-check isolated Worker
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Syntax-check owner panel and verify safe DOM rendering
+        run: |
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.inside=False; self.current=[]; self.items=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower()=="script": self.inside=True; self.current=[]
+              def handle_endtag(self, tag):
+                  if tag.lower()=="script" and self.inside:
+                      self.items.append("".join(self.current)); self.inside=False
+              def handle_data(self, data):
+                  if self.inside: self.current.append(data)
+          html=Path("cloudflare/licensing-panel/owner.html").read_text(encoding="utf-8")
+          parser=Scripts(); parser.feed(html)
+          if len(parser.items)!=1 or not parser.items[0].strip():
+              raise SystemExit("Owner panel must contain exactly one inline application script")
+          Path("/tmp/dentyar-owner-panel.js").write_text(parser.items[0],encoding="utf-8")
+          if "Content-Security-Policy" not in html or "default-src 'self'" not in html:
+              raise SystemExit("Owner panel CSP is missing")
+          if "innerHTML" in parser.items[0] or "eval(" in parser.items[0]:
+              raise SystemExit("Unsafe dynamic HTML or eval found in owner panel")
+          print("Owner panel script extracted; CSP and safe DOM rendering checks passed.")
+          PY
+          node --check /tmp/dentyar-owner-panel.js
       - name: Test atomic redemption lock behavior
         run: node --test cloudflare/dentyar-licensing-worker.test.mjs
       - uses: actions/setup-java@v4
