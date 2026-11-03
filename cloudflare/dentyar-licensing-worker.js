@@ -57,7 +57,8 @@ async function verifyOwner(request, env) {
   const auth = request.headers.get("authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
   if (!match) return false;
-  const apiKey = String(env.FIREBASE_WEB_API_KEY || "");\n  if (!apiKey) return false;\n  const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+encodeURIComponent(apiKey), {
+  const apiKey = String(env.FIREBASE_WEB_API_KEY || "");
+  if (!apiKey) return false;\n  const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+encodeURIComponent(apiKey), {
     method:"POST", headers:{ "content-type":"application/json" },
     body:JSON.stringify({ idToken:match[1] })
   });
@@ -92,10 +93,11 @@ async function redeem(env, body) {
   const license = await env.LICENSES.get("license:"+id, "json");
   if (!license || license.status!=="active" || license.deviceId!==body.deviceId || license.clinicCode!==body.clinicCode) return fail("license-not-active-for-this-device", 403);
   if (license.expiresAt && license.expiresAt<now()) return fail("license-expired", 403);
-  await env.LICENSES.delete("code:"+codeHash);
+  const customToken = await makeCustomToken(env,license);
   license.redeemedAt = now();
   await env.LICENSES.put("license:"+id, JSON.stringify(license));
-  return json({ ok:true, customToken:await makeCustomToken(env,license), licenseId:id, expiresAt:license.expiresAt||null });
+  await env.LICENSES.delete("code:"+codeHash);
+  return json({ ok:true, customToken, licenseId:id, expiresAt:license.expiresAt||null });
 }
 export default {
   async fetch(request, env) {
@@ -139,12 +141,13 @@ export default {
       const item=await env.LICENSES.get("request:"+String(body.requestId||""),"json");
       if (!item || item.status!=="pending") return fail("request-not-pending",404);
       const id=randomHex(16), code=randomHex(8).toUpperCase();
-      const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:expiry, requestId:item.id };
+      const expiryDays = Math.min(3650, Math.max(1, Number(body.expiryDays || 365)));
+      const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:now()+expiryDays*24*60*60*1000, requestId:item.id };
+      await dbWrite(env,"licenses/"+id,{ status:"active", clinicCode:item.clinicCode, deviceId:item.deviceId, expiresAt:license.expiresAt });
       await env.LICENSES.put("license:"+id,JSON.stringify(license));
       await env.LICENSES.put("code:"+await digest(code),id,{expirationTtl:60*60*24*7});
       item.status="approved"; item.licenseId=id; item.reviewedAt=now();
       await env.LICENSES.put("request:"+item.id,JSON.stringify(item));
-      await dbWrite(env,"licenses/"+id,{ status:"active", clinicCode:item.clinicCode, deviceId:item.deviceId, expiresAt:license.expiresAt||0 });
       return json({ ok:true, licenseId:id, activationCode:code, deviceName:item.deviceName, clinicCode:item.clinicCode });
     }
     if (url.pathname==="/v1/owner/revoke") {
