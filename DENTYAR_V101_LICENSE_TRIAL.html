@@ -5498,7 +5498,13 @@ document.addEventListener('focus',e=>{
 
   function ensureDeviceId(){
     let id = localStorage.getItem('dentyar_device_id');
-    if(!id){ id='dev_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); localStorage.setItem('dentyar_device_id', id); }
+    if(!id){
+      if(!window.crypto || !window.crypto.getRandomValues) throw new Error('برای ساخت شناسه امن دستگاه، دنت‌یار باید در مرورگر به‌روز و از مسیر امن HTTPS اجرا شود.');
+      const bytes=new Uint8Array(24); window.crypto.getRandomValues(bytes);
+      id='dev_'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+      localStorage.setItem('dentyar_device_id',id);
+    }
+    if(!/^dev_[A-Fa-f0-9]{48}$/.test(id)) throw new Error('شناسه دستگاه معتبر نیست؛ لطفاً از بخش پشتیبانی راهنمایی بگیرید.');
     deviceId = id; return id;
   }
   function sensitiveKeys(){ return ['password','profilePassword','appAdminPassword','appAdminEnabled','appAdminHidden','sync','_syncUpdatedAt']; }
