@@ -239,3 +239,13 @@ test("owner panel contains syntactically valid JavaScript and Persian RTL layout
   assert.match(html,/accounts:signInWithPassword/);
   assert.match(html,/v1\/owner\/approve/);
 });
+
+test("isolated V101 app licensing integration script parses", async () => {
+  const html=await readFile(new URL("../../DENTYAR_V101_LICENSE_TRIAL.html",import.meta.url),"utf8");
+  const scripts=[...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/g)].map(match=>match[1]);
+  const target=scripts.find(script=>script.includes("LICENSE_API_URL"));
+  assert.ok(target,"licensing integration script exists");
+  assert.doesNotThrow(()=>new Script(target));
+  assert.match(target,/signInWithCustomToken/);
+  assert.match(target,/v1\\/activation\\/redeem/);
+});
