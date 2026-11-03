@@ -130,8 +130,14 @@ jobs:
           echo
           test "$OWNER_STATUS" = "200"
           grep -qi '<html' "$OWNER_BODY"
+          CONFIG=$(curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 -sS "$BASE/v1/owner/config")
+          echo "$CONFIG" | jq -e '.ok == true and .projectId == "dentyar-458d9" and (.apiKey | type == "string" and length > 0)'
+          INVALID_BODY=$(mktemp)
+          INVALID_STATUS=$(curl -sS -o "$INVALID_BODY" -w '%{http_code}' -H 'content-type: application/json' -X POST --data '{}' "$BASE/v1/activation/request")
+          echo "Invalid activation request HTTP status: $INVALID_STATUS"
+          test "$INVALID_STATUS" = "400"
           PREFLIGHT_BODY=$(mktemp)
-          STATUS=$(curl -sS -o "$PREFLIGHT_BODY" -w '%{http_code}' -X OPTIONS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/v1/activation/redeem)
+          STATUS=$(curl -sS -o "$PREFLIGHT_BODY" -w '%{http_code}' -X OPTIONS "$BASE/v1/activation/redeem")
           echo "CORS preflight HTTP status: $STATUS"
           test "$STATUS" = "204"
-          echo "API health, owner panel, and CORS preflight verified."
+          echo "API health, owner panel, Firebase public config, request validation, and CORS preflight verified."
