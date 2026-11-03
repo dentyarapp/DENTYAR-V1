@@ -522,9 +522,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s DENTYAR-V101-LICENSE-TRIAL.apk
-          apksigner verify --verbose --print-certs DENTYAR-V101-LICENSE-TRIAL.apk | tee /tmp/dentyar-apk-signature.txt
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs DENTYAR-V101-LICENSE-TRIAL.apk | tee /tmp/dentyar-apk-signature.txt
           grep -qi 'Signer #1 certificate SHA-256 digest: 9d:ff:5f:46:57:0c:49:1d:e8:8a:d8:6a:66:9c:6b:82:3a:f0:d4:2a:cf:6b:a1:7b:ad:33:af:58:0b:d9:2f:b2' /tmp/dentyar-apk-signature.txt
-          aapt dump badging DENTYAR-V101-LICENSE-TRIAL.apk | grep -F "package: name='com.dentyar.parallelv101' versionCode='2' versionName='101.224.0-license-trial'"
+          "$AAPT" dump badging DENTYAR-V101-LICENSE-TRIAL.apk | grep -F "package: name='com.dentyar.parallelv101' versionCode='2' versionName='101.224.0-license-trial'"
           test "$(stat -c%s DENTYAR-V101-LICENSE-TRIAL.apk)" -gt 1000000
 
       - name: بارگذاری APK
