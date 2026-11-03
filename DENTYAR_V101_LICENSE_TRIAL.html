@@ -5897,7 +5897,8 @@ document.addEventListener('focus',e=>{
   SYNC.requestLicense = async function(){
     try{
       const cfg=SYNC.readForm();
-      if(!cfg.clinicCode || !/^[A-Z0-9_-]{4,32}$/.test(cfg.clinicCode.toUpperCase())){toast('کد مطب معتبر نیست.');return;}
+      cfg.clinicCode=String(cfg.clinicCode||'').trim().toUpperCase();
+      if(!/^[A-Z0-9_-]{4,32}$/.test(cfg.clinicCode)){toast('کد مطب معتبر نیست.');return;}
       if(!cfg.deviceName){toast('نام این دستگاه را وارد کنید.');return;}
       if(!cfg.firebaseConfig.apiKey || !cfg.firebaseConfig.databaseURL || !cfg.firebaseConfig.appId){toast('ابتدا تنظیمات Firebase را کامل کنید.');return;}
       cfg.clinicCode=cfg.clinicCode.toUpperCase();
@@ -5918,18 +5919,21 @@ document.addEventListener('focus',e=>{
       if(!/^[A-F0-9]{16}$/.test(code)){toast('کد فعال‌سازی باید ۱۶ نویسه انگلیسی معتبر باشد.');return;}
       if(!cfg.clinicCode || !cfg.deviceName || !cfg.firebaseConfig.apiKey || !cfg.firebaseConfig.databaseURL || !cfg.firebaseConfig.appId){toast('اطلاعات مطب، دستگاه و Firebase را کامل کنید.');return;}
       cfg.clinicCode=cfg.clinicCode.toUpperCase();
-      STATE.meta.sync=Object.assign({enabled:false,clinicCode:'',deviceName:'',firebaseConfig:null,lastSyncAt:null,pairedAt:null},cfg,{enabled:true,pairedAt:Date.now()});
+      STATE.meta.sync=Object.assign({enabled:false,clinicCode:'',deviceName:'',firebaseConfig:null,lastSyncAt:null,pairedAt:null},cfg,{enabled:false,pairedAt:null});
       saveState();
       const id=ensureDeviceId();
       const response=await fetch(LICENSE_API_URL+'/v1/activation/redeem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code,clinicCode:cfg.clinicCode,deviceId:id})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'کد فعال‌سازی معتبر نیست یا قبلاً استفاده شده است.');
+      if(!data.customToken) throw new Error('پاسخ سرویس فعال‌سازی ناقص است؛ کد مصرف نشدنی نیست، دوباره تلاش کنید.');
+      STATE.meta.sync.enabled=true;STATE.meta.sync.pairedAt=Date.now();saveState();
       SYNC.disconnect();
       SYNC._licenseCustomToken=data.customToken;
       const codeField=document.getElementById('syncActivationCode');if(codeField)codeField.value='';
       await SYNC.connect({licenseCustomToken:data.customToken});
       renderSettings();
       if(SYNC.isReady()) toast('مجوز تأیید شد و اتصال دنت‌یار برقرار گردید.');
+      else toast('مجوز ثبت شد؛ وضعیت اتصال: '+SYNC.diagnosticText());
     }catch(error){toast(error.message||'فعال‌سازی مجوز انجام نشد.');}
   };
   SYNC.toggleOff = function(){
