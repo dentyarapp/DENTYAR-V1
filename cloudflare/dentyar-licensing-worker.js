@@ -128,7 +128,12 @@ async function makeCustomToken(env, license) {
     }
   }, sa.private_key);
 }
-async function redeem(env, body) {
+async function redeem(request, env, body) {
+  const clientIp=request.headers.get("cf-connecting-ip") || "unknown";
+  const limiterId=env.ACTIVATION_LIMITS.idFromName("redeem:"+clientIp);
+  const limiter=env.ACTIVATION_LIMITS.get(limiterId);
+  const rate=await limiter.fetch("https://activation-limit/check",{method:"POST"});
+  if (!rate.ok) return fail("activation-attempt-rate-limited",429);
   const normalizedCode = String(body.code||"").trim().toUpperCase();
   if (!/^[A-F0-9]{16}$/.test(normalizedCode)) return fail("invalid-or-used-code",401);
   if (!/^[A-Za-z0-9_-]{12,100}$/.test(String(body.deviceId||"")) || !/^[A-Z0-9_-]{4,32}$/.test(String(body.clinicCode||""))) return fail("invalid-request");
@@ -193,7 +198,7 @@ export default {
       try { emailNotified=await sendOwnerEmail(env,"درخواست فعال‌سازی دنت‌یار", "درخواست جدید دستگاه دنت‌یار\nمطب: "+clinicCode+"\nدستگاه: "+deviceName+"\nشناسه درخواست: "+requestId+"\nبرای بررسی، پنل مالک را باز کنید."); } catch (emailError) { console.error("Owner notification failed",emailError); }
       return json({ ok:true, requestId, status:"pending", emailNotified },202);
     }
-    if (url.pathname==="/v1/activation/redeem") return redeem(env,body);
+    if (url.pathname==="/v1/activation/redeem") return redeem(request,env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
     if (url.pathname==="/v1/owner/requests") {
       const keys=await env.LICENSES.list({prefix:"request:"});
