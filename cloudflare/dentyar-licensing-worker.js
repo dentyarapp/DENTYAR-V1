@@ -57,7 +57,7 @@ async function verifyOwner(request, env) {
   const auth = request.headers.get("authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
   if (!match) return false;
-  const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup", {
+  const apiKey = String(env.FIREBASE_WEB_API_KEY || "");\n  if (!apiKey) return false;\n  const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+encodeURIComponent(apiKey), {
     method:"POST", headers:{ "content-type":"application/json" },
     body:JSON.stringify({ idToken:match[1] })
   });
@@ -82,7 +82,7 @@ async function makeCustomToken(env, license) {
     aud:"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
     iat, exp:iat+3600,
     uid:"dy_"+license.id.slice(0,24),
-    claims:{ clinicCode:license.clinicCode, deviceId:license.deviceId, licenseId:license.id, role:"clinic-device" }
+    clinicCode:license.clinicCode, deviceId:license.deviceId, licenseId:license.id, role:"clinic-device"
   }, sa.private_key);
 }
 async function redeem(env, body) {
