@@ -48,7 +48,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;
 (function(){
 "use strict";
 const API=location.origin;
-let apiKey="",idToken="",ownerEmail="",emailNotificationsEnabled=false;
+let apiKey="",idToken="",ownerEmail="",emailNotificationsEnabled=false,refreshInFlight=false;
 const $=id=>document.getElementById(id);
 function status(id,message,error){const e=$(id);e.textContent=message;e.classList.toggle("error",!!error);}
 function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
@@ -116,11 +116,12 @@ async function refreshLicenses(){
  data.licenses.forEach(item=>{const tr=el("tr");[item.clinicCode,item.deviceName,item.status==="active"?"فعال":item.status==="revoked"?"لغوشده":item.status,new Date(item.expiresAt).toLocaleDateString("fa-IR"),item.id].forEach(v=>tr.append(el("td",v)));const td=el("td",undefined,"actions");if(item.status==="active"){const recover=el("button","بازیابی کد","secondary");recover.addEventListener("click",async()=>{recover.disabled=true;try{showCode(await apiPost("/v1/owner/activation-code",{licenseId:item.id}));status("dashboardStatus","کد فعال‌سازی بازیابی شد.");}catch(e){status("dashboardStatus",e.message,true);}finally{recover.disabled=false;}});const b=el("button","لغو مجوز","danger");b.addEventListener("click",async()=>{if(!confirm("مجوز این دستگاه لغو شود؟"))return;b.disabled=true;try{await apiPost("/v1/owner/revoke",{licenseId:item.id});status("dashboardStatus","مجوز لغو شد.");await refreshAll();}catch(e){status("dashboardStatus",e.message,true);b.disabled=false;}});td.append(recover,b);}else td.textContent="—";tr.append(td);body.append(tr);});
  host.append(table);
 }
-async function refreshAll(){try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}}
+async function refreshAll(){if(refreshInFlight)return;refreshInFlight=true;try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}finally{refreshInFlight=false;}}
 function logout(){idToken="";ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
 $("loginBtn").addEventListener("click",login);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
 $("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);
 getConfig().catch(e=>status("loginStatus",e.message,true));
+setInterval(()=>{if(idToken)refreshAll();},30000);
 })();
 </script>
 </body></html>
