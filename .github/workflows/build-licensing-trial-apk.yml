@@ -7,12 +7,6 @@ permissions:
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/dentyar-owner-licensing-20261103
-    paths:
-      - 'DENTYAR_V101_LICENSE_TRIAL.html'
-      - '.github/workflows/build-licensing-trial-apk.yml'
 
 jobs:
   build-apk:
