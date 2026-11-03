@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
-const { RedemptionLock } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
+const { RedemptionLock, ActivationRateLimiter } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
 
 function makeState() {
   const values = new Map();
@@ -66,6 +66,10 @@ function testEnv() {
     REDEMPTION_LOCKS: {
       idFromName(name) { return name; },
       get() { return {fetch: request => new RedemptionLock(lockState).fetch(request)}; }
+    },
+    ACTIVATION_LIMITS: {
+      idFromName(name) { return name; },
+      get() { return {fetch: request => new ActivationRateLimiter(lockState).fetch(request)}; }
     },
     _values: values
   };
@@ -155,4 +159,19 @@ test("owner approval rejects non-integer or out-of-range expiry before creating 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("activation rate limiter allows five requests and blocks the sixth", async () => {
+  const limiter = new ActivationRateLimiter(makeState());
+  const responses = [];
+  for (let i=0;i<6;i++) {
+    responses.push(await limiter.fetch(new Request("https://activation-limit/check",{method:"POST"})));
+  }
+  assert.deepEqual(responses.map(response=>response.status),[200,200,200,200,200,429]);
+});
+
+test("activation rate limiter rejects unsupported methods and paths", async () => {
+  const limiter = new ActivationRateLimiter(makeState());
+  const response = await limiter.fetch(new Request("https://activation-limit/other",{method:"GET"}));
+  assert.equal(response.status,404);
 });
