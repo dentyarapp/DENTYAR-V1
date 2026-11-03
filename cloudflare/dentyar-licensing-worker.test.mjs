@@ -107,7 +107,7 @@ test("activation request stores a pending request without requiring owner creden
 
 test("oversized activation requests are rejected before parsing", async () => {
   const response = await worker.fetch(new Request("https://license.test/v1/activation/request", {
-    method:"POST", headers:{"content-type":"application/json","content-length":"20000"}, body:"{}"
+    method:"POST", headers:{"content-type":"application/json"}, body:" ".repeat(16385)
   }), testEnv());
   assert.equal(response.status, 413);
 });
