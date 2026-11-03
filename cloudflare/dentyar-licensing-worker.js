@@ -208,7 +208,11 @@ export default {
       const approvalResponse=await approvalLock.fetch("https://redemption-lock/approve",{
         method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proposed)
       });
-      if(!approvalResponse.ok) return fail("approval-lock-failed",503);
+      if(!approvalResponse.ok) {
+        const lockError=await approvalResponse.text();
+        console.error("Owner approval lock rejected",approvalResponse.status,lockError);
+        return fail("approval-lock-failed",503);
+      }
       const approval=await approvalResponse.json();
       const id=approval.licenseId, code=approval.activationCode, expiryDays=approval.expiryDays;
       const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:approval.licenseExpiresAt, requestId:item.id };
