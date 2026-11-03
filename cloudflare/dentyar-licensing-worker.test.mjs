@@ -49,7 +49,7 @@ test("the bound device can safely retry redemption without opening access to ano
 test("concurrent owner approvals reuse one license ID and one activation code", async () => {
   const lock=new RedemptionLock(makeState());
   const approve=(licenseId,activationCode)=>lock.fetch(new Request("https://redemption-lock/approve",{
-    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({licenseId,activationCode})
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({licenseId,activationCode,expiryDays:licenseId.startsWith("a")?30:365})
   }));
   const results=await Promise.all([
     approve("a".repeat(32),"A".repeat(16)),
@@ -59,6 +59,7 @@ test("concurrent owner approvals reuse one license ID and one activation code", 
   const records=await Promise.all(results.map(response=>response.json()));
   assert.equal(records[0].licenseId,records[1].licenseId);
   assert.equal(records[0].activationCode,records[1].activationCode);
+  assert.equal(records[0].expiryDays,records[1].expiryDays);
 });
 
 test("only POST /claim is accepted", async () => {
