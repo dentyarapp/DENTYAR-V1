@@ -13,6 +13,8 @@ function makeState() {
     storage: {
       async get(key) { return values.get(key); },
       async put(key, value) { values.set(key, value); },
+      async delete(key) { values.delete(key); },
+      async setAlarm(timestamp) { values.set("__alarm",timestamp); },
       transaction(fn) {
         const run = tail.then(() => fn({
           get: async key => values.get(key),
@@ -42,6 +44,21 @@ test("the bound device can safely retry redemption without opening access to ano
   assert.equal((await claim("device_identifier_123")).status,200);
   assert.equal((await claim("device_identifier_123")).status,200);
   assert.equal((await claim("device_identifier_456")).status,409);
+});
+
+test("concurrent owner approvals reuse one license ID and one activation code", async () => {
+  const lock=new RedemptionLock(makeState());
+  const approve=(licenseId,activationCode)=>lock.fetch(new Request("https://redemption-lock/approve",{
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({licenseId,activationCode})
+  }));
+  const results=await Promise.all([
+    approve("a".repeat(32),"A".repeat(16)),
+    approve("b".repeat(32),"B".repeat(16))
+  ]);
+  assert.deepEqual(results.map(response=>response.status),[200,200]);
+  const records=await Promise.all(results.map(response=>response.json()));
+  assert.equal(records[0].licenseId,records[1].licenseId);
+  assert.equal(records[0].activationCode,records[1].activationCode);
 });
 
 test("only POST /claim is accepted", async () => {
