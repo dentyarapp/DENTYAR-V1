@@ -102,6 +102,18 @@ jobs:
           import android.os.Environment;
           import android.provider.MediaStore;
           import android.util.Base64;
+          import android.content.SharedPreferences;
+          import android.security.keystore.KeyGenParameterSpec;
+          import android.security.keystore.KeyProperties;
+
+          import javax.crypto.Cipher;
+          import javax.crypto.KeyGenerator;
+          import javax.crypto.SecretKey;
+          import javax.crypto.spec.GCMParameterSpec;
+          import java.nio.charset.StandardCharsets;
+          import java.security.Key;
+          import java.security.KeyStore;
+          import java.security.SecureRandom;
 
           import com.getcapacitor.JSObject;
           import com.getcapacitor.Plugin;
@@ -119,6 +131,71 @@ jobs:
 
           @CapacitorPlugin(name = "DentyarNative")
           public class DentyarNativePlugin extends Plugin {
+              private static final String DEVICE_KEY_ALIAS = "dentyar_device_identity_v1";
+              private static final String DEVICE_PREFS = "dentyar_secure_identity";
+
+              @PluginMethod
+              public void getOrCreateDeviceId(PluginCall call) {
+                  try {
+                      String id = loadOrCreateSecureDeviceId();
+                      JSObject result = new JSObject();
+                      result.put("deviceId", id);
+                      call.resolve(result);
+                  } catch (Exception e) {
+                      call.reject("Secure Android device identity is unavailable: " + e.getMessage(), e);
+                  }
+              }
+
+              private String loadOrCreateSecureDeviceId() throws Exception {
+                  SharedPreferences prefs = getContext().getSharedPreferences(DEVICE_PREFS, android.content.Context.MODE_PRIVATE);
+                  String ivText = prefs.getString("device_iv", null);
+                  String encryptedText = prefs.getString("device_ciphertext", null);
+                  if (ivText != null && encryptedText != null) {
+                      byte[] iv = Base64.decode(ivText, Base64.NO_WRAP);
+                      byte[] encrypted = Base64.decode(encryptedText, Base64.NO_WRAP);
+                      Cipher decrypt = Cipher.getInstance("AES/GCM/NoPadding");
+                      decrypt.init(Cipher.DECRYPT_MODE, getOrCreateDeviceKey(), new GCMParameterSpec(128, iv));
+                      String existing = new String(decrypt.doFinal(encrypted), StandardCharsets.UTF_8);
+                      if (!existing.matches("dev_[A-Fa-f0-9]{48}")) throw new Exception("stored device identity is invalid");
+                      return existing;
+                  }
+
+                  byte[] random = new byte[24];
+                  new SecureRandom().nextBytes(random);
+                  StringBuilder hex = new StringBuilder("dev_");
+                  for (byte value : random) hex.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+                  String id = hex.toString();
+
+                  Cipher encrypt = Cipher.getInstance("AES/GCM/NoPadding");
+                  encrypt.init(Cipher.ENCRYPT_MODE, getOrCreateDeviceKey());
+                  byte[] encrypted = encrypt.doFinal(id.getBytes(StandardCharsets.UTF_8));
+                  boolean saved = prefs.edit()
+                      .putString("device_iv", Base64.encodeToString(encrypt.getIV(), Base64.NO_WRAP))
+                      .putString("device_ciphertext", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                      .commit();
+                  if (!saved) throw new Exception("could not persist encrypted device identity");
+                  return id;
+              }
+
+              private SecretKey getOrCreateDeviceKey() throws Exception {
+                  KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+                  keyStore.load(null);
+                  Key existing = keyStore.getKey(DEVICE_KEY_ALIAS, null);
+                  if (existing instanceof SecretKey) return (SecretKey) existing;
+
+                  KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+                  KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
+                      DEVICE_KEY_ALIAS,
+                      KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
+                  )
+                      .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                      .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                      .setKeySize(256)
+                      .setRandomizedEncryptionRequired(true)
+                      .build();
+                  generator.init(spec);
+                  return generator.generateKey();
+              }
 
               @PluginMethod
               public void saveToDownloads(PluginCall call) {
@@ -365,6 +442,9 @@ jobs:
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "getOrCreateDeviceId" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "AndroidKeyStore" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "AES/GCM/NoPadding" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
