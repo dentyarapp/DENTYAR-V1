@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://identitytoolkit.googleapis.com; img-src 'self' data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; img-src 'self' data:">
 <title>پنل مالک دنت‌یار</title>
 <style>
 :root{font-family:Tahoma,Arial,sans-serif;color:#18343b;background:#f3f7f8;font-synthesis:none}
@@ -48,13 +48,15 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;
 (function(){
 "use strict";
 const API=location.origin;
-let apiKey="",idToken="",ownerEmail="",emailNotificationsEnabled=false,refreshInFlight=false;
+let apiKey="",idToken="",refreshToken="",tokenExpiresAt=0,ownerEmail="",emailNotificationsEnabled=false,refreshInFlight=false;
 const $=id=>document.getElementById(id);
 function status(id,message,error){const e=$(id);e.textContent=message;e.classList.toggle("error",!!error);}
 function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
 async function getConfig(){const r=await fetch(API+"/v1/owner/config",{cache:"no-store"});if(!r.ok)throw new Error("تنظیمات ورود دریافت نشد.");const d=await r.json();if(!d.apiKey)throw new Error("کلید عمومی Firebase تنظیم نشده است.");apiKey=d.apiKey;emailNotificationsEnabled=!!d.emailNotificationsEnabled;}
 async function firebasePost(path,body){const r=await fetch("https://identitytoolkit.googleapis.com/v1/"+path+"?key="+encodeURIComponent(apiKey),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error&&d.error.message?d.error.message:"ورود به Firebase ناموفق بود.");return d;}
-async function apiPost(path,body){const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+idToken},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||"درخواست ناموفق بود.");return d;}
+async function refreshOwnerToken(){if(!refreshToken)throw new Error("نشست مالک پایان یافته است؛ دوباره وارد شوید.");const r=await fetch("https://securetoken.googleapis.com/v1/token?key="+encodeURIComponent(apiKey),{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"refresh_token",refresh_token:refreshToken})});const d=await r.json();if(!r.ok||!d.id_token){idToken="";refreshToken="";tokenExpiresAt=0;throw new Error("نشست مالک پایان یافته است؛ دوباره وارد شوید.");}idToken=d.id_token;refreshToken=d.refresh_token||refreshToken;tokenExpiresAt=Date.now()+Number(d.expires_in||3600)*1000;}
+async function ensureFreshToken(){if(!idToken)throw new Error("ابتدا وارد پنل مالک شوید.");if(!tokenExpiresAt||Date.now()>=tokenExpiresAt-300000)await refreshOwnerToken();}
+async function apiPost(path,body){await ensureFreshToken();const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+idToken},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||"درخواست ناموفق بود.");return d;}
 function makeTable(headers){const table=el("table"),thead=el("thead"),tr=el("tr");headers.forEach(h=>tr.append(el("th",h)));thead.append(tr);table.append(thead);table.append(el("tbody"));return table;}
 async function login(){
  $("loginBtn").disabled=true;
@@ -67,7 +69,7 @@ async function login(){
   const profile=await firebasePost("accounts:lookup",{idToken:auth.idToken});
   const user=profile.users&&profile.users[0];
   if(!user||!user.emailVerified)throw new Error("ابتدا ایمیل حساب مالک باید تأیید شده باشد.");
-  idToken=auth.idToken;ownerEmail=user.email||email;
+  idToken=auth.idToken;refreshToken=auth.refreshToken||"";tokenExpiresAt=Date.now()+Number(auth.expiresIn||3600)*1000;ownerEmail=user.email||email;
   $("password").value="";$("login").classList.add("hidden");$("dashboard").classList.remove("hidden");
   status("dashboardStatus","ورود موفق: "+ownerEmail+(emailNotificationsEnabled?"":"\nهشدار: ارسال خودکار ایمیل فعال نیست؛ کلید Resend و نشانی فرستنده باید پیکربندی شود."),!emailNotificationsEnabled);
   await refreshAll();
@@ -117,7 +119,7 @@ async function refreshLicenses(){
  host.append(table);
 }
 async function refreshAll(){if(refreshInFlight)return;refreshInFlight=true;try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}finally{refreshInFlight=false;}}
-function logout(){idToken="";ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
+function logout(){idToken="";refreshToken="";tokenExpiresAt=0;ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
 $("loginBtn").addEventListener("click",login);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
 $("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);
 getConfig().catch(e=>status("loginStatus",e.message,true));
