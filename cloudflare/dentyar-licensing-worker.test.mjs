@@ -354,10 +354,10 @@ test("license revocation retries safely and persists database denial before KV s
       body:JSON.stringify({licenseId})
     }),env);
     const first=await revoke();
-    assert.equal(first.status,503);
+    assert.equal(first.status,503,JSON.stringify(await first.clone().json()));
     assert.equal(JSON.parse(env._values.get("license:"+licenseId)).status,"active");
     const second=await revoke();
-    assert.equal(second.status,200);
+    assert.equal(second.status,200,JSON.stringify(await second.clone().json()));
     assert.equal(JSON.parse(env._values.get("license:"+licenseId)).status,"revoked");
     assert.deepEqual(sequence,["database","database","kv"]);
   } finally {
