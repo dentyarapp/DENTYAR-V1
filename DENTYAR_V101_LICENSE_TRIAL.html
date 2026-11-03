@@ -5897,7 +5897,7 @@ document.addEventListener('focus',e=>{
       const response=await fetch(LICENSE_API_URL+'/v1/activation/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({clinicCode:cfg.clinicCode,deviceId:id,deviceName:cfg.deviceName,appVersion:'101-license-trial'})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'ثبت درخواست فعال‌سازی ناموفق بود.');
-      toast('درخواست فعال‌سازی ثبت شد. شناسه پیگیری: '+data.requestId);
+      toast('درخواست فعال‌سازی ثبت شد. '+(data.emailNotified?'اطلاع مالک از طریق ایمیل ارسال شد.':'مالک باید درخواست را در پنل مدیریت بررسی کند.')+' شناسه پیگیری: '+data.requestId);
       renderSettings();
     }catch(error){toast(error.message||'خطا در ثبت درخواست فعال‌سازی.');}
   };
