@@ -176,3 +176,14 @@ test("activation rate limiter rejects unsupported methods and paths", async () =
   const response = await limiter.fetch(new Request("https://activation-limit/other",{method:"GET"}));
   assert.equal(response.status,404);
 });
+
+test("unexpected storage failures return a safe service-unavailable response", async () => {
+  const env = testEnv();
+  env.LICENSES.put = async () => { throw new Error("private-storage-detail"); };
+  const response = await worker.fetch(new Request("https://license.test/v1/activation/request", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"CLINIC_01",deviceId:"device_identifier_123",deviceName:"Test phone"})
+  }), env);
+  assert.equal(response.status,503);
+  assert.deepEqual(await response.json(),{ok:false,error:"service-unavailable"});
+});
