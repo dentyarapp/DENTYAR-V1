@@ -62,7 +62,7 @@ function databaseBase(env) {
   const configured=String(env.FIREBASE_DATABASE_URL||"");
   if(!/^[a-z0-9-]{4,40}$/.test(projectId)) throw new Error("firebase-project-id-invalid");
   const url=new URL(configured);
-  if(url.protocol!=="https:" || url.hostname!==projectId+"-default-rtdb.firebaseio.com" || url.username || url.password || url.search || url.hash || (url.pathname!=="/" && url.pathname!=="")) {
+  if(url.protocol!=="https:" || url.hostname!==projectId+"-default-rtdb.firebaseio.com" || url.username || url.password || url.port || url.search || url.hash || (url.pathname!=="/" && url.pathname!=="")) {
     throw new Error("firebase-database-url-mismatch");
   }
   return url.origin;
