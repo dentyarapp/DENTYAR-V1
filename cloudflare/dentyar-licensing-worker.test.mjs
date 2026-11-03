@@ -4,7 +4,7 @@ import { createHash, generateKeyPairSync, verify as verifySignature } from "node
 import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
-const { RedemptionLock, ActivationRateLimiter } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
+const { RedemptionLock, ActivationRateLimiter, randomActivationCode, isActivationCode } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
 
 function makeState() {
   const values = new Map();
@@ -594,7 +594,7 @@ test("owner can reissue an expired activation code without creating a second lic
     const result=await response.json();
     assert.equal(result.licenseId,licenseId);
     assert.equal(result.reissued,true);
-    assert.match(result.activationCode,/^[A-F0-9]{16}$/);
+    assert.match(result.activationCode,/^[A-Z0-9]{16}$/);
     const approval=await state.storage.get("approval");
     assert.equal(approval.licenseId,licenseId);
     assert.equal(approval.activationCode,result.activationCode);
@@ -706,4 +706,16 @@ test("Resend rejection is reported as no notification without losing activation 
     assert.equal(result.emailNotified,false);
     assert.equal([...env._values.keys()].filter(key=>key.startsWith("request:")).length,1);
   }finally{globalThis.fetch=originalFetch;}
+});
+
+
+test("activation codes are exactly 16 uppercase English letters or digits", () => {
+  assert.equal(isActivationCode("A1B2C3D4E5F6G7H8"), true);
+  assert.equal(isActivationCode("0123456789ABCDEF"), true);
+  assert.equal(isActivationCode("A1B2C3D4E5F6G7"), false);
+  assert.equal(isActivationCode("A1B2C3D4E5F6G7H89"), false);
+  assert.equal(isActivationCode("a1B2C3D4E5F6G7H8"), false);
+  assert.equal(isActivationCode("۱۲۳۴۵۶۷۸۹۰ABCDEF"), false);
+  assert.equal(isActivationCode("A1B2-C3D4E5F6G7H"), false);
+  for (let i=0;i<100;i++) assert.match(randomActivationCode(), /^[A-Z0-9]{16}$/);
 });
