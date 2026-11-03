@@ -242,12 +242,10 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
   assert.equal(payload.role,undefined);
 });
 
-test("owner panel is served from the configured static asset binding", async () => {
-  const env=testEnv();
-  env.ASSETS={fetch:async request=>new Response(new URL(request.url).pathname,{status:200})};
-  const response=await worker.fetch(new Request("https://license.test/owner"),env);
-  assert.equal(response.status,200);
-  assert.equal(await response.text(),"/owner.html");
+test("owner route redirects to the directly served static panel asset", async () => {
+  const response=await worker.fetch(new Request("https://license.test/owner"),testEnv());
+  assert.equal(response.status,302);
+  assert.equal(response.headers.get("location"),"https://license.test/owner.html");
 });
 
 test("owner login receives only the public Firebase client configuration", async () => {
