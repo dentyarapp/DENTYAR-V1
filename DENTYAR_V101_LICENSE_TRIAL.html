@@ -5573,13 +5573,9 @@ document.addEventListener('focus',e=>{
   // Keep credentials in memory only for retries during this app session; never save passwords in STATE/localStorage.
   SYNC._sessionCredentials = SYNC._sessionCredentials || null;
   SYNC._licenseCustomToken = SYNC._licenseCustomToken || null;
-  SYNC.connect = async function(credentials){
+  SYNC.connect = async function(){
     const cfg = SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig){ return; }
-    if(credentials && credentials.email && credentials.password){
-      SYNC._sessionCredentials = { email:String(credentials.email).trim(), password:String(credentials.password) };
-    }
-    credentials = credentials || SYNC._sessionCredentials;
     if(started && connected) return;
     if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
     try{
@@ -5929,7 +5925,6 @@ document.addEventListener('focus',e=>{
     }catch(error){toast(error.message||'فعال‌سازی مجوز انجام نشد.');}
   };
   SYNC.toggleOff = function(){
-    SYNC._sessionCredentials = null;
     if(STATE.meta.sync) STATE.meta.sync.enabled = false; saveState();
     SYNC.disconnect(); toast('همگام‌سازی قطع شد (داده‌های محلی نگه‌دری شد)'); renderSettings();
   };
