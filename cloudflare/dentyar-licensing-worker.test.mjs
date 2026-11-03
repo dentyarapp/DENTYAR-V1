@@ -203,7 +203,7 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
     clinicCode:"CLINIC_01",
     deviceId:"device_identifier_123"
   });
-  assert.match(token,/^[^.]+\\.[^.]+\\.[^.]+$/);
+  assert.match(token,/^[^.]+\.[^.]+\.[^.]+$/);
   const payload = JSON.parse(Buffer.from(token.split(".")[1],"base64url").toString("utf8"));
   assert.equal(payload.uid,"dy_license-test-001");
   assert.equal(payload.licenseId,"license-test-001");
