@@ -122,15 +122,17 @@ jobs:
           curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 --fail-with-body -sS "$BASE/health" -o /tmp/health.json || { echo "Health endpoint transport failed"; exit 1; }
           cat /tmp/health.json
           jq -e '.ok == true and .service == "dentyar-licensing"' /tmp/health.json
+          OWNER_REDIRECT=$(curl -sS -o /dev/null -w '%{http_code}' https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner)
           OWNER_BODY=$(mktemp)
-          OWNER_STATUS=$(curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 -L --compressed -sS -o "$OWNER_BODY" -w '%{http_code}' "$BASE/owner") || { echo "Owner panel transport failed"; cat "$OWNER_BODY"; exit 1; }
-          echo "Owner panel HTTP status: $OWNER_STATUS"
+          OWNER_STATUS=$(curl -sS -o "$OWNER_BODY" -w '%{http_code}' https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner.html)
+          echo "Owner route redirect: $OWNER_REDIRECT; static panel HTTP status: $OWNER_STATUS"
           head -c 180 "$OWNER_BODY" || true
           echo
+          test "$OWNER_REDIRECT" = "302"
           test "$OWNER_STATUS" = "200"
           grep -qi '<html' "$OWNER_BODY"
           PREFLIGHT_BODY=$(mktemp)
-          STATUS=$(curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 -sS -o "$PREFLIGHT_BODY" -w '%{http_code}' -X OPTIONS "$BASE/v1/activation/redeem") || { echo "CORS preflight transport failed"; cat "$PREFLIGHT_BODY"; exit 1; }
+          STATUS=$(curl -sS -o "$PREFLIGHT_BODY" -w '%{http_code}' -X OPTIONS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/v1/activation/redeem)
           echo "CORS preflight HTTP status: $STATUS"
           test "$STATUS" = "204"
           echo "API health, owner panel, and CORS preflight verified."
