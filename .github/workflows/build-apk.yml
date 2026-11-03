@@ -11,9 +11,12 @@ on:
   pull_request:
     branches:
       - main
+      - fix/v101-sync-root-diagnostics-20261102
   push:
     branches:
       - main
+      - fix/dentyar-signing-cert-guard-20261103
+      - fix/v101-sync-root-diagnostics-20261102
       - fix/v59-safe-numeric-serial-20261009
       - test/dentyar-comprehensive-fixes-20261009
       - fix/dentyar-sync-auth-session-20261015
@@ -472,12 +475,19 @@ jobs:
             cp "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore" android/app/dentyar-release.keystore
           fi
           keytool -list -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release
-          # Refuse to publish an APK signed with the established DENTYAR release certificate.
+          # Require the established DENTYAR release certificate before building an update APK.
           keytool -list -v -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release > "$RUNNER_TEMP/dentyar-signing/certificate.txt"
-          if ! grep -qi 'SHA256: 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
-            echo "::error::Signing certificate mismatch. Expected the established DENTYAR release certificate SHA-256 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49. Build stopped to protect existing installations."
-            exit 1
-          fi
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          report = Path(__import__('os').environ['RUNNER_TEMP'] + '/dentyar-signing/certificate.txt').read_text()
+          expected = '5B1285D7588A40B5E4F38115847080E2E74E1F451A1F2DAA19E32AB795BCAD49'
+          found = re.findall(r'SHA-?256\\)?\\s*:\\s*([0-9A-Fa-f:]{64,})', report, re.I)
+          normalized = [re.sub(r'[^0-9A-Fa-f]', '', value).upper() for value in found]
+          if expected not in normalized:
+              raise SystemExit('Signing certificate mismatch: expected the original DENTYAR release certificate. Build stopped to protect existing installations.')
+          print('Original DENTYAR release certificate confirmed.')
+          PY
           python - <<'PY'
           from pathlib import Path
           p = Path("android/app/build.gradle")
@@ -536,7 +546,7 @@ jobs:
           import re
           from pathlib import Path
           report = Path(__import__("os").environ["RUNNER_TEMP"] + "/dentyar-apk-signature.txt").read_text()
-          expected = "9DFF5F46570C491DE88AD86A669C6B823AF0D42ACF6BA17BAD33AF580BD92FB2"
+          expected = "5B1285D7588A40B5E4F38115847080E2E74E1F451A1F2DAA19E32AB795BCAD49"
           found = re.findall(r"certificate SHA-256 digest:\s*([0-9a-fA-F:]+)", report, re.I)
           normalized = [re.sub(r"[^0-9a-f]", "", value).upper() for value in found]
           if expected not in normalized:
@@ -551,7 +561,7 @@ jobs:
           if not match:
               raise SystemExit("Could not read APK package/version metadata")
           package, code, name = match.groups()
-          if (package, code, name) != ("com.dentyar.dentyartest", "223", "101.224.0"):
+          if (package, code, name) != ("com.dentyar.dentyartest", "224", "101.224.0"):
               raise SystemExit(f"Unexpected APK metadata: {package} {code} {name}")
           PY
           echo "APK archive, alignment, signing certificate, package ID and version metadata verified."
