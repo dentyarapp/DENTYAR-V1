@@ -270,6 +270,9 @@ test("owner panel contains syntactically valid JavaScript and Persian RTL layout
   assert.ok(match,"owner panel script exists");
   assert.doesNotThrow(()=>new Script(match[1]));
   assert.match(html,/accounts:signInWithPassword/);
+  assert.match(html,/securetoken\.googleapis\.com/);
+  assert.match(html,/refreshOwnerToken/);
+  assert.match(html,/tokenExpiresAt/);
   assert.match(html,/v1\/owner\/approve/);
 });
 
