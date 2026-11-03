@@ -16,10 +16,7 @@ function makeState() {
       async delete(key) { values.delete(key); },
       async setAlarm(timestamp) { values.set("__alarm",timestamp); },
       transaction(fn) {
-        const run = tail.then(() => fn({
-          get: async key => values.get(key),
-          put: async (key, value) => values.set(key, value)
-        }));
+        const run = tail.then(() => fn());
         tail = run.catch(() => {});
         return run;
       }
