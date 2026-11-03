@@ -41,6 +41,7 @@ Email notifications are enabled only when both Resend settings exist. The API an
 ## Security and compatibility notes
 
 - The production V101 branch, existing Worker deployment, and production RTDB rules are left untouched by this feature branch.
+- The licensing trial APK uses Android version code 2. Any final APK intended to update a device that installed this trial must use version code 3 or higher and the same verified DENTYAR signing certificate.
 - Activation codes are device-bound. Same-device retries are allowed to recover from a lost response; another device is rejected.
 - RTDB is the authorization source for clinic data. Revocation updates RTDB before the local license record.
 - On Android APK, the random installation ID is encrypted with AES-GCM under a non-exportable Android Keystore key; copying browser preferences alone does not clone it. A restored backup without the original Keystore key generates a new ID and needs a new license. In PWA/browser mode, the fallback ID is stored in localStorage and can be cloned by copying browser storage; it is not hardware attestation.
