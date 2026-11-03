@@ -472,3 +472,14 @@ test("activation redemption supports same-device retries and blocks cross-device
   const retry=await worker.fetch(makeRequest(),env);
   assert.equal(retry.status,200);
 });
+
+test("activation redemption enforces per-IP attempt limits before checking codes", async () => {
+  const env=testEnv();
+  env.ACTIVATION_LIMITS.get=()=>({fetch:async()=>new Response("rate-limited",{status:429})});
+  const response=await worker.fetch(new Request("https://license.test/v1/activation/redeem",{
+    method:"POST",headers:{"content-type":"application/json","cf-connecting-ip":"203.0.113.9"},
+    body:JSON.stringify({code:"A1B2C3D4E5F60718",clinicCode:"CLINIC_01",deviceId:"device_identifier_123"})
+  }),env);
+  assert.equal(response.status,429);
+  assert.equal((await response.json()).error,"activation-attempt-rate-limited");
+});
