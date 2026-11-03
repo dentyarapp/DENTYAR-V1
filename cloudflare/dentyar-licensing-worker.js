@@ -253,3 +253,5 @@ export class ActivationRateLimiter {
     return new Response(allowed?"allowed":"rate-limited",{status:allowed?200:429});
   }
 }
+
+export { digest };
