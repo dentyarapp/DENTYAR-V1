@@ -597,7 +597,7 @@ jobs:
           test -x "$AAPT"
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-trial-apk-cert.txt
-          grep -qi 'Signer #1 certificate SHA-256 digest: 9d:ff:5f:46:57:0c:49:1d:e8:8a:d8:6a:66:9c:6b:82:3a:f0:d4:2a:cf:6b:a1:7b:ad:33:af:58:0b:d9:2f:b2' /tmp/dentyar-trial-apk-cert.txt
+          grep -qi 'V2 Signer: certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-trial-apk-cert.txt
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
