@@ -33,6 +33,11 @@ jobs:
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
       - name: Test atomic redemption lock behavior
         run: node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - name: Validate Wrangler configuration and Durable Object migrations
+        run: |
+          npm install --global wrangler@4
+          sed -i 's/REPLACE_WITH_NEW_KV_NAMESPACE_ID/00000000000000000000000000000000/' wrangler.licensing.toml
+          wrangler deploy --dry-run --outdir /tmp/dentyar-licensing-dry-run --config wrangler.licensing.toml
       - name: Verify required endpoints and secret boundaries
         run: |
           set -euo pipefail
