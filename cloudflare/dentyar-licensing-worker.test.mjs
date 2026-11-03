@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, verify as verifySignature } from "node:crypto";
 import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
@@ -212,7 +212,7 @@ test("unexpected storage failures return a safe service-unavailable response", a
 });
 
 test("custom-token signing produces a Firebase-compatible three-part JWT", async () => {
-  const { privateKey } = generateKeyPairSync("rsa", {modulusLength:2048});
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {modulusLength:2048});
   const privatePem = privateKey.export({type:"pkcs8",format:"pem"}).toString();
   const token = await workerModule.makeCustomToken({
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({
@@ -226,7 +226,12 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
     deviceId:"device_identifier_123"
   });
   assert.match(token,/^[^.]+\.[^.]+\.[^.]+$/);
-  const payload = JSON.parse(Buffer.from(token.split(".")[1],"base64url").toString("utf8"));
+  const [headerPart,payloadPart,signaturePart]=token.split(".");
+  assert.equal(verifySignature("RSA-SHA256",Buffer.from(headerPart+"."+payloadPart),publicKey,Buffer.from(signaturePart,"base64url")),true);
+  const header=JSON.parse(Buffer.from(headerPart,"base64url").toString("utf8"));
+  const payload = JSON.parse(Buffer.from(payloadPart,"base64url").toString("utf8"));
+  assert.equal(header.alg,"RS256");
+  assert.equal(payload.aud,"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit");
   assert.equal(payload.uid,"dy_license-test-001");
   assert.equal(payload.licenseId,"license-test-001");
   assert.equal(payload.role,"clinic-device");
