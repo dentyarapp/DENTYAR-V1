@@ -231,7 +231,7 @@ test("owner login receives only the public Firebase client configuration", async
 });
 
 test("owner panel contains syntactically valid JavaScript and Persian RTL layout", async () => {
-  const html=await readFile(new URL("../licensing-panel/owner.html",import.meta.url),"utf8");
+  const html=await readFile(new URL("./licensing-panel/owner.html",import.meta.url),"utf8");
   assert.match(html,/<html lang="fa" dir="rtl">/);
   const match=html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(match,"owner panel script exists");
