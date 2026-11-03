@@ -120,7 +120,12 @@ async function makeCustomToken(env, license) {
     aud:"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
     iat, exp:iat+3600,
     uid:"dy_"+license.id.slice(0,24),
-    clinicCode:license.clinicCode, deviceId:license.deviceId, licenseId:license.id, role:"clinic-device"
+    claims:{
+      clinicCode:license.clinicCode,
+      deviceId:license.deviceId,
+      licenseId:license.id,
+      role:"clinic-device"
+    }
   }, sa.private_key);
 }
 async function redeem(env, body) {
