@@ -426,3 +426,36 @@ test("redemption lock exposes no approval details after expiry", async () => {
   const response=await lock.fetch(new Request("https://redemption-lock/approval"));
   assert.equal(response.status,404);
 });
+
+test("activation redemption issues a signed Firebase token once and blocks replay", async () => {
+  const env=testEnv();
+  const code="A1B2C3D4E5F60718";
+  const licenseId="c".repeat(32);
+  const deviceId="device_identifier_123";
+  const clinicCode="CLINIC_01";
+  const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  env.FIREBASE_PROJECT_ID="dentyar-458d9";
+  env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({
+    client_email:"firebase-adminsdk@example.test",
+    private_key:privateKey.export({type:"pkcs8",format:"pem"}).toString(),
+    project_id:"dentyar-458d9"
+  });
+  const codeHash=await workerModule.digest(code);
+  env._values.set("code:"+codeHash,licenseId);
+  env._values.set("license:"+licenseId,JSON.stringify({
+    id:licenseId,clinicCode,deviceId,status:"active",expiresAt:Date.now()+86400000
+  }));
+  const makeRequest=()=>new Request("https://license.test/v1/activation/redeem",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({code,clinicCode,deviceId})
+  });
+  const responses=await Promise.all([worker.fetch(makeRequest(),env),worker.fetch(makeRequest(),env)]);
+  assert.deepEqual(responses.map(response=>response.status).sort(),[200,401]);
+  const success=responses.find(response=>response.status===200);
+  const data=await success.json();
+  assert.equal(data.ok,true);
+  assert.equal(data.licenseId,licenseId);
+  assert.match(data.customToken,/^[^.]+\.[^.]+\.[^.]+$/);
+  const saved=JSON.parse(env._values.get("license:"+licenseId));
+  assert.ok(saved.redeemedAt);
+});
