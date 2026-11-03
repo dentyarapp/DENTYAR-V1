@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "licenses": {
+      "$licenseId": {
+        ".read": "auth != null && auth.token.licenseId === $licenseId",
+        ".write": false
+      }
+    },
+    "clinics": {
+      "$clinicCode": {
+        ".read": "auth != null && auth.token.role === 'clinic-device' && auth.token.clinicCode === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('status').val() === 'active' && root.child('licenses').child(auth.token.licenseId).child('deviceId').val() === auth.token.deviceId && (!root.child('licenses').child(auth.token.licenseId).child('expiresAt').exists() || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() === 0 || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() > now)",
+        ".write": "auth != null && auth.token.role === 'clinic-device' && auth.token.clinicCode === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('status').val() === 'active' && root.child('licenses').child(auth.token.licenseId).child('deviceId').val() === auth.token.deviceId && (!root.child('licenses').child(auth.token.licenseId).child('expiresAt').exists() || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() === 0 || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() > now)"
+      }
+    }
+  }
+}
