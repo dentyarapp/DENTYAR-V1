@@ -256,7 +256,7 @@ test("owner login receives only the public Firebase client configuration", async
   env.FIREBASE_PROJECT_ID="demo-dentyar";
   const response=await worker.fetch(new Request("https://license.test/v1/owner/config"),env);
   assert.equal(response.status,200);
-  assert.deepEqual(await response.json(),{ok:true,apiKey:"public-client-key",projectId:"demo-dentyar"});
+  assert.deepEqual(await response.json(),{ok:true,apiKey:"public-client-key",projectId:"demo-dentyar",emailNotificationsEnabled:false});
 });
 
 test("owner panel contains syntactically valid JavaScript and Persian RTL layout", async () => {
