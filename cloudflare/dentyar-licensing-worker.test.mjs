@@ -273,6 +273,8 @@ test("isolated V101 app licensing integration script parses", async () => {
   assert.doesNotThrow(()=>new Script(target));
   assert.match(target,/signInWithCustomToken/);
   assert.match(target,/v1\/activation\/redeem/);
+  assert.match(target,/crypto\.getRandomValues/);
+  assert.match(target,/dev_\[A-Fa-f0-9\]\{48\}/);
 });
 
 test("owner approval API is idempotent when two owner sessions approve together", async () => {
