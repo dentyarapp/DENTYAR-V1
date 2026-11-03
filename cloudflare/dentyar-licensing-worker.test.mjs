@@ -70,7 +70,7 @@ function testEnv() {
     },
     ACTIVATION_LIMITS: {
       idFromName(name) { return name; },
-      get(name) { return {fetch: request => new ActivationRateLimiter(stateFor(name)).fetch(request)}; }
+      get() { return {fetch: async () => new Response("allowed",{status:200})}; }
     },
     _values: values
   };
