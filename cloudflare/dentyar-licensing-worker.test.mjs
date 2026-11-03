@@ -433,7 +433,7 @@ test("redemption lock exposes no approval details after expiry", async () => {
   assert.equal(response.status,404);
 });
 
-test("activation redemption issues a signed Firebase token once and blocks replay", async () => {
+test("activation redemption supports same-device retries and blocks cross-device replay", async () => {
   const env=testEnv();
   const code="A1B2C3D4E5F60718";
   const licenseId="c".repeat(32);
