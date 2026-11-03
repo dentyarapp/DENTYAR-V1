@@ -502,10 +502,27 @@ jobs:
         if: ${{ steps.signing.outputs.available == 'true' }}
         run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-224-LICENSE-TRIAL.apk
 
+      - name: بررسی امضا، شناسه برنامه و نسخه APK
+        run: |
+          set -euo pipefail
+          APK=DENTYAR-V101-224-LICENSE-TRIAL.apk
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          BADGING=$("$AAPT" dump badging "$APK" | head -n1)
+          echo "$BADGING"
+          echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
+          echo "$BADGING" | grep -F "versionCode='2'"
+          echo "$BADGING" | grep -F "versionName='101.224.0-license-trial'"
+          sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V101-224-LICENSE-TRIAL-APK
-          path: DENTYAR-V101-224-LICENSE-TRIAL.apk
+          path: |
+            DENTYAR-V101-224-LICENSE-TRIAL.apk
+            DENTYAR-V101-224-LICENSE-TRIAL.apk.sha256
           if-no-files-found: error
 
