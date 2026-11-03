@@ -120,6 +120,7 @@ test("activation request stores a pending request without requiring owner creden
   const data = await response.json();
   assert.equal(response.status, 202);
   assert.equal(data.status, "pending");
+  assert.equal(data.emailNotified,false);
   assert.ok(data.requestId);
   assert.equal(env._values.get("request:"+data.requestId) !== undefined, true);
 });
@@ -482,4 +483,48 @@ test("activation redemption enforces per-IP attempt limits before checking codes
   }),env);
   assert.equal(response.status,429);
   assert.equal((await response.json()).error,"activation-attempt-rate-limited");
+});
+
+test("activation request reports email notification only after Resend accepts it", async () => {
+  const env=testEnv();
+  env.RESEND_API_KEY="test-resend-key";
+  env.RESEND_FROM="DENTYAR <licenses@example.test>";
+  env.OWNER_EMAIL="owner@example.test";
+  const originalFetch=globalThis.fetch;
+  let captured=null;
+  globalThis.fetch=async (input,init)=>{
+    captured={url:String(input),headers:init.headers,body:JSON.parse(init.body)};
+    return new Response(JSON.stringify({id:"email-test-001"}),{status:200,headers:{"content-type":"application/json"}});
+  };
+  try{
+    const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({clinicCode:"CLINIC_01",deviceId:"device_identifier_123",deviceName:"Test phone",appVersion:"101"})
+    }),env);
+    const result=await response.json();
+    assert.equal(response.status,202);
+    assert.equal(result.emailNotified,true);
+    assert.equal(captured.url,"https://api.resend.com/emails");
+    assert.equal(captured.body.to[0],"owner@example.test");
+    assert.match(captured.body.text,/CLINIC_01/);
+  }finally{globalThis.fetch=originalFetch;}
+});
+
+test("Resend rejection is reported as no notification without losing activation request", async () => {
+  const env=testEnv();
+  env.RESEND_API_KEY="test-resend-key";
+  env.RESEND_FROM="DENTYAR <licenses@example.test>";
+  env.OWNER_EMAIL="owner@example.test";
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response("rejected",{status:403});
+  try{
+    const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({clinicCode:"CLINIC_01",deviceId:"device_identifier_456",deviceName:"Test tablet",appVersion:"101"})
+    }),env);
+    const result=await response.json();
+    assert.equal(response.status,202);
+    assert.equal(result.emailNotified,false);
+    assert.equal([...env._values.keys()].filter(key=>key.startsWith("request:")).length,1);
+  }finally{globalThis.fetch=originalFetch;}
 });
