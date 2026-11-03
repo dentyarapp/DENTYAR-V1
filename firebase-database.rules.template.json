@@ -2,7 +2,7 @@
   "rules": {
     "licenses": {
       "$licenseId": {
-        ".read": "auth != null && auth.token.licenseId === $licenseId",
+        ".read": "auth != null && auth.token.role === 'clinic-device' && auth.token.licenseId === $licenseId && auth.token.deviceId === root.child('licenses').child($licenseId).child('deviceId').val()",
         ".write": false
       }
     },
