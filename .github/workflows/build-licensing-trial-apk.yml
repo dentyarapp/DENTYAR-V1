@@ -31,10 +31,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.223.0",
+            "version": "101.224.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-223"
+              "build": "echo DENTYAR V101-224 LICENSE TRIAL"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
