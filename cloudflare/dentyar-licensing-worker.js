@@ -82,7 +82,7 @@ async function googleAccess(env) {
 }
 async function dbWrite(env, path, value) {
   const token = await googleAccess(env);
-  const base = (env.FIREBASE_DATABASE_URL || "").replace(/\/$/,"");
+  const base = databaseBase(env);
   const url = base+"/"+path.replace(/^\//,"")+".json";
   const response = await fetch(url, { method:"PUT", headers:{ authorization:"Bearer "+token, "content-type":"application/json" }, body:JSON.stringify(value) });
   if (!response.ok) throw new Error("firebase-admin-db-write-failed");
