@@ -234,7 +234,7 @@ test("verified backup owner email is accepted by the owner allowlist", async () 
   }),{status:200,headers:{"content-type":"application/json"}});
   try {
     const response=await worker.fetch(new Request("https://license.test/v1/owner/requests",{
-      method:"GET",headers:{authorization:"Bearer backup-owner-id-token"}
+      method:"POST",headers:{"content-type":"application/json",authorization:"Bearer backup-owner-id-token"},body:"{}"
     }),env);
     assert.equal(response.status,200);
   } finally {
@@ -253,7 +253,7 @@ test("unlisted verified email cannot access owner administration", async () => {
   }),{status:200,headers:{"content-type":"application/json"}});
   try {
     const response=await worker.fetch(new Request("https://license.test/v1/owner/requests",{
-      method:"GET",headers:{authorization:"Bearer outsider-id-token"}
+      method:"POST",headers:{"content-type":"application/json",authorization:"Bearer outsider-id-token"},body:"{}"
     }),env);
     assert.equal(response.status,403);
   } finally {
