@@ -5918,7 +5918,7 @@ document.addEventListener('focus',e=>{
       SYNC.disconnect();
       SYNC._licenseCustomToken=data.customToken;
       const codeField=document.getElementById('syncActivationCode');if(codeField)codeField.value='';
-      await SYNC.connect({licenseCustomToken:data.customToken});
+      await SYNC.connect();
       renderSettings();
       if(SYNC.isReady()) toast('مجوز تأیید شد و اتصال دنت‌یار برقرار گردید.');
       else toast('مجوز ثبت شد؛ وضعیت اتصال: '+SYNC.diagnosticText());
