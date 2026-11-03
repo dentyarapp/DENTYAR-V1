@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://identitytoolkit.googleapis.com; img-src 'self' data:">
+<title>پنل مالک دنت‌یار</title>
+<style>
+:root{font-family:Tahoma,Arial,sans-serif;color:#18343b;background:#f3f7f8;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;padding:24px 14px 50px}.wrap{max-width:960px;margin:auto}
+header{background:linear-gradient(125deg,#0f766e,#164e63);color:#fff;border-radius:18px;padding:22px 24px;margin-bottom:18px;box-shadow:0 12px 30px #164e6322}
+h1{font-size:22px;margin:0 0 8px}header p{margin:0;color:#d8f1ed;font-size:13px;line-height:1.9}
+.card{background:#fff;border:1px solid #dce7e9;border-radius:15px;padding:18px;margin:14px 0;box-shadow:0 5px 18px #193b4410}
+h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+label{display:block;font-size:12px;color:#52676d;margin:8px 0 6px}
+input{width:100%;padding:12px;border:1px solid #cbd9dc;border-radius:9px;font:inherit;font-size:14px;background:#fff;color:#18343b}
+button{border:0;border-radius:9px;padding:11px 16px;background:#0f766e;color:#fff;font:inherit;font-size:13px;cursor:pointer;margin:6px 4px 0 0}
+button.secondary{background:#e8f1f2;color:#17434a}button.danger{background:#a43c3c}
+button:disabled{opacity:.55;cursor:wait}.muted{font-size:12px;color:#6c7d82;line-height:1.8}
+.status{padding:10px 12px;border-radius:9px;background:#eef5f6;color:#28535a;font-size:13px;margin-top:12px;white-space:pre-wrap}
+.status.error{background:#fff0ef;color:#9a302b}.hidden{display:none!important}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;padding:11px 8px;border-bottom:1px solid #e7edef;vertical-align:middle}th{color:#587077;font-weight:600;background:#f8fbfb}
+.actions{white-space:nowrap}.code{direction:ltr;text-align:center;font:700 20px monospace;letter-spacing:2px;padding:14px;background:#f1f7f6;border:1px dashed #75a9a2;border-radius:10px;user-select:all}
+@media(max-width:600px){body{padding:12px 8px 35px}.card{padding:14px;overflow-x:auto}header{padding:18px}h1{font-size:19px}table{min-width:650px}}
+</style>
+</head>
+<body><main class="wrap">
+<header><h1>پنل مدیریت مالک دنت‌یار</h1><p>بررسی درخواست‌های فعال‌سازی، صدور کد اختصاصی دستگاه و مدیریت مجوزها</p></header>
+<section id="login" class="card">
+<h2>ورود مالک</h2>
+<div class="grid"><div><label for="email">ایمیل مالک</label><input id="email" type="email" autocomplete="username" dir="ltr"></div>
+<div><label for="password">رمز عبور حساب Firebase</label><input id="password" type="password" autocomplete="current-password" dir="ltr"></div></div>
+<button id="loginBtn">ورود امن</button><div id="loginStatus" class="status" role="status">برای ورود، از حساب مالک تأییدشده استفاده کنید.</div>
+</section>
+<section id="dashboard" class="hidden">
+<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2>درخواست‌های فعال‌سازی</h2><div><button id="refreshBtn" class="secondary">به‌روزرسانی</button><button id="logoutBtn" class="danger">خروج</button></div></div>
+<p class="muted">با تأیید هر درخواست، کد فعال‌سازی یک‌بارمصرف و مخصوص همان دستگاه صادر می‌شود.</p>
+<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div><label for="expiry">مدت مجوز (روز)</label><input id="expiry" type="number" min="1" max="3650" value="365" style="max-width:150px"></div></div>
+<div id="requests" class="muted">در حال دریافت درخواست‌ها…</div>
+</div>
+<div class="card"><h2>مجوزهای صادرشده</h2><div id="licenses" class="muted">برای نمایش، به‌روزرسانی را بزنید.</div></div>
+<div class="card"><h2>کد صادرشده</h2><div id="issued" class="muted">پس از تأیید درخواست، کد فعال‌سازی در این قسمت نمایش داده می‌شود.</div></div>
+<div id="dashboardStatus" class="status" role="status"></div>
+</section>
+</main>
+<script>
+(function(){
+"use strict";
+const API=location.origin;
+let apiKey="",idToken="",ownerEmail="";
+const $=id=>document.getElementById(id);
+function status(id,message,error){const e=$(id);e.textContent=message;e.classList.toggle("error",!!error);}
+function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
+async function getConfig(){const r=await fetch(API+"/v1/owner/config",{cache:"no-store"});if(!r.ok)throw new Error("تنظیمات ورود دریافت نشد.");const d=await r.json();if(!d.apiKey)throw new Error("کلید عمومی Firebase تنظیم نشده است.");apiKey=d.apiKey;}
+async function firebasePost(path,body){const r=await fetch("https://identitytoolkit.googleapis.com/v1/"+path+"?key="+encodeURIComponent(apiKey),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error&&d.error.message?d.error.message:"ورود به Firebase ناموفق بود.");return d;}
+async function apiPost(path,body){const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+idToken},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||"درخواست ناموفق بود.");return d;}
+function makeTable(headers){const table=el("table"),thead=el("thead"),tr=el("tr");headers.forEach(h=>tr.append(el("th",h)));thead.append(tr);table.append(thead);table.append(el("tbody"));return table;}
+async function login(){
+ $("loginBtn").disabled=true;
+ try{
+  status("loginStatus","در حال بررسی حساب مالک…");
+  if(!apiKey)await getConfig();
+  const email=$("email").value.trim(),password=$("password").value;
+  if(!email||!password)throw new Error("ایمیل و رمز عبور را وارد کنید.");
+  const auth=await firebasePost("accounts:signInWithPassword",{email,password,returnSecureToken:true});
+  const profile=await firebasePost("accounts:lookup",{idToken:auth.idToken});
+  const user=profile.users&&profile.users[0];
+  if(!user||!user.emailVerified)throw new Error("ابتدا ایمیل حساب مالک باید تأیید شده باشد.");
+  idToken=auth.idToken;ownerEmail=user.email||email;
+  $("password").value="";$("login").classList.add("hidden");$("dashboard").classList.remove("hidden");
+  status("dashboardStatus","ورود موفق: "+ownerEmail);
+  await refreshAll();
+ }catch(e){status("loginStatus",e.message||"خطا در ورود",true);}
+ finally{$("loginBtn").disabled=false;}
+}
+async function refreshRequests(){
+ const data=await apiPost("/v1/owner/requests");
+ const host=$("requests");host.replaceChildren();
+ if(!data.requests||!data.requests.length){host.append(el("p","درخواست در انتظار بررسی وجود ندارد."));return;}
+ const table=makeTable(["کد مطب","نام دستگاه","شناسه دستگاه","نسخه برنامه","زمان درخواست","اقدام"]);
+ const body=table.querySelector("tbody");
+ for(const item of data.requests){
+  const tr=el("tr");
+  [item.clinicCode,item.deviceName,item.deviceId,item.appVersion||"—",new Date(item.createdAt).toLocaleString("fa-IR")].forEach(v=>tr.append(el("td",v)));
+  const td=el("td",undefined,"actions"),approve=el("button","تأیید"),reject=el("button","رد","danger");
+  approve.addEventListener("click",()=>approveRequest(item,approve));reject.addEventListener("click",()=>rejectRequest(item,reject));
+  td.append(approve,reject);tr.append(td);body.append(tr);
+ }
+ host.append(table);
+}
+async function approveRequest(item,button){
+ const days=Number($("expiry").value);
+ if(!Number.isInteger(days)||days<1||days>3650){status("dashboardStatus","مدت مجوز باید عددی بین ۱ تا ۳۶۵۰ روز باشد.",true);return;}
+ if(!confirm("درخواست این دستگاه تأیید و کد یک‌بارمصرف صادر شود؟"))return;
+ button.disabled=true;
+ try{const d=await apiPost("/v1/owner/approve",{requestId:item.id,expiryDays:days});showCode(d);status("dashboardStatus","مجوز صادر شد. کد را به مسئول همان مطب تحویل دهید.");await refreshAll();}
+ catch(e){status("dashboardStatus",e.message,true);button.disabled=false;}
+}
+async function rejectRequest(item,button){
+ if(!confirm("درخواست این دستگاه رد شود؟"))return;button.disabled=true;
+ try{await apiPost("/v1/owner/reject",{requestId:item.id});status("dashboardStatus","درخواست رد شد.");await refreshAll();}
+ catch(e){status("dashboardStatus",e.message,true);button.disabled=false;}
+}
+function showCode(d){
+ const host=$("issued");host.replaceChildren();
+ host.append(el("p","کد فعال‌سازی برای مطب "+d.clinicCode+" و دستگاه "+d.deviceName));
+ host.append(el("div",d.activationCode,"code"));
+ const copy=el("button","کپی کد");copy.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(d.activationCode);status("dashboardStatus","کد کپی شد.");}catch(_){status("dashboardStatus","کد را با لمس طولانی انتخاب و کپی کنید.");}});
+ host.append(copy,el("p","این کد فقط یک‌بار و فقط برای دستگاه ثبت‌شده معتبر است. آن را در اختیار فرد دیگری قرار ندهید.","muted"));
+}
+async function refreshLicenses(){
+ const data=await apiPost("/v1/owner/licenses");const host=$("licenses");host.replaceChildren();
+ if(!data.licenses||!data.licenses.length){host.append(el("p","هنوز مجوزی صادر نشده است."));return;}
+ const table=makeTable(["کد مطب","دستگاه","وضعیت","انقضا","شناسه مجوز","اقدام"]),body=table.querySelector("tbody");
+ data.licenses.forEach(item=>{const tr=el("tr");[item.clinicCode,item.deviceName,item.status==="active"?"فعال":item.status==="revoked"?"لغوشده":item.status,new Date(item.expiresAt).toLocaleDateString("fa-IR"),item.id].forEach(v=>tr.append(el("td",v)));const td=el("td",undefined,"actions");if(item.status==="active"){const b=el("button","لغو مجوز","danger");b.addEventListener("click",async()=>{if(!confirm("مجوز این دستگاه لغو شود؟"))return;b.disabled=true;try{await apiPost("/v1/owner/revoke",{licenseId:item.id});status("dashboardStatus","مجوز لغو شد.");await refreshAll();}catch(e){status("dashboardStatus",e.message,true);b.disabled=false;}});td.append(b);}else td.textContent="—";tr.append(td);body.append(tr);});
+ host.append(table);
+}
+async function refreshAll(){try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}}
+function logout(){idToken="";ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
+$("loginBtn").addEventListener("click",login);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
+$("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);
+getConfig().catch(e=>status("loginStatus",e.message,true));
+})();
+</script>
+</body></html>
