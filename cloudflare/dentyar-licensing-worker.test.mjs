@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateKeyPairSync, verify as verifySignature } from "node:crypto";
+import { createHash, generateKeyPairSync, verify as verifySignature } from "node:crypto";
 import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
