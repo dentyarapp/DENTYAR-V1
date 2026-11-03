@@ -173,7 +173,7 @@ export default {
       return env.ASSETS.fetch(new Request(new URL("/owner.html",request.url),request));
     }
     if (url.pathname==="/v1/owner/config" && request.method==="GET") {
-      return json({ ok:true, apiKey:String(env.FIREBASE_WEB_API_KEY||""), projectId:String(env.FIREBASE_PROJECT_ID||"") });
+      return json({ ok:true, apiKey:String(env.FIREBASE_WEB_API_KEY||""), projectId:String(env.FIREBASE_PROJECT_ID||""), emailNotificationsEnabled:!!(env.RESEND_API_KEY && env.RESEND_FROM) });
     }
     if (request.method!=="POST") return fail("method-not-allowed",405);
     let body;
