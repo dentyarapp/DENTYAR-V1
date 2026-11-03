@@ -13,7 +13,7 @@
  *   FIREBASE_DATABASE_URL = https://dentyar-458d9-default-rtdb.firebaseio.com
  *   RESEND_FROM = verified sender, e.g. DENTYAR <licenses@your-verified-domain>
  */
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
+const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "access-control-allow-origin": "*", "vary": "Origin", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" };
 const encoder = new TextEncoder();
 const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
 const json = (data, status=200) => new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
@@ -104,10 +104,13 @@ async function redeem(env, body) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (request.method==="OPTIONS") return new Response(null,{status:204,headers:{ "access-control-allow-origin":"*", "access-control-allow-methods":"GET,POST,OPTIONS", "access-control-allow-headers":"authorization,content-type" }});
+    if (request.method==="OPTIONS") return new Response(null,{status:204,headers:{ ...JSON_HEADERS, "access-control-allow-methods":"GET,POST,OPTIONS", "access-control-allow-headers":"authorization,content-type", "access-control-max-age":"600" }});
     if (url.pathname==="/health" && request.method==="GET") return json({ ok:true, service:"dentyar-licensing", version:1 });
     if (request.method!=="POST") return fail("method-not-allowed",405);
+    const declaredLength = Number(request.headers.get("content-length") || 0);
+    if (declaredLength > 16384) return fail("request-too-large",413);
     let body; try { body=await request.json(); } catch { return fail("invalid-json"); }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("invalid-request-body");
     if (url.pathname==="/v1/activation/request") {
       const clinicCode=String(body.clinicCode||"").trim().toUpperCase();
       const deviceId=String(body.deviceId||"").trim();
