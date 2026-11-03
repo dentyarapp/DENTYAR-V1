@@ -1,0 +1,68 @@
+name: Deploy isolated DENTYAR licensing API
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/dentyar-owner-licensing-20261103
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate Worker
+        run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Create licensing KV namespace automatically
+        id: kv
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CF_TOKEN"
+          test -n "$CF_ACCOUNT"
+          RESPONSE=$(curl --fail-with-body -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
+            -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+            --data '{"title":"DENTYAR_LICENSES"}')
+          KV_ID=$(printf '%s' "$RESPONSE" | jq -r '.result.id // empty')
+          if [ -z "$KV_ID" ]; then
+            KV_ID=$(curl --fail-with-body -sS "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
+              -H "Authorization: Bearer $CF_TOKEN" | jq -r '.result[] | select(.title=="DENTYAR_LICENSES") | .id' | head -n1)
+          fi
+          test -n "$KV_ID"
+          sed -i "s/REPLACE_WITH_NEW_KV_NAMESPACE_ID/$KV_ID/" wrangler.licensing.toml
+      - name: Configure Firebase Admin secret
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.licensing.toml
+      - name: Configure optional Resend secret
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          if [ -n "$RESEND_API_KEY" ]; then
+            printf '%s' "$RESEND_API_KEY" | wrangler secret put RESEND_API_KEY --config wrangler.licensing.toml
+          fi
+      - name: Deploy isolated licensing Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OWNER_EMAIL: h.alkasir13@gmail.com
+          FIREBASE_PROJECT_ID: dentyar-458d9
+          FIREBASE_DATABASE_URL: https://dentyar-458d9-default-rtdb.firebaseio.com
+          FIREBASE_WEB_API_KEY: ${{ vars.DENTYAR_FIREBASE_WEB_API_KEY }}
+          RESEND_FROM: ${{ vars.DENTYAR_RESEND_FROM }}
+        run: |
+          test -n "$OWNER_EMAIL"
+          test -n "$FIREBASE_WEB_API_KEY"
+          args=(--config wrangler.licensing.toml --var "OWNER_EMAIL:$OWNER_EMAIL" --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "FIREBASE_DATABASE_URL:$FIREBASE_DATABASE_URL" --var "FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY")
+          if [ -n "$RESEND_FROM" ]; then args+=(--var "RESEND_FROM:$RESEND_FROM"); fi
+          wrangler deploy "${args[@]}"
