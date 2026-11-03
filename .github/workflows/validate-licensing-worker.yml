@@ -11,7 +11,7 @@ on:
       - '.github/workflows/validate-licensing-worker.yml'
   pull_request:
     branches:
-      - feature/dentyar-owner-licensing-20261103
+      - build/v101-parallel-app-20261102
     paths:
       - 'cloudflare/dentyar-licensing-worker.js'
       - 'wrangler.licensing.toml'
