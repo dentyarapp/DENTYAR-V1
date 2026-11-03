@@ -60,6 +60,7 @@ test("concurrent owner approvals reuse one license ID and one activation code", 
   assert.equal(records[0].licenseId,records[1].licenseId);
   assert.equal(records[0].activationCode,records[1].activationCode);
   assert.equal(records[0].expiryDays,records[1].expiryDays);
+  assert.equal(records[0].licenseExpiresAt,records[1].licenseExpiresAt);
 });
 
 test("only POST /claim is accepted", async () => {
