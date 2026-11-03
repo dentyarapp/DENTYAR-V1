@@ -215,7 +215,7 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {modulusLength:2048});
   const privatePem = privateKey.export({type:"pkcs8",format:"pem"}).toString();
   const token = await workerModule.makeCustomToken({
-    FIREBASE_PROJECT_ID:"demo-dentyar",
+    FIREBASE_PROJECT_ID:"dentyar-458d9",
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({
       client_email:"firebase-adminsdk@example.test",
       private_key:privatePem,
