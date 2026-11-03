@@ -127,6 +127,11 @@ export default {
       const deviceId=String(body.deviceId||"").trim();
       const deviceName=String(body.deviceName||"").trim().slice(0,80);
       if (!/^[A-Z0-9_-]{4,32}$/.test(clinicCode) || !/^[A-Za-z0-9_-]{12,100}$/.test(deviceId) || !deviceName) return fail("invalid-request");
+      const clientIp=request.headers.get("cf-connecting-ip") || "unknown";
+      const limiterId=env.ACTIVATION_LIMITS.idFromName("activation:"+clientIp);
+      const limiter=env.ACTIVATION_LIMITS.get(limiterId);
+      const rate=await limiter.fetch("https://activation-limit/check",{method:"POST"});
+      if (!rate.ok) return fail("activation-request-rate-limited",429);
       const requestId=randomHex(16);
       const item={ id:requestId, clinicCode, deviceId, deviceName, appVersion:String(body.appVersion||"").slice(0,40), status:"pending", createdAt:now() };
       await env.LICENSES.put("request:"+requestId,JSON.stringify(item),{expirationTtl:60*60*24*30});
@@ -199,5 +204,24 @@ export class RedemptionLock {
       return true;
     });
     return new Response(claimed ? "claimed" : "already-used", { status: claimed ? 200 : 409 });
+  }
+}
+
+
+// Per-IP activation request limiter: five requests per rolling minute window.
+export class ActivationRateLimiter {
+  constructor(state) { this.state=state; }
+  async fetch(request) {
+    if(request.method!=="POST" || new URL(request.url).pathname!=="/check") return new Response("not-found",{status:404});
+    const allowed=await this.state.storage.transaction(async txn=>{
+      const timestamp=now();
+      const current=await txn.get("window");
+      const window=current && timestamp-current.startedAt<60000 ? current : {startedAt:timestamp,count:0};
+      if(window.count>=5) return false;
+      window.count+=1;
+      await txn.put("window",window);
+      return true;
+    });
+    return new Response(allowed?"allowed":"rate-limited",{status:allowed?200:429});
   }
 }
