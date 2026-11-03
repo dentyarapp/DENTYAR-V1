@@ -45,6 +45,7 @@ jobs:
       - name: Test Firebase RTDB licensing rules in emulator
         run: |
           npm install --global firebase-tools
+          npm install --no-save @firebase/rules-unit-testing firebase
           firebase emulators:exec --only database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs"
       - name: Validate Wrangler configuration and Durable Object migrations
         run: |
