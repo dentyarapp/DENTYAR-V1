@@ -155,7 +155,8 @@ function testEnv() {
       idFromName(name) { return name; },
       get() { return {fetch: async () => new Response("allowed",{status:200})}; }
     },
-    _values: values
+    _values: values,
+    _lockStates: lockStates
   };
 }
 
@@ -503,6 +504,44 @@ test("owner can recover an issued activation code after a lost approval response
     const data=await response.json();
     assert.equal(data.activationCode,activationCode);
     assert.equal(data.licenseId,licenseId);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test("owner can reissue an expired activation code without creating a second license", async () => {
+  const env=testEnv();
+  const requestId="e".repeat(32);
+  const licenseId="f".repeat(32);
+  const expiresAt=Date.now()+30*24*60*60*1000;
+  const state=makeState();
+  env._lockStates.set("approval:"+requestId,state);
+  await state.storage.put("approval",{
+    licenseId,activationCode:null,expiryDays:365,licenseExpiresAt:expiresAt,
+    expiresAt:0,expiredAt:Date.now()
+  });
+  env._values.set("license:"+licenseId,JSON.stringify({
+    id:licenseId,clinicCode:"CLINIC_01",deviceId:"device_identifier_123",
+    deviceName:"Test phone",status:"active",requestId,expiresAt
+  }));
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({
+    users:[{email:"owner@example.test",emailVerified:true}]
+  }),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(new Request("https://license.test/v1/owner/activation-code",{
+      method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},
+      body:JSON.stringify({licenseId})
+    }),{...env,OWNER_EMAIL:"owner@example.test",FIREBASE_WEB_API_KEY:"test-api-key"});
+    assert.equal(response.status,200);
+    const result=await response.json();
+    assert.equal(result.licenseId,licenseId);
+    assert.equal(result.reissued,true);
+    assert.match(result.activationCode,/^[A-F0-9]{16}$/);
+    const approval=await state.storage.get("approval");
+    assert.equal(approval.licenseId,licenseId);
+    assert.equal(approval.activationCode,result.activationCode);
+    assert.equal([...env._values.keys()].filter(key=>key.startsWith("code:")).length,1);
   } finally {
     globalThis.fetch=originalFetch;
   }
