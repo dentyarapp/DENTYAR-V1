@@ -115,6 +115,7 @@ async function redeem(env, body) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    try {
     if (request.method==="OPTIONS") return new Response(null,{status:204,headers:{ ...JSON_HEADERS, "access-control-allow-methods":"GET,POST,OPTIONS", "access-control-allow-headers":"authorization,content-type", "access-control-max-age":"600" }});
     if (url.pathname==="/health" && request.method==="GET") return json({ ok:true, service:"dentyar-licensing", version:1 });
     if (request.method!=="POST") return fail("method-not-allowed",405);
@@ -189,6 +190,10 @@ export default {
       return json({ ok:true, licenses });
     }
     return fail("not-found",404);
+    } catch (error) {
+      console.error("Licensing API request failed", error);
+      return fail("service-unavailable",503);
+    }
   }
 };
 
