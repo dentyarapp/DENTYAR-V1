@@ -1,0 +1,46 @@
+name: Validate isolated DENTYAR licensing worker
+
+on:
+  push:
+    branches:
+      - feature/dentyar-owner-licensing-20261103
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'wrangler.licensing.toml'
+      - 'firebase-database.rules.template.json'
+      - '.github/workflows/validate-licensing-worker.yml'
+  pull_request:
+    branches:
+      - feature/dentyar-owner-licensing-20261103
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'wrangler.licensing.toml'
+      - 'firebase-database.rules.template.json'
+      - '.github/workflows/validate-licensing-worker.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax-check isolated Worker
+        run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Verify required endpoints and secret boundaries
+        run: |
+          set -euo pipefail
+          grep -q '"/v1/activation/request"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/activation/redeem"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/requests"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/approve"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/reject"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/revoke"' cloudflare/dentyar-licensing-worker.js
+          grep -q 'FIREBASE_SERVICE_ACCOUNT_JSON' cloudflare/dentyar-licensing-worker.js
+          ! grep -q 'BEGIN PRIVATE KEY' cloudflare/dentyar-licensing-worker.js
+          ! grep -q '"private_key":' cloudflare/dentyar-licensing-worker.js
+          grep -q 'auth.token.licenseId' firebase-database.rules.template.json
