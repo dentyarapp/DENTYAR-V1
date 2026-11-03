@@ -5496,15 +5496,25 @@ document.addEventListener('focus',e=>{
     return 'وضعیت فنی: '+(labels[connectStage]||'در حال بررسی اتصال');
   };
 
-  function ensureDeviceId(){
-    let id = localStorage.getItem('dentyar_device_id');
+  async function ensureDeviceId(){
+    const native=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.DentyarNative;
+    if(native&&typeof native.getOrCreateDeviceId==='function'){
+      const result=await native.getOrCreateDeviceId();
+      const nativeId=String(result&&result.deviceId||'');
+      if(!/^dev_[A-Fa-f0-9]{48}$/.test(nativeId)) throw new Error('شناسه امن دستگاه اندروید معتبر نیست؛ مجوز جدید صادر نکنید و با پشتیبانی تماس بگیرید.');
+      localStorage.setItem('dentyar_device_id',nativeId);
+      deviceId=nativeId;
+      return nativeId;
+    }
+    let id=localStorage.getItem('dentyar_device_id');
     if(!/^dev_[A-Fa-f0-9]{48}$/.test(String(id||''))){
-      if(!window.crypto || !window.crypto.getRandomValues) throw new Error('برای ساخت شناسه امن دستگاه، دنت‌یار باید در مرورگر به‌روز و از مسیر امن HTTPS اجرا شود.');
-      const bytes=new Uint8Array(24); window.crypto.getRandomValues(bytes);
+      if(!window.crypto||!window.crypto.getRandomValues) throw new Error('برای ساخت شناسه امن دستگاه، دنت‌یار باید در مرورگر به‌روز و از مسیر امن HTTPS اجرا شود.');
+      const bytes=new Uint8Array(24);window.crypto.getRandomValues(bytes);
       id='dev_'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
       localStorage.setItem('dentyar_device_id',id);
     }
-    deviceId = id; return id;
+    deviceId=id;
+    return id;
   }
   function sensitiveKeys(){ return ['password','profilePassword','appAdminPassword','appAdminEnabled','appAdminHidden','sync','_syncUpdatedAt']; }
   function sanitizedMeta(){
@@ -5650,7 +5660,7 @@ document.addEventListener('focus',e=>{
           throw new Error('برای اتصال این دستگاه، دریافت و ثبت مجوز اختصاصی دنت‌یار الزامی است.');
         }
       }
-      const expectedDeviceId=ensureDeviceId();
+      const expectedDeviceId=await ensureDeviceId();
       const idTokenResult=await auth.currentUser.getIdTokenResult(true);
       const claims=idTokenResult.claims||{};
       if(claims.role!=='clinic-device' || !claims.licenseId || claims.clinicCode!==cfg.clinicCode || claims.deviceId!==expectedDeviceId){
@@ -5663,7 +5673,6 @@ document.addEventListener('focus',e=>{
       try{ dbm.goOnline(db); }catch(_){}
       try{ await dbm.enableIndexedDbPersistence(db); }catch(e){ console.warn('Sync persistence unavailable (multi-tab):', e); }
       connectStage='device-registration'; SYNC.renderStatus&&SYNC.renderStatus();
-      ensureDeviceId();
       await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
       subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){connectStage='ready';SYNC._lastError=null;}else if(started){connectStage='waiting-rtdb';} SYNC.renderStatus&&SYNC.renderStatus(); }));
@@ -5890,7 +5899,7 @@ document.addEventListener('focus',e=>{
       cfg.clinicCode=cfg.clinicCode.toUpperCase();
       STATE.meta.sync=Object.assign({enabled:false,clinicCode:'',deviceName:'',firebaseConfig:null,lastSyncAt:null,pairedAt:null},cfg,{enabled:false});
       saveState();
-      const id=ensureDeviceId();
+      const id=await ensureDeviceId();
       const response=await fetch(LICENSE_API_URL+'/v1/activation/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({clinicCode:cfg.clinicCode,deviceId:id,deviceName:cfg.deviceName,appVersion:'101-license-trial'})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'ثبت درخواست فعال‌سازی ناموفق بود.');
