@@ -45,3 +45,63 @@ test("only POST /claim is accepted", async () => {
   const response = await lock.fetch(new Request("https://redemption-lock/other", { method: "POST" }));
   assert.equal(response.status, 404);
 });
+
+const workerModule = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
+const worker = workerModule.default;
+
+function testEnv() {
+  const values = new Map();
+  const lockState = makeState();
+  return {
+    LICENSES: {
+      async get(key, type) {
+        const value = values.get(key);
+        if (type === "json" && typeof value === "string") return JSON.parse(value);
+        return value;
+      },
+      async put(key, value) { values.set(key, value); },
+      async delete(key) { values.delete(key); },
+      async list({prefix}) { return {keys:[...values.keys()].filter(k=>k.startsWith(prefix)).map(name=>({name}))}; }
+    },
+    REDEMPTION_LOCKS: {
+      idFromName(name) { return name; },
+      get() { return {fetch: request => new RedemptionLock(lockState).fetch(request)}; }
+    },
+    _values: values
+  };
+}
+
+test("health endpoint is public and returns service identity", async () => {
+  const response = await worker.fetch(new Request("https://license.test/health"), testEnv());
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).service, "dentyar-licensing");
+});
+
+test("activation request rejects malformed clinic and device identifiers", async () => {
+  const response = await worker.fetch(new Request("https://license.test/v1/activation/request", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"x",deviceId:"short",deviceName:"Test"})
+  }), testEnv());
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error, "invalid-request");
+});
+
+test("activation request stores a pending request without requiring owner credentials", async () => {
+  const env = testEnv();
+  const response = await worker.fetch(new Request("https://license.test/v1/activation/request", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"CLINIC_01",deviceId:"device_identifier_123",deviceName:"Test phone",appVersion:"101"})
+  }), env);
+  const data = await response.json();
+  assert.equal(response.status, 202);
+  assert.equal(data.status, "pending");
+  assert.ok(data.requestId);
+  assert.equal(env._values.get("request:"+data.requestId) !== undefined, true);
+});
+
+test("oversized activation requests are rejected before parsing", async () => {
+  const response = await worker.fetch(new Request("https://license.test/v1/activation/request", {
+    method:"POST", headers:{"content-type":"application/json","content-length":"20000"}, body:"{}"
+  }), testEnv());
+  assert.equal(response.status, 413);
+});
