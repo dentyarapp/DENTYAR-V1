@@ -11,6 +11,8 @@ on:
       - 'DENTYAR_V101_LICENSE_TRIAL.html'
       - 'wrangler.licensing.toml'
       - 'firebase-database.rules.template.json'
+      - 'firebase.licensing-emulator.json'
+      - 'cloudflare/test-rtdb-licensing-rules.mjs'
       - '.github/workflows/validate-licensing-worker.yml'
   pull_request:
     branches:
@@ -36,6 +38,14 @@ jobs:
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
       - name: Test atomic redemption lock behavior
         run: node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Test Firebase RTDB licensing rules in emulator
+        run: |
+          npm install --global firebase-tools
+          firebase emulators:exec --only database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs"
       - name: Validate Wrangler configuration and Durable Object migrations
         run: |
           npm install --global wrangler@4
