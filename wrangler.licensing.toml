@@ -1,0 +1,8 @@
+name = "dentyar-licensing-api"
+main = "cloudflare/dentyar-licensing-worker.js"
+compatibility_date = "2026-10-16"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "REPLACE_WITH_NEW_KV_NAMESPACE_ID"
