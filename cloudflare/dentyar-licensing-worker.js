@@ -135,7 +135,9 @@ async function redeem(env, body) {
   if (!claim.ok) return fail("invalid-or-used-code",401);
   license.redeemedAt = now();
   await env.LICENSES.put("license:"+id, JSON.stringify(license));
-  await env.LICENSES.delete("code:"+codeHash);
+  // Keep the short-lived code digest until its seven-day TTL. The Durable Object
+  // permits retries only from the already-bound device, so a lost HTTP response
+  // cannot strand that device after its first successful claim.
   return json({ ok:true, customToken, licenseId:id, expiresAt:license.expiresAt||null });
 }
 export default {
