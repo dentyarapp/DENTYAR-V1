@@ -43,5 +43,5 @@ Email notifications are enabled only when both Resend settings exist. The API an
 - The production V101 branch, existing Worker deployment, and production RTDB rules are left untouched by this feature branch.
 - Activation codes are device-bound. Same-device retries are allowed to recover from a lost response; another device is rejected.
 - RTDB is the authorization source for clinic data. Revocation updates RTDB before the local license record.
-- The app's device ID is a random persistent installation identifier in browser storage. It is not hardware attestation; copying the app's browser storage can clone that identifier. Treat it as a practical device binding, not an uncopyable hardware identity.
+- On Android APK, the random installation ID is encrypted with AES-GCM under a non-exportable Android Keystore key; copying browser preferences alone does not clone it. A restored backup without the original Keystore key generates a new ID and needs a new license. In PWA/browser mode, the fallback ID is stored in localStorage and can be cloned by copying browser storage; it is not hardware attestation.
 - Firebase rules deployment is a migration step and must not be performed until every required device has been updated and activated.
