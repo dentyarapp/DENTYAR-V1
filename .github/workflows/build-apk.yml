@@ -482,7 +482,7 @@ jobs:
           from pathlib import Path
           report = Path(__import__('os').environ['RUNNER_TEMP'] + '/dentyar-signing/certificate.txt').read_text()
           expected = '5B1285D7588A40B5E4F38115847080E2E74E1F451A1F2DAA19E32AB795BCAD49'
-          found = re.findall(r'SHA-?256\\)?\\s*:\\s*([0-9A-Fa-f:]{64,})', report, re.I)
+          found = re.findall(r'SHA-?256\)?\s*:\s*([0-9A-Fa-f:]{64,})', report, re.I)
           normalized = [re.sub(r'[^0-9A-Fa-f]', '', value).upper() for value in found]
           if expected not in normalized:
               raise SystemExit('Signing certificate mismatch: expected the original DENTYAR release certificate. Build stopped to protect existing installations.')
