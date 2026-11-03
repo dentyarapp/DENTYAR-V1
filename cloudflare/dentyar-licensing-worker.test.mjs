@@ -234,8 +234,14 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
   assert.equal(header.alg,"RS256");
   assert.equal(payload.aud,"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit");
   assert.equal(payload.uid,"dy_license-test-001");
-  assert.equal(payload.licenseId,"license-test-001");
-  assert.equal(payload.role,"clinic-device");
+  assert.deepEqual(payload.claims,{
+    clinicCode:"CLINIC_01",
+    deviceId:"device_identifier_123",
+    licenseId:"license-test-001",
+    role:"clinic-device"
+  });
+  assert.equal(payload.licenseId,undefined);
+  assert.equal(payload.role,undefined);
 });
 
 test("owner panel is served from the configured static asset binding", async () => {
