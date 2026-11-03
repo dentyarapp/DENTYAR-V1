@@ -14,3 +14,11 @@ class_name = "RedemptionLock"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RedemptionLock"]
+
+[[durable_objects.bindings]]
+name = "ACTIVATION_LIMITS"
+class_name = "ActivationRateLimiter"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ActivationRateLimiter"]
