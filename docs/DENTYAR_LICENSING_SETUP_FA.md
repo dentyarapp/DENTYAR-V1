@@ -8,7 +8,7 @@
 3. متغیرهای Worker:
    - `OWNER_EMAIL`: ایمیل مالک Firebase که تأیید دومرحله‌ای/تأیید ایمیل آن فعال است.
    - `FIREBASE_PROJECT_ID`: `dentyar-458d9`
-   - `FIREBASE_DATABASE_URL`: `https://dentyar-458d9-default-rtdb.firebaseio.com`
+   - `FIREBASE_DATABASE_URL`: `https://dentyar-458d9-default-rtdb.firebaseio.com`\n   - `FIREBASE_WEB_API_KEY`: کلید عمومی Web API پروژه Firebase (برای اعتبارسنجی نشست مالک؛ این کلید به‌تنهایی راز امنیتی نیست).
    - `RESEND_FROM`: فرستنده تأییدشده در Resend (اختیاری تا زمان فعال‌سازی ایمیل).
 4. Secrets فقط در Cloudflare Worker:
    - `FIREBASE_SERVICE_ACCOUNT_JSON`: محتوای JSON حساب سرویس Firebase Admin.
@@ -18,7 +18,7 @@
 - `POST /v1/activation/request` — ثبت درخواست دستگاه.
 - `POST /v1/activation/redeem` — مصرف کد و دریافت Firebase custom token.
 - `POST /v1/owner/requests` — فهرست درخواست‌های در انتظار؛ نیازمند Firebase ID token مالک.
-- `POST /v1/owner/approve` — تأیید درخواست و صدور کد یک‌بارمصرف.
+- `POST /v1/owner/approve` — تأیید درخواست و صدور کد یک‌بارمصرف.\n- `POST /v1/owner/reject` — رد درخواست در انتظار.
 - `POST /v1/owner/revoke` — لغو مجوز و ثبت وضعیت revoked در RTDB.
 - `POST /v1/owner/licenses` — فهرست مجوزها.
 
