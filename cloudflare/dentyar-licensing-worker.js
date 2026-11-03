@@ -158,7 +158,9 @@ export default {
       const item=await env.LICENSES.get("request:"+String(body.requestId||""),"json");
       if (!item || item.status!=="pending") return fail("request-not-pending",404);
       const id=randomHex(16), code=randomHex(8).toUpperCase();
-      const expiryDays = Math.min(3650, Math.max(1, Number(body.expiryDays || 365)));
+      const requestedExpiry = body.expiryDays === undefined ? 365 : Number(body.expiryDays);
+      if (!Number.isInteger(requestedExpiry) || requestedExpiry < 1 || requestedExpiry > 3650) return fail("invalid-expiry-days",400);
+      const expiryDays = requestedExpiry;
       const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:now()+expiryDays*24*60*60*1000, requestId:item.id };
       await dbWrite(env,"licenses/"+id,{ status:"active", clinicCode:item.clinicCode, deviceId:item.deviceId, expiresAt:license.expiresAt });
       await env.LICENSES.put("license:"+id,JSON.stringify(license));
