@@ -1,6 +1,6 @@
-name: Build isolated DENTYAR V101 Licensing Trial APK
-# Build the isolated V101 licensing trial for the existing parallel Android package.
-# This workflow only uploads a test artifact; it never publishes a release.
+name: Build DENTYAR V101-223 Production APK
+# Build corrected V101-223 for the existing production DENTYAR Android package.
+# Includes the explicit draft-to-finalized patient transition and manager-PIN edit gate.
 
 permissions:
   contents: write
@@ -21,7 +21,6 @@ on:
       - rebuild/v100-222-final-baseline-238
       - fix/v100-223-sync-records-teeth-20261025
       - build/v101-parallel-app-20261102
-      - feature/dentyar-owner-licensing-20261103
 
 jobs:
   build-apk:
@@ -41,15 +40,15 @@ jobs:
       - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
         run: |
           mkdir -p www
-          cp DENTYAR_V101_LICENSE_TRIAL.html www/index.html
+          cp DENTYAR_V100_FINAL_SYNC_FIX.html www/index.html
 
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.224.0",
+            "version": "101.223.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-224 LICENSE TRIAL"
+              "build": "echo DENTYAR V101-223"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -73,10 +72,10 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 2', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.224.0-license-trial"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 1', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0-parallel"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android trial update-compatible versionCode/versionName")
+              raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -471,7 +470,7 @@ jobs:
           # Refuse to publish an APK signed with any certificate other than the parallel V101 build.
           keytool -list -v -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release > "$RUNNER_TEMP/dentyar-signing/certificate.txt"
           if ! grep -qi 'SHA256: 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
-            echo "::error::Signing certificate mismatch. Expected the parallel V101 signing certificate SHA-256 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2. Build stopped to protect existing installations."
+            echo "::error::Signing certificate mismatch. Expected the parallel V101 signing certificate SHA-256 5B:12:85:D7:58:8A:40:B5:E4:F3:81:15:84:70:80:E2:E7:4E:1F:45:1A:1F:2D:AA:19:E3:2A:B7:95:BC:AD:49. Build stopped to protect existing installations."
             exit 1
           fi
           python - <<'PY'
@@ -515,26 +514,26 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-LICENSE-TRIAL.apk
-
-      - name: Verify APK package, version, and release signature
-        if: ${{ steps.signing.outputs.available == 'true' }}
-        run: |
-          set -euo pipefail
-          test -s DENTYAR-V101-LICENSE-TRIAL.apk
-          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
-          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
-          test -x "$APKSIGNER"
-          test -x "$AAPT"
-          "$APKSIGNER" verify --verbose --print-certs DENTYAR-V101-LICENSE-TRIAL.apk | tee /tmp/dentyar-apk-signature.txt
-          grep -qi 'Signer #1 certificate SHA-256 digest: 9d:ff:5f:46:57:0c:49:1d:e8:8a:d8:6a:66:9c:6b:82:3a:f0:d4:2a:cf:6b:a1:7b:ad:33:af:58:0b:d9:2f:b2' /tmp/dentyar-apk-signature.txt
-          "$AAPT" dump badging DENTYAR-V101-LICENSE-TRIAL.apk | grep -F "package: name='com.dentyar.parallelv101' versionCode='2' versionName='101.224.0-license-trial'"
-          test "$(stat -c%s DENTYAR-V101-LICENSE-TRIAL.apk)" -gt 1000000
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-LICENSE-TRIAL-APK
-          path: DENTYAR-V101-LICENSE-TRIAL.apk
+          name: DENTYAR-V101-223-APK
+          path: DENTYAR-V101-223.apk
           if-no-files-found: error
 
+      - name: انتشار نسخه نهایی دنت‌یار
+        if: ${{ steps.signing.outputs.available == 'true' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-v101]') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v101-223-final
+          name: DENTYAR V101-223 Final
+          body: |
+            نسخه نهایی دنت‌یار V101-223 شامل اصلاح شماره دندان، ویرایش کنترل‌شده پرونده بیمار، و نمایش مرحله و کد خطای همگام‌سازی؛ با شناسه برنامه و کلید امضای ثابت نسخه تولیدی.
+            این APK با کلید امضای ثابت دنت‌یار ساخته می‌شود تا به‌روزرسانی نسخه نصب‌شده امکان‌پذیر باشد.
+          files: DENTYAR-V101-223.apk
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
