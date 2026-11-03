@@ -100,7 +100,7 @@ async function verifyOwner(request, env) {
   if (!response.ok) return false;
   const data = await response.json();
   const user = data.users && data.users[0];
-  return !!(user && user.emailVerified && String(user.email).toLowerCase()===String(env.OWNER_EMAIL).toLowerCase());
+  return !!(user && user.emailVerified && !user.disabled && String(user.email).toLowerCase()===String(env.OWNER_EMAIL).toLowerCase());
 }
 async function sendOwnerEmail(env, subject, body) {
   if (!env.RESEND_API_KEY || !env.RESEND_FROM) return false;
