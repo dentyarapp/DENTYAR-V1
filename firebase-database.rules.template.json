@@ -2,14 +2,14 @@
   "rules": {
     "licenses": {
       "$licenseId": {
-        ".read": "auth != null && auth.token.role === 'clinic-device' && auth.token.licenseId === $licenseId && auth.token.deviceId === root.child('licenses').child($licenseId).child('deviceId').val()",
+        ".read": "auth != null && auth.token.role === 'clinic-device' && auth.token.licenseId === $licenseId && auth.token.deviceId === root.child('licenses').child($licenseId).child('deviceId').val() && auth.token.clinicCode === root.child('licenses').child($licenseId).child('clinicCode').val() && root.child('licenses').child($licenseId).child('status').val() === 'active' && (!root.child('licenses').child($licenseId).child('expiresAt').exists() || root.child('licenses').child($licenseId).child('expiresAt').val() === 0 || root.child('licenses').child($licenseId).child('expiresAt').val() > now)",
         ".write": false
       }
     },
     "clinics": {
       "$clinicCode": {
-        ".read": "auth != null && auth.token.role === 'clinic-device' && auth.token.clinicCode === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('status').val() === 'active' && root.child('licenses').child(auth.token.licenseId).child('deviceId').val() === auth.token.deviceId && (!root.child('licenses').child(auth.token.licenseId).child('expiresAt').exists() || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() === 0 || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() > now)",
-        ".write": "auth != null && auth.token.role === 'clinic-device' && auth.token.clinicCode === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('status').val() === 'active' && root.child('licenses').child(auth.token.licenseId).child('deviceId').val() === auth.token.deviceId && (!root.child('licenses').child(auth.token.licenseId).child('expiresAt').exists() || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() === 0 || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() > now)"
+        ".read": "auth != null && auth.token.role === 'clinic-device' && auth.token.clinicCode === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('clinicCode').val() === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('status').val() === 'active' && root.child('licenses').child(auth.token.licenseId).child('deviceId').val() === auth.token.deviceId && (!root.child('licenses').child(auth.token.licenseId).child('expiresAt').exists() || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() === 0 || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() > now)",
+        ".write": "auth != null && auth.token.role === 'clinic-device' && auth.token.clinicCode === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('clinicCode').val() === $clinicCode && root.child('licenses').child(auth.token.licenseId).child('status').val() === 'active' && root.child('licenses').child(auth.token.licenseId).child('deviceId').val() === auth.token.deviceId && (!root.child('licenses').child(auth.token.licenseId).child('expiresAt').exists() || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() === 0 || root.child('licenses').child(auth.token.licenseId).child('expiresAt').val() > now)"
       }
     }
   }
