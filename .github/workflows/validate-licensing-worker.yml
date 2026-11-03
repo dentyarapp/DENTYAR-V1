@@ -16,6 +16,7 @@ on:
       - 'cloudflare/test-firebase-auth-emulator.mjs'
       - '.github/workflows/validate-licensing-worker.yml'
       - '.github/workflows/deploy-dentyar-licensing.yml'
+      - '.github/workflows/build-licensing-trial-apk.yml'
 permissions:
   contents: read
 
@@ -68,5 +69,10 @@ jobs:
           grep -q 'env.ASSETS.fetch' cloudflare/dentyar-licensing-worker.js
           grep -q 'binding = "ASSETS"' wrangler.licensing.toml
           test -s cloudflare/licensing-panel/owner.html
+          test -s .github/workflows/build-licensing-trial-apk.yml
+          grep -q 'DENTYAR_V101_LICENSE_TRIAL.html' .github/workflows/build-licensing-trial-apk.yml
+          grep -q 'versionCode 2' .github/workflows/build-licensing-trial-apk.yml
+          grep -q 'DENTYAR-V101-224-LICENSE-TRIAL.apk' .github/workflows/build-licensing-trial-apk.yml
+          grep -q 'SHA256: 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' .github/workflows/build-licensing-trial-apk.yml
           grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
           grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
