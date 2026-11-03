@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash, generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync } from "node:crypto";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
 const { RedemptionLock, ActivationRateLimiter } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
@@ -202,7 +202,7 @@ test("real activation redemption issues one custom token and rejects the concurr
     private_key:privatePem,
     project_id:"demo-dentyar"
   });
-  const hash = createHash("sha256").update(code).digest("base64url");
+  const hash = await workerModule.digest(code);
   env._values.set("code:"+hash,licenseId);
   env._values.set("license:"+licenseId,JSON.stringify({
     id:licenseId,clinicCode,deviceId,status:"active",expiresAt:Date.now()+86400000
