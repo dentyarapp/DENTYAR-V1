@@ -121,7 +121,7 @@ jobs:
           HEALTH=$(curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/health)
           echo "$HEALTH" | jq -e '.ok == true and .service == "dentyar-licensing"'
           OWNER_BODY=$(mktemp)
-          OWNER_STATUS=$(curl -sS -o "$OWNER_BODY" -w '%{http_code}' https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner)
+          OWNER_STATUS=$(curl -L --compressed -sS -o "$OWNER_BODY" -w '%{http_code}' https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner)
           echo "Owner panel HTTP status: $OWNER_STATUS"
           head -c 180 "$OWNER_BODY" || true
           echo
