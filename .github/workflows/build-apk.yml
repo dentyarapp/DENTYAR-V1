@@ -535,6 +535,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V101-LICENSE-TRIAL-APK
-          path: DENTYAR-V101-223.apk
+          path: DENTYAR-V101-LICENSE-TRIAL.apk
           if-no-files-found: error
 
