@@ -13,6 +13,7 @@ on:
       - 'firebase-database.rules.template.json'
       - 'firebase.licensing-emulator.json'
       - 'cloudflare/test-rtdb-licensing-rules.mjs'
+      - 'cloudflare/test-firebase-auth-emulator.mjs'
       - '.github/workflows/validate-licensing-worker.yml'
   pull_request:
     branches:
@@ -51,7 +52,7 @@ jobs:
         run: |
           npm install --global firebase-tools
           npm install --no-save @firebase/rules-unit-testing firebase
-          firebase emulators:exec --only database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs"
+          firebase emulators:exec --only auth,database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs && node cloudflare/test-firebase-auth-emulator.mjs"
       - name: Validate Wrangler configuration and Durable Object migrations
         run: |
           npm install --global wrangler@4
