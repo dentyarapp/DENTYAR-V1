@@ -46,4 +46,4 @@ jobs:
           grep -q 'auth.token.licenseId' firebase-database.rules.template.json
           grep -q 'REDEMPTION_LOCKS' cloudflare/dentyar-licensing-worker.js
           grep -q 'class RedemptionLock' cloudflare/dentyar-licensing-worker.js
-          grep -q 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
+          grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
