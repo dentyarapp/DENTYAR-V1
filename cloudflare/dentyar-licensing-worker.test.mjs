@@ -321,3 +321,43 @@ test("owner approval API is idempotent when two owner sessions approve together"
     globalThis.fetch=originalFetch;
   }
 });
+
+test("license revocation retries safely and persists database denial before KV status", async () => {
+  const env=testEnv();
+  const ownerEmail="owner@example.test";
+  const licenseId="license-revoke-test";
+  const license={id:licenseId,clinicCode:"CLINIC_01",deviceId:"device_identifier_123",status:"active",expiresAt:Date.now()+86400000};
+  env._values.set("license:"+licenseId,JSON.stringify(license));
+  env.OWNER_EMAIL=ownerEmail;
+  env.FIREBASE_WEB_API_KEY="test-public-key";
+  env.FIREBASE_DATABASE_URL="https://dentyar-458d9-default-rtdb.firebaseio.com";
+  env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({client_email:"firebase-adminsdk@example.test",private_key:"unused",project_id:"dentyar-458d9"});
+  const sequence=[];
+  let failDatabaseWrite=true;
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async input=>{
+    const url=String(input);
+    if(url.includes("identitytoolkit.googleapis.com")) return new Response(JSON.stringify({users:[{email:ownerEmail,emailVerified:true}]}),{status:200});
+    if(url.includes("oauth2.googleapis.com/token")) return new Response(JSON.stringify({access_token:"test-admin-access-token",expires_in:3600}),{status:200});
+    sequence.push("database");
+    if(failDatabaseWrite){failDatabaseWrite=false;return new Response("temporary failure",{status:500});}
+    return new Response("null",{status:200});
+  };
+  const originalPut=env.LICENSES.put;
+  env.LICENSES.put=async(key,value,options)=>{if(key==="license:"+licenseId)sequence.push("kv");return originalPut(key,value,options);};
+  try {
+    const revoke=()=>worker.fetch(new Request("https://license.test/v1/owner/revoke",{
+      method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},
+      body:JSON.stringify({licenseId})
+    }),env);
+    const first=await revoke();
+    assert.equal(first.status,503);
+    assert.equal(JSON.parse(env._values.get("license:"+licenseId)).status,"active");
+    const second=await revoke();
+    assert.equal(second.status,200);
+    assert.equal(JSON.parse(env._values.get("license:"+licenseId)).status,"revoked");
+    assert.deepEqual(sequence,["database","database","kv"]);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
