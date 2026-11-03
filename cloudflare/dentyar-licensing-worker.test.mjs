@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { RedemptionLock } from "./dentyar-licensing-worker.js";
+import { readFile } from "node:fs/promises";
+const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
+const { RedemptionLock } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
 
 function makeState() {
   const values = new Map();
