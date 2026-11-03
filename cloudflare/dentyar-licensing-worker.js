@@ -293,7 +293,7 @@ export default {
       let approvalResponse=await approvalLock.fetch("https://redemption-lock/approval",{method:"GET"});
       let reissued=false;
       if(!approvalResponse.ok) {
-        const activationCode=randomHex(8).toUpperCase();
+        const activationCode=randomActivationCode();
         const remainingDays=Math.max(1,Math.min(3650,Math.ceil((license.expiresAt-now())/(24*60*60*1000))));
         approvalResponse=await approvalLock.fetch("https://redemption-lock/approve",{
           method:"POST",headers:{"content-type":"application/json"},
