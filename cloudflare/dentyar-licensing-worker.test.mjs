@@ -215,6 +215,7 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {modulusLength:2048});
   const privatePem = privateKey.export({type:"pkcs8",format:"pem"}).toString();
   const token = await workerModule.makeCustomToken({
+    FIREBASE_PROJECT_ID:"demo-dentyar",
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({
       client_email:"firebase-adminsdk@example.test",
       private_key:privatePem,
@@ -281,6 +282,7 @@ test("owner approval API is idempotent when two owner sessions approve together"
   const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
   env.OWNER_EMAIL=ownerEmail;
   env.FIREBASE_WEB_API_KEY="test-public-key";
+  env.FIREBASE_PROJECT_ID="dentyar-458d9";
   env.FIREBASE_DATABASE_URL="https://dentyar-458d9-default-rtdb.firebaseio.com";
   env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({
     client_email:"firebase-adminsdk@example.test",
@@ -330,6 +332,7 @@ test("license revocation retries safely and persists database denial before KV s
   env._values.set("license:"+licenseId,JSON.stringify(license));
   env.OWNER_EMAIL=ownerEmail;
   env.FIREBASE_WEB_API_KEY="test-public-key";
+  env.FIREBASE_PROJECT_ID="dentyar-458d9";
   env.FIREBASE_DATABASE_URL="https://dentyar-458d9-default-rtdb.firebaseio.com";
   env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({client_email:"firebase-adminsdk@example.test",private_key:"unused",project_id:"dentyar-458d9"});
   const sequence=[];
@@ -359,5 +362,22 @@ test("license revocation retries safely and persists database denial before KV s
     assert.deepEqual(sequence,["database","database","kv"]);
   } finally {
     globalThis.fetch=originalFetch;
+  }
+});
+
+test("admin database writes are pinned to the canonical DENTYAR RTDB host", () => {
+  const base=workerModule.databaseBase({
+    FIREBASE_PROJECT_ID:"dentyar-458d9",
+    FIREBASE_DATABASE_URL:"https://dentyar-458d9-default-rtdb.firebaseio.com/"
+  });
+  assert.equal(base,"https://dentyar-458d9-default-rtdb.firebaseio.com");
+  for(const FIREBASE_DATABASE_URL of [
+    "http://dentyar-458d9-default-rtdb.firebaseio.com",
+    "https://dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app",
+    "https://other-project-default-rtdb.firebaseio.com",
+    "https://dentyar-458d9-default-rtdb.firebaseio.com/other",
+    "https://dentyar-458d9-default-rtdb.firebaseio.com?x=1"
+  ]) {
+    assert.throws(()=>workerModule.databaseBase({FIREBASE_PROJECT_ID:"dentyar-458d9",FIREBASE_DATABASE_URL}));
   }
 });
