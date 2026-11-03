@@ -28,6 +28,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Validate deployment workflow YAML syntax
+        run: |
+          ruby -e 'require "yaml"; ARGV.each { |file| YAML.load_file(file, aliases: true); puts "YAML OK: #{file}" }' \
+            .github/workflows/deploy-dentyar-licensing.yml \
+            .github/workflows/build-licensing-trial-apk.yml
       - name: Syntax-check isolated Worker
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
       - name: Test atomic redemption lock behavior
