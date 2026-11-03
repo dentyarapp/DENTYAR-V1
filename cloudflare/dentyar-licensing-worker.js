@@ -251,6 +251,7 @@ export class RedemptionLock {
   async fetch(request) {
     if(request.method!=="POST") return new Response("not-found",{status:404});
     const path=new URL(request.url).pathname;
+    if(path!=="/approve" && path!=="/claim") return new Response("not-found",{status:404});
     let body;
     try { body=await request.json(); } catch { return new Response("invalid-request",{status:400}); }
     if(path==="/approve") {
