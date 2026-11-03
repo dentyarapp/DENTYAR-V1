@@ -15,6 +15,7 @@ on:
       - 'cloudflare/test-rtdb-licensing-rules.mjs'
       - 'cloudflare/test-firebase-auth-emulator.mjs'
       - '.github/workflows/validate-licensing-worker.yml'
+      - '.github/workflows/deploy-dentyar-licensing.yml'
 permissions:
   contents: read
 
