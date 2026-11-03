@@ -268,3 +268,51 @@ test("isolated V101 app licensing integration script parses", async () => {
   assert.match(target,/signInWithCustomToken/);
   assert.match(target,/v1\/activation\/redeem/);
 });
+
+test("owner approval API is idempotent when two owner sessions approve together", async () => {
+  const env=testEnv();
+  const requestId="c".repeat(32);
+  const ownerEmail="owner@example.test";
+  const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  env.OWNER_EMAIL=ownerEmail;
+  env.FIREBASE_WEB_API_KEY="test-public-key";
+  env.FIREBASE_DATABASE_URL="https://dentyar-458d9-default-rtdb.firebaseio.com";
+  env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({
+    client_email:"firebase-adminsdk@example.test",
+    private_key:privateKey.export({type:"pkcs8",format:"pem"}).toString(),
+    project_id:"dentyar-458d9"
+  });
+  env._values.set("request:"+requestId,JSON.stringify({
+    id:requestId,clinicCode:"CLINIC_01",deviceId:"device_identifier_123",
+    deviceName:"Test phone",status:"pending",createdAt:Date.now()
+  }));
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async input=>{
+    const url=String(input);
+    if(url.includes("identitytoolkit.googleapis.com")) return new Response(JSON.stringify({
+      users:[{email:ownerEmail,emailVerified:true}]
+    }),{status:200,headers:{"content-type":"application/json"}});
+    if(url.includes("oauth2.googleapis.com/token")) return new Response(JSON.stringify({
+      access_token:"test-admin-access-token",expires_in:3600
+    }),{status:200,headers:{"content-type":"application/json"}});
+    return new Response("null",{status:200});
+  };
+  try {
+    const approve=expiryDays=>worker.fetch(new Request("https://license.test/v1/owner/approve",{
+      method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},
+      body:JSON.stringify({requestId,expiryDays})
+    }),env);
+    const responses=await Promise.all([approve(30),approve(365)]);
+    assert.deepEqual(responses.map(response=>response.status),[200,200]);
+    const results=await Promise.all(responses.map(response=>response.json()));
+    assert.equal(results[0].licenseId,results[1].licenseId);
+    assert.equal(results[0].activationCode,results[1].activationCode);
+    assert.equal(results[0].expiresAt,results[1].expiresAt);
+    const request=JSON.parse(env._values.get("request:"+requestId));
+    assert.equal(request.status,"approved");
+    assert.equal(request.licenseId,results[0].licenseId);
+    assert.ok(env._values.has("license:"+results[0].licenseId));
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
