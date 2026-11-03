@@ -203,7 +203,9 @@ test("real activation redemption issues one custom token and rejects the concurr
     project_id:"demo-dentyar"
   });
   const hash = await workerModule.digest(code);
+  assert.match(code,/^[A-F0-9]{16}$/);
   env._values.set("code:"+hash,licenseId);
+  assert.equal(await env.LICENSES.get("code:"+hash),licenseId);
   env._values.set("license:"+licenseId,JSON.stringify({
     id:licenseId,clinicCode,deviceId,status:"active",expiresAt:Date.now()+86400000
   }));
