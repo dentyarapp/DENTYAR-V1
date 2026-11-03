@@ -3,9 +3,10 @@
  *
  * Required bindings:
  *   KV namespace: LICENSES
+ *   Durable Objects: REDEMPTION_LOCKS (RedemptionLock), ACTIVATION_LIMITS (ActivationRateLimiter)
  * Required secrets:
  *   FIREBASE_SERVICE_ACCOUNT_JSON (service-account JSON; never commit)
- *   RESEND_API_KEY (optional until email notifications are enabled)
+ *   RESEND_API_KEY (optional; required for owner email notifications)
  *
  * Variables:
  *   OWNER_EMAIL = verified Firebase owner email
