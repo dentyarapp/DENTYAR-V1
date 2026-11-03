@@ -376,7 +376,8 @@ test("admin database writes are pinned to the canonical DENTYAR RTDB host", () =
     "https://dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app",
     "https://other-project-default-rtdb.firebaseio.com",
     "https://dentyar-458d9-default-rtdb.firebaseio.com/other",
-    "https://dentyar-458d9-default-rtdb.firebaseio.com?x=1"
+    "https://dentyar-458d9-default-rtdb.firebaseio.com?x=1",
+    "https://dentyar-458d9-default-rtdb.firebaseio.com:444"
   ]) {
     assert.throws(()=>workerModule.databaseBase({FIREBASE_PROJECT_ID:"dentyar-458d9",FIREBASE_DATABASE_URL}));
   }
