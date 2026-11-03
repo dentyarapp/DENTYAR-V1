@@ -5881,16 +5881,8 @@ document.addEventListener('focus',e=>{
     return cfg;
   };
   SYNC.saveAndConnect = async function(){
-    const cfg = SYNC.readForm();
-    const accountPassword = ((document.getElementById('syncAccountPassword')||{}).value||'');
-    if(!cfg.accountEmail){ toast('ایمیل حساب همگام‌سازی را وارد کنید.'); return; }
-    if(!cfg.clinicCode){ toast('کد مطب را وارد کنید یا «تولید کد» را بزنید'); return; }
-    if(!cfg.firebaseConfig.apiKey || !cfg.firebaseConfig.databaseURL || !cfg.firebaseConfig.appId){ toast('تنظیمات Firebase ناقص است (apiKey، databaseURL، appId الزامی است)'); return; }
-    STATE.meta.sync = Object.assign({ enabled:false, clinicCode:'', deviceName:'', firebaseConfig:null, lastSyncAt:null, pairedAt:null }, cfg, { enabled:true, pairedAt: Date.now() });
-    saveState();
-    SYNC.disconnect();
-    await SYNC.connect(accountPassword ? {email:cfg.accountEmail,password:accountPassword} : null);
-    renderSettings();
+    toast('اتصال مستقیم با ایمیل و رمز عبور غیرفعال است؛ برای این دستگاه باید درخواست مجوز اختصاصی ثبت شود.');
+    await SYNC.requestLicense();
   };
   SYNC.requestLicense = async function(){
     try{
