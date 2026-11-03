@@ -113,7 +113,7 @@ jobs:
         run: |
           test -n "$OWNER_EMAIL"
           test -n "$FIREBASE_WEB_API_KEY"
-          args=(--config wrangler.licensing.toml --var "OWNER_EMAIL:$OWNER_EMAIL" --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "FIREBASE_DATABASE_URL:$FIREBASE_DATABASE_URL" --var "FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY")
+          args=(--config wrangler.licensing.toml --var "OWNER_EMAIL:$OWNER_EMAIL" --var "OWNER_EMAILS:$OWNER_EMAILS" --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "FIREBASE_DATABASE_URL:$FIREBASE_DATABASE_URL" --var "FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY")
           if [ -n "$RESEND_FROM" ]; then args+=(--var "RESEND_FROM:$RESEND_FROM"); fi
           wrangler deploy "${args[@]}"
 
