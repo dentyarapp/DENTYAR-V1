@@ -209,3 +209,20 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
   assert.equal(payload.licenseId,"license-test-001");
   assert.equal(payload.role,"clinic-device");
 });
+
+test("owner panel is served from the configured static asset binding", async () => {
+  const env=testEnv();
+  env.ASSETS={fetch:async request=>new Response(new URL(request.url).pathname,{status:200})};
+  const response=await worker.fetch(new Request("https://license.test/owner"),env);
+  assert.equal(response.status,200);
+  assert.equal(await response.text(),"/owner.html");
+});
+
+test("owner login receives only the public Firebase client configuration", async () => {
+  const env=testEnv();
+  env.FIREBASE_WEB_API_KEY="public-client-key";
+  env.FIREBASE_PROJECT_ID="demo-dentyar";
+  const response=await worker.fetch(new Request("https://license.test/v1/owner/config"),env);
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{ok:true,apiKey:"public-client-key",projectId:"demo-dentyar"});
+});
