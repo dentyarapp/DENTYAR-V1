@@ -8,6 +8,7 @@ on:
     paths:
       - 'cloudflare/dentyar-licensing-worker.js'
       - 'cloudflare/licensing-panel/**'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
       - 'wrangler.licensing.toml'
       - 'firebase-database.rules.template.json'
       - 'firebase.licensing-emulator.json'
