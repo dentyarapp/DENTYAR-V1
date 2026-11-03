@@ -30,3 +30,23 @@
 - **این API به‌تنهایی هنوز نسخه نهایی قابل‌استفاده نیست.** اپ فعلی هنوز از Firebase email/password مشترک و دسترسی مستقیم RTDB استفاده می‌کند. لازم است در کلاینت، ورود custom-token، درخواست/مصرف کد، پنل مالک، جداسازی خواندن/نوشتن و تست‌های انتهابه‌انتها پیاده‌سازی شود. همچنین وضعیت revoked باید با قوانین RTDB در هر درخواست خواندن/نوشتن بررسی شود.
 - قبل از انتشار، آزمون‌های pending/approved/rejected/expired/revoked، تلاش با دستگاه دیگر، مصرف دوباره کد، قطع اینترنت، حذف داده برنامه و تغییر شناسه دستگاه الزامی است.
 - در این مرحله هیچ Secret، Firebase Rule یا Worker تولیدی تغییر نکرده است.
+
+
+## استقرار کنترل‌شده از GitHub Actions
+فایل `.github/workflows/deploy-dentyar-licensing.yml` فقط با اجرای دستی فعال می‌شود و به Worker همگام‌سازی دست نمی‌زند. پیش از اجرا، این موارد باید در تنظیمات همان مخزن ثبت شوند:
+
+### Repository Secrets
+- `CLOUDFLARE_API_TOKEN`: توکن Cloudflare با دسترسی ساخت/استقرار Worker و مدیریت Worker KV در حساب مربوط.
+- `CLOUDFLARE_ACCOUNT_ID`: شناسه حساب Cloudflare.
+- `LICENSES_KV_NAMESPACE_ID`: شناسه KV namespace تازه‌ای که binding آن `LICENSES` است.
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: کل JSON حساب سرویس Firebase Admin؛ فقط در GitHub Secret و Cloudflare Worker Secret، نه در فایل یا APK.
+- `RESEND_API_KEY`: اختیاری؛ برای ارسال اعلان ایمیل.
+
+### Repository Variables
+- `DENTYAR_OWNER_EMAIL`: ایمیل مالک تأییدشده Firebase.
+- `DENTYAR_FIREBASE_WEB_API_KEY`: Web API Key پروژه Firebase.
+- `DENTYAR_RESEND_FROM`: فرستنده تأییدشده Resend، اختیاری.
+
+پس از ثبت موارد بالا، از Actions، گردش‌کار **Deploy isolated DENTYAR licensing API** را با گزینه Run workflow اجرا کنید. سپس آدرس Worker جدید باید با مسیر `/health` پاسخ `ok:true` بدهد.
+
+**مهم:** موفقیت Deploy فقط استقرار API است؛ به معنی آماده بودن نسخه مشتری نیست. هنوز رابط درخواست فعال‌سازی/پنل مالک در HTML برنامه، جایگزینی ورود مشترک Firebase با custom token، ادغام امن قواعد فعلی RTDB و آزمون انتهابه‌انتها لازم است. تا پیش از آن، فایل قواعد نمونه را روی پایگاه اصلی اعمال نکنید و نسخه مجوزدار را به مشتری ندهید.
