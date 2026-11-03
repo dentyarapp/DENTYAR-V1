@@ -5,7 +5,7 @@
 - The licensing API is a separate Cloudflare Worker. It does not replace the existing DENTYAR sync relay.
 - The V101 production branch and installed V101 app are not modified by this feature branch.
 - Do not apply the RTDB rules template to the live database until the app has been integrated and a full migration test has passed.
-- Activation codes are 16 hexadecimal characters, stored as SHA-256 digests, expire after seven days, and can be redeemed once for the exact clinic/device pair.
+- Activation codes are 16 hexadecimal characters, stored as SHA-256 digests, and expire after seven days. Redemption is bound to the exact clinic/device pair; the same device may safely retry during the code lifetime, while any other device is rejected.
 - Durable Objects serialize code redemption and apply a five-requests-per-minute per-IP limit to public activation requests.
 - Owner endpoints require a valid Firebase ID token from the configured, verified owner email.
 
