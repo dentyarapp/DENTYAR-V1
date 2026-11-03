@@ -213,6 +213,9 @@ export default {
     if (url.pathname==="/v1/owner/reject") {
       const item=await env.LICENSES.get("request:"+String(body.requestId||""),"json");
       if (!item || item.status!=="pending") return fail("request-not-pending",404);
+      const lock=env.REDEMPTION_LOCKS.get(env.REDEMPTION_LOCKS.idFromName("approval:"+item.id));
+      const decision=await lock.fetch("https://redemption-lock/reject",{method:"POST"});
+      if(!decision.ok) return fail("request-already-approved",409);
       item.status="rejected"; item.reviewedAt=now();
       await env.LICENSES.put("request:"+item.id,JSON.stringify(item));
       return json({ ok:true, status:"rejected" });
@@ -233,7 +236,7 @@ export default {
       if(!approvalResponse.ok) {
         const lockError=await approvalResponse.text();
         console.error("Owner approval lock rejected",approvalResponse.status,lockError);
-        return fail("approval-lock-failed",503);
+        return approvalResponse.status===409 ? fail("request-already-rejected",409) : fail("approval-lock-failed",503);
       }
       const approval=await approvalResponse.json();
       const id=approval.licenseId, code=approval.activationCode, expiryDays=approval.expiryDays;
@@ -288,42 +291,62 @@ export class RedemptionLock {
     const path=new URL(request.url).pathname;
     if(request.method==="GET" && path==="/approval") {
       const approval=await this.state.storage.get("approval");
-      if(!approval || approval.expiresAt<=now()) return new Response("not-found",{status:404});
+      if(!approval || approval.rejected || !approval.activationCode || approval.expiresAt<=now()) return new Response("not-found",{status:404});
       return new Response(JSON.stringify(approval),{status:200,headers:{"content-type":"application/json"}});
     }
     if(request.method!=="POST") return new Response("not-found",{status:404});
-    if(path!=="/approve" && path!=="/claim") return new Response("not-found",{status:404});
-    let body;
-    try { body=await request.json(); } catch { return new Response("invalid-request",{status:400}); }
+    if(path!=="/approve" && path!=="/reject" && path!=="/claim") return new Response("not-found",{status:404});
+    let body={};
+    if(path!=="/reject") {
+      try { body=await request.json(); } catch { return new Response("invalid-request",{status:400}); }
+    }
+    if(path==="/reject") {
+      const result=await this.state.storage.transaction(async txn=>{
+        const existing=await txn.get("approval");
+        if(existing && existing.licenseId) return "already-approved";
+        if(existing && existing.rejected) return "rejected";
+        await txn.put("approval",{rejected:true,rejectedAt:now()});
+        return "rejected";
+      });
+      return new Response(result,{status:result==="already-approved"?409:200});
+    }
     if(path==="/approve") {
       const licenseId=String(body.licenseId||"");
       const activationCode=String(body.activationCode||"");
       const expiryDays=Number(body.expiryDays);
       if(!/^[a-f0-9]{32}$/.test(licenseId) || !/^[A-F0-9]{16}$/.test(activationCode) || !Number.isInteger(expiryDays) || expiryDays<1 || expiryDays>3650) return new Response("invalid-approval",{status:400});
-      const approval=await this.state.storage.transaction(async ()=>{
-        const existing=await this.state.storage.get("approval");
-        if(existing && existing.expiresAt>now()) return existing;
+      const approval=await this.state.storage.transaction(async txn=>{
+        const existing=await txn.get("approval");
+        if(existing && existing.rejected) return {rejected:true};
+        if(existing && existing.licenseId) {
+          if(existing.activationCode && existing.expiresAt>now()) return existing;
+          const renewed={...existing,activationCode,expiresAt:now()+7*24*60*60*1000,expiredAt:null};
+          await txn.put("approval",renewed);
+          return renewed;
+        }
         const next={licenseId,activationCode,expiryDays,licenseExpiresAt:now()+expiryDays*24*60*60*1000,expiresAt:now()+7*24*60*60*1000};
-        await this.state.storage.put("approval",next);
+        await txn.put("approval",next);
         return next;
       });
+      if(approval.rejected) return new Response("already-rejected",{status:409});
       await this.state.storage.setAlarm(approval.expiresAt);
       return new Response(JSON.stringify(approval),{status:200,headers:{"content-type":"application/json"}});
     }
-    if(path!=="/claim") return new Response("not-found",{status:404});
     const deviceId=String(body.deviceId||"");
     if(!/^[A-Za-z0-9_-]{12,100}$/.test(deviceId)) return new Response("invalid-device",{status:400});
-    const claimed = await this.state.storage.transaction(async () => {
-      const existing=await this.state.storage.get("claim");
+    const claimed=await this.state.storage.transaction(async txn=>{
+      const existing=await txn.get("claim");
       if(existing) return existing.deviceId===deviceId;
-      await this.state.storage.put("claim",{deviceId,claimedAt:now()});
+      await txn.put("claim",{deviceId,claimedAt:now()});
       return true;
     });
-    return new Response(claimed ? "claimed" : "already-used", { status: claimed ? 200 : 409 });
+    return new Response(claimed?"claimed":"already-used",{status:claimed?200:409});
   }
   async alarm() {
     const approval=await this.state.storage.get("approval");
-    if(approval && approval.expiresAt<=now()) await this.state.storage.delete("approval");
+    if(approval && approval.activationCode && approval.expiresAt<=now()) {
+      await this.state.storage.put("approval",{...approval,activationCode:null,expiredAt:now(),expiresAt:0});
+    }
   }
 }
 
@@ -333,13 +356,13 @@ export class ActivationRateLimiter {
   constructor(state) { this.state=state; }
   async fetch(request) {
     if(request.method!=="POST" || new URL(request.url).pathname!=="/check") return new Response("not-found",{status:404});
-    const allowed=await this.state.storage.transaction(async ()=>{
+    const allowed=await this.state.storage.transaction(async txn=>{
       const timestamp=now();
-      const current=await this.state.storage.get("window");
+      const current=await txn.get("window");
       const window=current && timestamp-current.startedAt<60000 ? current : {startedAt:timestamp,count:0};
       if(window.count>=5) return false;
       window.count+=1;
-      await this.state.storage.put("window",window);
+      await txn.put("window",window);
       return true;
     });
     return new Response(allowed?"allowed":"rate-limited",{status:allowed?200:429});
