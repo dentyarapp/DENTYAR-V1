@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
+import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
 const { RedemptionLock, ActivationRateLimiter } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
@@ -225,4 +226,14 @@ test("owner login receives only the public Firebase client configuration", async
   const response=await worker.fetch(new Request("https://license.test/v1/owner/config"),env);
   assert.equal(response.status,200);
   assert.deepEqual(await response.json(),{ok:true,apiKey:"public-client-key",projectId:"demo-dentyar"});
+});
+
+test("owner panel contains syntactically valid JavaScript and Persian RTL layout", async () => {
+  const html=await readFile(new URL("../licensing-panel/owner.html",import.meta.url),"utf8");
+  assert.match(html,/<html lang="fa" dir="rtl">/);
+  const match=html.match(/<script>([\\s\\S]*?)<\\/script>/);
+  assert.ok(match,"owner panel script exists");
+  assert.doesNotThrow(()=>new Script(match[1]));
+  assert.match(html,/accounts:signInWithPassword/);
+  assert.match(html,/v1\\/owner\\/approve/);
 });
