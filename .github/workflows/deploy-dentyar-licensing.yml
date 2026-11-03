@@ -2,6 +2,18 @@ name: Deploy isolated DENTYAR licensing API
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/dentyar-owner-licensing-20261103
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/licensing-panel/**'
+      - 'wrangler.licensing.toml'
+      - 'firebase-database.rules.template.json'
+      - 'firebase.licensing-emulator.json'
+      - 'cloudflare/test-rtdb-licensing-rules.mjs'
+      - 'cloudflare/test-firebase-auth-emulator.mjs'
+      - '.github/workflows/deploy-dentyar-licensing.yml'
 
 permissions:
   contents: read
@@ -14,8 +26,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Validate Worker
-        run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Validate Worker and run unit tests
+        run: |
+          set -euo pipefail
+          node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+          node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Test Firebase Auth and RTDB rules in emulators
+        run: |
+          npm install --global firebase-tools
+          npm install --no-save @firebase/rules-unit-testing firebase
+          firebase emulators:exec --only auth,database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs && node cloudflare/test-firebase-auth-emulator.mjs"
       - name: Install Wrangler
         run: npm install --global wrangler@4
       - name: Create or reuse licensing KV namespace
@@ -43,6 +67,7 @@ jobs:
           fi
           test -n "$KV_ID"
           sed -i "s/REPLACE_WITH_NEW_KV_NAMESPACE_ID/$KV_ID/" wrangler.licensing.toml
+          wrangler deploy --dry-run --outdir /tmp/dentyar-licensing-dry-run --config wrangler.licensing.toml
       - name: Run licensing unit and integration tests
         run: node --test cloudflare/dentyar-licensing-worker.test.mjs
       - name: Dry-run the exact licensing Worker deployment
