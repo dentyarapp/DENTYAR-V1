@@ -303,7 +303,7 @@ test("owner approval API is idempotent when two owner sessions approve together"
       body:JSON.stringify({requestId,expiryDays})
     }),env);
     const responses=await Promise.all([approve(30),approve(365)]);
-    assert.deepEqual(responses.map(response=>response.status),[200,200]);
+    assert.deepEqual(responses.map(response=>response.status),[200,200],JSON.stringify(await Promise.all(responses.map(response=>response.clone().json()))));
     const results=await Promise.all(responses.map(response=>response.json()));
     assert.equal(results[0].licenseId,results[1].licenseId);
     assert.equal(results[0].activationCode,results[1].activationCode);
