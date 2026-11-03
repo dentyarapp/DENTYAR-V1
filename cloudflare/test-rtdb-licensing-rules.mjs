@@ -41,6 +41,11 @@ try {
 
   const unauthenticated=env.unauthenticatedContext().database();
   await assertFails(get(ref(unauthenticated,"clinics/"+clinicCode+"/records/meta")));
+  await assertFails(get(ref(licensed,".")));
+  const wrongRole=env.authenticatedContext("dy_test_device",{
+    role:"owner",clinicCode,deviceId,licenseId
+  }).database();
+  await assertFails(get(ref(wrongRole,"clinics/"+clinicCode+"/records/meta")));
 
   const otherClinic=env.authenticatedContext("dy_test_device",{
     role:"clinic-device",clinicCode:"OTHER_01",deviceId,licenseId
