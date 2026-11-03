@@ -51,7 +51,8 @@ const worker = workerModule.default;
 
 function testEnv() {
   const values = new Map();
-  const lockState = makeState();
+  const lockStates = new Map();
+  const stateFor = name => { if(!lockStates.has(name)) lockStates.set(name,makeState()); return lockStates.get(name); };
   return {
     LICENSES: {
       async get(key, type) {
@@ -65,11 +66,11 @@ function testEnv() {
     },
     REDEMPTION_LOCKS: {
       idFromName(name) { return name; },
-      get() { return {fetch: request => new RedemptionLock(lockState).fetch(request)}; }
+      get(name) { return {fetch: request => new RedemptionLock(stateFor(name)).fetch(request)}; }
     },
     ACTIVATION_LIMITS: {
       idFromName(name) { return name; },
-      get() { return {fetch: request => new ActivationRateLimiter(lockState).fetch(request)}; }
+      get(name) { return {fetch: request => new ActivationRateLimiter(stateFor(name)).fetch(request)}; }
     },
     _values: values
   };
