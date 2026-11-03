@@ -113,11 +113,11 @@ async function makeCustomToken(env, license) {
 }
 async function redeem(env, body) {
   const normalizedCode = String(body.code||"").trim().toUpperCase();
-  if (!/^[A-F0-9]{16}$/.test(normalizedCode)) return fail("invalid-or-used-code",401);
+  if (!/^[A-F0-9]{16}$/.test(normalizedCode)) return fail("invalid-code-format",401);
   if (!/^[A-Za-z0-9_-]{12,100}$/.test(String(body.deviceId||"")) || !/^[A-Z0-9_-]{4,32}$/.test(String(body.clinicCode||""))) return fail("invalid-request");
   const codeHash = await digest(normalizedCode);
   const id = await env.LICENSES.get("code:"+codeHash);
-  if (!id) return fail("invalid-or-used-code", 401);
+  if (!id) return fail("code-hash-not-found", 401);
   const license = await env.LICENSES.get("license:"+id, "json");
   if (!license || license.status!=="active" || license.deviceId!==body.deviceId || license.clinicCode!==body.clinicCode) return fail("license-not-active-for-this-device", 403);
   if (license.expiresAt && license.expiresAt<now()) return fail("license-expired", 403);
