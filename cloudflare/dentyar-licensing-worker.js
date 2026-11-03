@@ -212,8 +212,10 @@ export default {
       const license=await env.LICENSES.get("license:"+String(body.licenseId||""),"json");
       if (!license) return fail("license-not-found",404);
       license.status="revoked"; license.revokedAt=now();
-      await env.LICENSES.put("license:"+license.id,JSON.stringify(license));
+      // RTDB is the authorization source checked by security rules. Revoke there first;
+      // if KV persistence fails, the owner can safely retry this idempotent operation.
       await dbWrite(env,"licenses/"+license.id,{ status:"revoked", clinicCode:license.clinicCode, deviceId:license.deviceId, revokedAt:license.revokedAt });
+      await env.LICENSES.put("license:"+license.id,JSON.stringify(license));
       return json({ ok:true, status:"revoked" });
     }
     if (url.pathname==="/v1/owner/licenses") {
