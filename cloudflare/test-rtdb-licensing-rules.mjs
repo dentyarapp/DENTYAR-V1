@@ -61,6 +61,20 @@ try {
 
   await env.withSecurityRulesDisabled(async context=>{
     await set(ref(context.database(),"licenses/"+licenseId),{
+      status:"active",clinicCode:"OTHER_01",deviceId,expiresAt:Date.now()+86400000
+    });
+  });
+  await assertFails(get(ref(licensed,"licenses/"+licenseId)));
+  await assertFails(get(ref(licensed,"clinics/"+clinicCode+"/records/meta")));
+
+  await env.withSecurityRulesDisabled(async context=>{
+    await set(ref(context.database(),"licenses/"+licenseId),{
+      status:"active",clinicCode,deviceId,expiresAt:Date.now()+86400000
+    });
+  });
+
+  await env.withSecurityRulesDisabled(async context=>{
+    await set(ref(context.database(),"licenses/"+licenseId),{
       status:"revoked",clinicCode,deviceId,revokedAt:Date.now()
     });
   });
