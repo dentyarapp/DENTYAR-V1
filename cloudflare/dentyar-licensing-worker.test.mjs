@@ -105,3 +105,27 @@ test("oversized activation requests are rejected before parsing", async () => {
   }), testEnv());
   assert.equal(response.status, 413);
 });
+
+test("owner endpoints reject requests without a verified owner token", async () => {
+  const response = await worker.fetch(new Request("https://license.test/v1/owner/requests", {
+    method:"POST", headers:{"content-type":"application/json"}, body:"{}"
+  }), testEnv());
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error, "owner-auth-required");
+});
+
+test("unknown POST endpoints do not expose internal routing details", async () => {
+  const response = await worker.fetch(new Request("https://license.test/v1/not-a-route", {
+    method:"POST", headers:{"content-type":"application/json"}, body:"{}"
+  }), testEnv());
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error, "owner-auth-required");
+});
+
+test("CORS preflight advertises only the API methods and required headers", async () => {
+  const response = await worker.fetch(new Request("https://license.test/v1/activation/request", {method:"OPTIONS"}), testEnv());
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-methods"), "GET,POST,OPTIONS");
+  assert.equal(response.headers.get("access-control-allow-headers"), "authorization,content-type");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
