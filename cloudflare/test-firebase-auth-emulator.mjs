@@ -25,6 +25,7 @@ const idClaims=JSON.parse(Buffer.from(result.idToken.split(".")[1],"base64url").
 console.log("Auth emulator identity claims:",JSON.stringify({localId:result.localId,sub:idClaims.sub,user_id:idClaims.user_id,role:idClaims.role,claims:idClaims}));
 assert.equal(idClaims.sub||idClaims.user_id,"dy_emulator-license-001");
 const idTokenClaims=JSON.parse(Buffer.from(result.idToken.split(".")[1],"base64url").toString("utf8"));
+assert.equal(idTokenClaims.sub,"dy_emulator-license-001");
 assert.equal(idTokenClaims.role,"clinic-device");
 assert.equal(idTokenClaims.licenseId,license.id);
 assert.equal(idTokenClaims.clinicCode,license.clinicCode);
