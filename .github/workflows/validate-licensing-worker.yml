@@ -55,5 +55,5 @@ jobs:
           grep -q 'class RedemptionLock' cloudflare/dentyar-licensing-worker.js
           grep -q 'class ActivationRateLimiter' cloudflare/dentyar-licensing-worker.js
           grep -q 'ACTIVATION_LIMITS' cloudflare/dentyar-licensing-worker.js
-          grep -q 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
+          grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
           grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
