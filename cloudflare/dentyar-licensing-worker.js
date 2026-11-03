@@ -170,7 +170,13 @@ export default {
     if (url.pathname==="/health" && request.method==="GET") return json({ ok:true, service:"dentyar-licensing", version:1 });
     if (request.method==="GET" && (url.pathname==="/owner" || url.pathname==="/owner/")) {
       if (!env.ASSETS) return fail("owner-panel-not-configured",503);
-      return env.ASSETS.fetch(new Request(new URL("/owner.html",request.url),request));
+      const asset=await env.ASSETS.fetch(new Request(new URL("/owner.html",request.url),request));
+      const headers=new Headers(asset.headers);
+      headers.set("x-frame-options","DENY");
+      headers.set("x-content-type-options","nosniff");
+      headers.set("referrer-policy","no-referrer");
+      headers.set("cache-control","no-store");
+      return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }
     if (url.pathname==="/v1/owner/config" && request.method==="GET") {
       return json({ ok:true, apiKey:String(env.FIREBASE_WEB_API_KEY||""), projectId:String(env.FIREBASE_PROJECT_ID||""), emailNotificationsEnabled:!!(env.RESEND_API_KEY && env.RESEND_FROM) });
