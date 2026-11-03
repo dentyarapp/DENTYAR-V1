@@ -211,7 +211,7 @@ export default {
       if(!approvalResponse.ok) return fail("approval-lock-failed",503);
       const approval=await approvalResponse.json();
       const id=approval.licenseId, code=approval.activationCode, expiryDays=approval.expiryDays;
-      const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:now()+expiryDays*24*60*60*1000, requestId:item.id };
+      const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:approval.licenseExpiresAt, requestId:item.id };
       await dbWrite(env,"licenses/"+id,{ status:"active", clinicCode:item.clinicCode, deviceId:item.deviceId, expiresAt:license.expiresAt });
       await env.LICENSES.put("license:"+id,JSON.stringify(license));
       await env.LICENSES.put("code:"+await digest(code),id,{expirationTtl:60*60*24*7});
@@ -261,7 +261,7 @@ export class RedemptionLock {
       const approval=await this.state.storage.transaction(async txn=>{
         const existing=await txn.get("approval");
         if(existing && existing.expiresAt>now()) return existing;
-        const next={licenseId,activationCode,expiryDays,expiresAt:now()+7*24*60*60*1000};
+        const next={licenseId,activationCode,expiryDays,licenseExpiresAt:now()+expiryDays*24*60*60*1000,expiresAt:now()+7*24*60*60*1000};
         await txn.put("approval",next);
         return next;
       });
