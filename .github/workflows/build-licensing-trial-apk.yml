@@ -7,6 +7,12 @@ permissions:
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/dentyar-owner-licensing-20261103
+    paths:
+      - 'DENTYAR_V101_LICENSE_TRIAL.html'
+      - '.github/workflows/build-licensing-trial-apk.yml'
 
 jobs:
   build-apk:
@@ -510,8 +516,9 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$AAPT"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose "$APK"
-          BADGING=$("$AAPT" dump badging "$APK" | head -n1)
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-trial-apk-cert.txt
+          grep -qi 'Signer #1 certificate SHA-256 digest: 9d:ff:5f:46:57:0c:49:1d:e8:8a:d8:6a:66:9c:6b:82:3a:f0:d4:2a:cf:6b:a1:7b:ad:33:af:58:0b:d9:2f:b2' /tmp/dentyar-trial-apk-cert.txt
+          BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
           echo "$BADGING" | grep -F "versionCode='2'"
