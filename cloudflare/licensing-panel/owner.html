@@ -85,7 +85,7 @@ async function diagnoseConnection(){
   }
   const providers=Array.isArray(data.allProviders)?data.allProviders:[];
   const passwordEnabled=providers.includes("password")||(Array.isArray(data.signinMethods)&&data.signinMethods.includes("password"));
-  status("loginStatus","آزمایش اتصال موفق بود: اینترنت، سرور پنل، دریافت تنظیمات و ارتباط با Firebase برقرار است. پروژه: "+cfg.projectId+(passwordEnabled?"؛ روش Email/Password در پاسخ Firebase موجود است.":"؛ پاسخ Firebase روش password را اعلام نکرد؛ تنظیمات Authentication باید بررسی شود.")+"\nاگر ورود هنوز INVALID_LOGIN_CREDENTIALS می‌دهد، علت به احتمال زیاد در حساب/اعتبارنامه یا تنظیمات همان پروژه است، نه قطع ارتباط.",!passwordEnabled);
+  status("loginStatus","آزمایش اتصال موفق بود: اینترنت، سرور پنل، دریافت تنظیمات و دسترسی به Firebase برقرار است. پروژه: "+cfg.projectId+(passwordEnabled?"؛ Firebase روش password را در پاسخ اعلام کرده است.":"؛ Firebase فهرست روش‌های ورود را در این آزمون اعلام نکرده است. این موضوع به‌تنهایی به معنی غیرفعال‌بودن Email/Password نیست؛ برخی تنظیمات حریم خصوصی Firebase اطلاعات روش ورود را پنهان می‌کنند.")+"\nاین آزمون اتصال را تأیید می‌کند، نه صحت رمز یا وضعیت حساب مالک. برای تشخیص نهایی باید پاسخ ورود واقعی یا پیکربندی احراز هویت از سمت مدیریت Firebase بررسی شود.",false);
  }catch(e){status("loginStatus","آزمایش اتصال کامل نشد: "+(e.message||"خطای نامشخص") ,true);}
  finally{button.disabled=false;}
 }
