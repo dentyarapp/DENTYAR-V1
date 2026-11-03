@@ -27,4 +27,4 @@ new_sqlite_classes = ["ActivationRateLimiter"]
 directory = "./cloudflare/licensing-panel"
 html_handling = "none"
 binding = "ASSETS"
-run_worker_first = ["/v1/*", "/health", "/owner"]
+run_worker_first = true
