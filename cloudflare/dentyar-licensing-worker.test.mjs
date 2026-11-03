@@ -89,7 +89,7 @@ function testEnv() {
     },
     REDEMPTION_LOCKS: {
       idFromName(name) { return name; },
-      get(name) { return {fetch: request => new RedemptionLock(stateFor(name)).fetch(request)}; }
+      get(name) { return {fetch: (input,init) => new RedemptionLock(stateFor(name)).fetch(input instanceof Request?input:new Request(input,init))}; }
     },
     ACTIVATION_LIMITS: {
       idFromName(name) { return name; },
