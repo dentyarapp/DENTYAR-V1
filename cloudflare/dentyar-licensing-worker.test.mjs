@@ -219,7 +219,7 @@ test("custom-token signing produces a Firebase-compatible three-part JWT", async
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({
       client_email:"firebase-adminsdk@example.test",
       private_key:privatePem,
-      project_id:"demo-dentyar"
+      project_id:"dentyar-458d9"
     })
   }, {
     id:"license-test-001",
