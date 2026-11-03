@@ -204,6 +204,25 @@ test("owner endpoints reject requests without a verified owner token", async () 
   assert.equal((await response.json()).error, "owner-auth-required");
 });
 
+test("disabled Firebase owner accounts cannot access licensing administration", async () => {
+  const env=testEnv();
+  env.OWNER_EMAIL="owner@example.test";
+  env.FIREBASE_WEB_API_KEY="test-api-key";
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({
+    users:[{email:"owner@example.test",emailVerified:true,disabled:true}]
+  }),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(new Request("https://license.test/v1/owner/requests",{
+      method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},body:"{}"
+    }),env);
+    assert.equal(response.status,403);
+    assert.equal((await response.json()).error,"owner-auth-required");
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
 test("unknown POST endpoints do not expose internal routing details", async () => {
   const response = await worker.fetch(new Request("https://license.test/v1/not-a-route", {
     method:"POST", headers:{"content-type":"application/json"}, body:"{}"
