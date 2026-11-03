@@ -285,6 +285,9 @@ test("isolated V101 app licensing integration script parses", async () => {
   assert.match(target,/signInWithCustomToken/);
   assert.match(target,/v1\/activation\/redeem/);
   assert.match(target,/crypto\.getRandomValues/);
+  assert.match(target,/const id=await ensureDeviceId\(\);[\s\S]*v1\/activation\/redeem/);
+  assert.match(target,/getOrCreateDeviceId/);
+  assert.doesNotMatch(target,/const id=ensureDeviceId\(\)/);
   assert.match(target,/getOrCreateDeviceId/);
   assert.match(target,/dev_\[A-Fa-f0-9\]\{48\}/);
   assert.match(target,/getIdTokenResult\(true\)/);
