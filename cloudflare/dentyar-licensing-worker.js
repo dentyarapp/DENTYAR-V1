@@ -336,4 +336,4 @@ export class ActivationRateLimiter {
   }
 }
 
-export { makeCustomToken, databaseBase };
+export { makeCustomToken, databaseBase, digest };
