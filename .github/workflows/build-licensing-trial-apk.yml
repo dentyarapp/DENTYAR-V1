@@ -107,6 +107,7 @@ jobs:
           import android.security.keystore.KeyProperties;
 
           import javax.crypto.Cipher;
+          import javax.crypto.AEADBadTagException;
           import javax.crypto.KeyGenerator;
           import javax.crypto.SecretKey;
           import javax.crypto.spec.GCMParameterSpec;
@@ -151,13 +152,19 @@ jobs:
                   String ivText = prefs.getString("device_iv", null);
                   String encryptedText = prefs.getString("device_ciphertext", null);
                   if (ivText != null && encryptedText != null) {
-                      byte[] iv = Base64.decode(ivText, Base64.NO_WRAP);
-                      byte[] encrypted = Base64.decode(encryptedText, Base64.NO_WRAP);
-                      Cipher decrypt = Cipher.getInstance("AES/GCM/NoPadding");
-                      decrypt.init(Cipher.DECRYPT_MODE, getOrCreateDeviceKey(), new GCMParameterSpec(128, iv));
-                      String existing = new String(decrypt.doFinal(encrypted), StandardCharsets.UTF_8);
-                      if (!existing.matches("dev_[A-Fa-f0-9]{48}")) throw new Exception("stored device identity is invalid");
-                      return existing;
+                      try {
+                          byte[] iv = Base64.decode(ivText, Base64.NO_WRAP);
+                          byte[] encrypted = Base64.decode(encryptedText, Base64.NO_WRAP);
+                          Cipher decrypt = Cipher.getInstance("AES/GCM/NoPadding");
+                          decrypt.init(Cipher.DECRYPT_MODE, getOrCreateDeviceKey(), new GCMParameterSpec(128, iv));
+                          String existing = new String(decrypt.doFinal(encrypted), StandardCharsets.UTF_8);
+                          if (existing.matches("dev_[A-Fa-f0-9]{48}")) return existing;
+                      } catch (AEADBadTagException | IllegalArgumentException invalidStoredIdentity) {
+                          // A restored backup may contain ciphertext without its non-exportable Android Keystore key.
+                      }
+                      if (!prefs.edit().remove("device_iv").remove("device_ciphertext").commit()) {
+                          throw new Exception("could not reset an unavailable device identity");
+                      }
                   }
 
                   byte[] random = new byte[24];
