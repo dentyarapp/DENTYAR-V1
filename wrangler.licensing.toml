@@ -22,3 +22,8 @@ class_name = "ActivationRateLimiter"
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["ActivationRateLimiter"]
+
+[assets]
+directory = "./cloudflare/licensing-panel"
+binding = "ASSETS"
+run_worker_first = true
