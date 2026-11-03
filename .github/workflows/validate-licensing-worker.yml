@@ -19,8 +19,13 @@ on:
       - build/v101-parallel-app-20261102
     paths:
       - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'cloudflare/licensing-panel/**'
+      - 'cloudflare/test-rtdb-licensing-rules.mjs'
+      - 'DENTYAR_V101_LICENSE_TRIAL.html'
       - 'wrangler.licensing.toml'
       - 'firebase-database.rules.template.json'
+      - 'firebase.licensing-emulator.json'
       - '.github/workflows/validate-licensing-worker.yml'
 
 permissions:
@@ -60,6 +65,8 @@ jobs:
           grep -q '"/v1/owner/requests"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/approve"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/reject"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/licenses"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/config"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/revoke"' cloudflare/dentyar-licensing-worker.js
           grep -q 'FIREBASE_SERVICE_ACCOUNT_JSON' cloudflare/dentyar-licensing-worker.js
           ! grep -q 'BEGIN PRIVATE KEY' cloudflare/dentyar-licensing-worker.js
