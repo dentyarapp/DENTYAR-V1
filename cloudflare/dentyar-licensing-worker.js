@@ -89,12 +89,19 @@ async function makeCustomToken(env, license) {
   }, sa.private_key);
 }
 async function redeem(env, body) {
-  const codeHash = await digest(String(body.code||"").trim().toUpperCase());
+  const normalizedCode = String(body.code||"").trim().toUpperCase();
+  if (!/^[A-F0-9]{16}$/.test(normalizedCode)) return fail("invalid-or-used-code",401);
+  if (!/^[A-Za-z0-9_-]{12,100}$/.test(String(body.deviceId||"")) || !/^[A-Z0-9_-]{4,32}$/.test(String(body.clinicCode||""))) return fail("invalid-request");
+  const codeHash = await digest(normalizedCode);
   const id = await env.LICENSES.get("code:"+codeHash);
   if (!id) return fail("invalid-or-used-code", 401);
   const license = await env.LICENSES.get("license:"+id, "json");
   if (!license || license.status!=="active" || license.deviceId!==body.deviceId || license.clinicCode!==body.clinicCode) return fail("license-not-active-for-this-device", 403);
   if (license.expiresAt && license.expiresAt<now()) return fail("license-expired", 403);
+  const lockId = env.REDEMPTION_LOCKS.idFromName(codeHash);
+  const lock = env.REDEMPTION_LOCKS.get(lockId);
+  const claim = await lock.fetch("https://redemption-lock/claim", { method:"POST" });
+  if (!claim.ok) return fail("invalid-or-used-code",401);
   const customToken = await makeCustomToken(env,license);
   license.redeemedAt = now();
   await env.LICENSES.put("license:"+id, JSON.stringify(license));
@@ -173,3 +180,18 @@ export default {
     return fail("not-found",404);
   }
 };
+
+
+// Durable Object provides an atomic, per-code one-time redemption claim.
+export class RedemptionLock {
+  constructor(state) { this.state = state; }
+  async fetch(request) {
+    if (request.method !== "POST" || new URL(request.url).pathname !== "/claim") return new Response("not-found",{status:404});
+    const claimed = await this.state.storage.transaction(async txn => {
+      if (await txn.get("used")) return false;
+      await txn.put("used", true);
+      return true;
+    });
+    return new Response(claimed ? "claimed" : "already-used", { status: claimed ? 200 : 409 });
+  }
+}
