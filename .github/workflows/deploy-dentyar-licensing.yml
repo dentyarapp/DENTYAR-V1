@@ -50,6 +50,7 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          node -e 'const s=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON); if(s.project_id!=="dentyar-458d9"||!s.client_email||!s.private_key) process.exit(1);'
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.licensing.toml
       - name: Configure optional Resend secret
         env:
