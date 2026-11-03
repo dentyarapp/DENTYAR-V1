@@ -48,11 +48,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;
 (function(){
 "use strict";
 const API=location.origin;
-let apiKey="",idToken="",ownerEmail="";
+let apiKey="",idToken="",ownerEmail="",emailNotificationsEnabled=false;
 const $=id=>document.getElementById(id);
 function status(id,message,error){const e=$(id);e.textContent=message;e.classList.toggle("error",!!error);}
 function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
-async function getConfig(){const r=await fetch(API+"/v1/owner/config",{cache:"no-store"});if(!r.ok)throw new Error("تنظیمات ورود دریافت نشد.");const d=await r.json();if(!d.apiKey)throw new Error("کلید عمومی Firebase تنظیم نشده است.");apiKey=d.apiKey;}
+async function getConfig(){const r=await fetch(API+"/v1/owner/config",{cache:"no-store"});if(!r.ok)throw new Error("تنظیمات ورود دریافت نشد.");const d=await r.json();if(!d.apiKey)throw new Error("کلید عمومی Firebase تنظیم نشده است.");apiKey=d.apiKey;emailNotificationsEnabled=!!d.emailNotificationsEnabled;}
 async function firebasePost(path,body){const r=await fetch("https://identitytoolkit.googleapis.com/v1/"+path+"?key="+encodeURIComponent(apiKey),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error&&d.error.message?d.error.message:"ورود به Firebase ناموفق بود.");return d;}
 async function apiPost(path,body){const r=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+idToken},body:JSON.stringify(body||{})});const d=await r.json();if(!r.ok)throw new Error(d.error||"درخواست ناموفق بود.");return d;}
 function makeTable(headers){const table=el("table"),thead=el("thead"),tr=el("tr");headers.forEach(h=>tr.append(el("th",h)));thead.append(tr);table.append(thead);table.append(el("tbody"));return table;}
@@ -69,7 +69,7 @@ async function login(){
   if(!user||!user.emailVerified)throw new Error("ابتدا ایمیل حساب مالک باید تأیید شده باشد.");
   idToken=auth.idToken;ownerEmail=user.email||email;
   $("password").value="";$("login").classList.add("hidden");$("dashboard").classList.remove("hidden");
-  status("dashboardStatus","ورود موفق: "+ownerEmail);
+  status("dashboardStatus","ورود موفق: "+ownerEmail+(emailNotificationsEnabled?"":"\nهشدار: ارسال خودکار ایمیل فعال نیست؛ کلید Resend و نشانی فرستنده باید پیکربندی شود."),!emailNotificationsEnabled);
   await refreshAll();
  }catch(e){status("loginStatus",e.message||"خطا در ورود",true);}
  finally{$("loginBtn").disabled=false;}
