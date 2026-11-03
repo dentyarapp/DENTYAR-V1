@@ -129,3 +129,30 @@ test("CORS preflight advertises only the API methods and required headers", asyn
   assert.equal(response.headers.get("access-control-allow-headers"), "authorization,content-type");
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
+
+test("owner approval rejects non-integer or out-of-range expiry before creating a license", async () => {
+  const env = testEnv();
+  const requestId = "a".repeat(32);
+  env._values.set("request:"+requestId, JSON.stringify({
+    id:requestId, clinicCode:"CLINIC_01", deviceId:"device_identifier_123",
+    deviceName:"Test phone", status:"pending", createdAt:Date.now()
+  }));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    users:[{email:"owner@example.test",emailVerified:true}]
+  }), {status:200,headers:{"content-type":"application/json"}});
+  try {
+    for (const expiryDays of ["not-a-number", 0, 3651, 1.5]) {
+      const response = await worker.fetch(new Request("https://license.test/v1/owner/approve", {
+        method:"POST",
+        headers:{"content-type":"application/json","authorization":"Bearer test-id-token"},
+        body:JSON.stringify({requestId,expiryDays})
+      }), {...env, OWNER_EMAIL:"owner@example.test", FIREBASE_WEB_API_KEY:"test-api-key"});
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).error, "invalid-expiry-days");
+    }
+    assert.equal([...env._values.keys()].filter(key=>key.startsWith("license:")).length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
