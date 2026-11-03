@@ -343,10 +343,16 @@ export class RedemptionLock {
     return new Response(claimed?"claimed":"already-used",{status:claimed?200:409});
   }
   async alarm() {
-    const approval=await this.state.storage.get("approval");
-    if(approval && approval.activationCode && approval.expiresAt<=now()) {
-      await this.state.storage.put("approval",{...approval,activationCode:null,expiredAt:now(),expiresAt:0});
-    }
+    const nextExpiry=await this.state.storage.transaction(async txn=>{
+      const approval=await txn.get("approval");
+      if(!approval || !approval.activationCode) return null;
+      if(approval.expiresAt<=now()) {
+        await txn.put("approval",{...approval,activationCode:null,expiredAt:now(),expiresAt:0});
+        return null;
+      }
+      return approval.expiresAt;
+    });
+    if(nextExpiry) await this.state.storage.setAlarm(nextExpiry);
   }
 }
 
