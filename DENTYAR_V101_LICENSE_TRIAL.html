@@ -5917,7 +5917,7 @@ document.addEventListener('focus',e=>{
       cfg.clinicCode=cfg.clinicCode.toUpperCase();
       STATE.meta.sync=Object.assign({enabled:false,clinicCode:'',deviceName:'',firebaseConfig:null,lastSyncAt:null,pairedAt:null},cfg,{enabled:false,pairedAt:null});
       saveState();
-      const id=ensureDeviceId();
+      const id=await ensureDeviceId();
       const response=await fetch(LICENSE_API_URL+'/v1/activation/redeem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code,clinicCode:cfg.clinicCode,deviceId:id})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'کد فعال‌سازی معتبر نیست یا قبلاً استفاده شده است.');
