@@ -84,5 +84,7 @@ jobs:
           grep -q 'getOrCreateDeviceId' DENTYAR_V101_LICENSE_TRIAL.html
           grep -q 'AndroidKeyStore' .github/workflows/build-licensing-trial-apk.yml
           grep -q 'AES/GCM/NoPadding' .github/workflows/build-licensing-trial-apk.yml
+          grep -q 'AEADBadTagException' .github/workflows/build-licensing-trial-apk.yml
+          grep -q 'could not reset an unavailable device identity' .github/workflows/build-licensing-trial-apk.yml
           grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
           grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
