@@ -295,11 +295,11 @@ export class RedemptionLock {
       const activationCode=String(body.activationCode||"");
       const expiryDays=Number(body.expiryDays);
       if(!/^[a-f0-9]{32}$/.test(licenseId) || !/^[A-F0-9]{16}$/.test(activationCode) || !Number.isInteger(expiryDays) || expiryDays<1 || expiryDays>3650) return new Response("invalid-approval",{status:400});
-      const approval=await this.state.storage.transaction(async txn=>{
-        const existing=await txn.get("approval");
+      const approval=await this.state.storage.transaction(async ()=>{
+        const existing=await this.state.storage.get("approval");
         if(existing && existing.expiresAt>now()) return existing;
         const next={licenseId,activationCode,expiryDays,licenseExpiresAt:now()+expiryDays*24*60*60*1000,expiresAt:now()+7*24*60*60*1000};
-        await txn.put("approval",next);
+        await this.state.storage.put("approval",next);
         return next;
       });
       await this.state.storage.setAlarm(approval.expiresAt);
@@ -308,10 +308,10 @@ export class RedemptionLock {
     if(path!=="/claim") return new Response("not-found",{status:404});
     const deviceId=String(body.deviceId||"");
     if(!/^[A-Za-z0-9_-]{12,100}$/.test(deviceId)) return new Response("invalid-device",{status:400});
-    const claimed = await this.state.storage.transaction(async txn => {
-      const existing=await txn.get("claim");
+    const claimed = await this.state.storage.transaction(async () => {
+      const existing=await this.state.storage.get("claim");
       if(existing) return existing.deviceId===deviceId;
-      await txn.put("claim",{deviceId,claimedAt:now()});
+      await this.state.storage.put("claim",{deviceId,claimedAt:now()});
       return true;
     });
     return new Response(claimed ? "claimed" : "already-used", { status: claimed ? 200 : 409 });
@@ -328,13 +328,13 @@ export class ActivationRateLimiter {
   constructor(state) { this.state=state; }
   async fetch(request) {
     if(request.method!=="POST" || new URL(request.url).pathname!=="/check") return new Response("not-found",{status:404});
-    const allowed=await this.state.storage.transaction(async txn=>{
+    const allowed=await this.state.storage.transaction(async ()=>{
       const timestamp=now();
-      const current=await txn.get("window");
+      const current=await this.state.storage.get("window");
       const window=current && timestamp-current.startedAt<60000 ? current : {startedAt:timestamp,count:0};
       if(window.count>=5) return false;
       window.count+=1;
-      await txn.put("window",window);
+      await this.state.storage.put("window",window);
       return true;
     });
     return new Response(allowed?"allowed":"rate-limited",{status:allowed?200:429});
