@@ -40,9 +40,9 @@ await adminPut("licenses/"+licenseId,{
 await adminPut("clinics/"+clinicCode+"/records/meta",{clinicName:"Test Clinic"});
 await adminPut("clinics/"+clinicCode+"/records/patients/p1",{id:"p1",name:"Patient Test"});
 
+await expectAllowed(await request("licenses/"+licenseId,token()),"matching license metadata read");
 await expectAllowed(await request("clinics/"+clinicCode+"/records/meta",token()),"licensed clinic read");
 await expectAllowed(await request("clinics/"+clinicCode+"/records/meta",token(), "PUT",{clinicName:"Updated"}),"licensed clinic write");
-await expectAllowed(await request("licenses/"+licenseId,token()),"matching license metadata read");
 await expectDenied(await request("licenses/"+licenseId,token({licenseId:"another_license"})),"other license metadata read");
 await expectDenied(await request("clinics/"+clinicCode+"/records/meta",null),"unauthenticated clinic read");
 await expectDenied(await request("clinics/"+clinicCode+"/records/meta",token({clinicCode:"OTHER_01"})),"cross-clinic read");
