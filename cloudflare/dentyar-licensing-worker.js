@@ -169,7 +169,8 @@ export default {
     if (request.method==="OPTIONS") return new Response(null,{status:204,headers:{ ...JSON_HEADERS, "access-control-allow-methods":"GET,POST,OPTIONS", "access-control-allow-headers":"authorization,content-type", "access-control-max-age":"600" }});
     if (url.pathname==="/health" && request.method==="GET") return json({ ok:true, service:"dentyar-licensing", version:1 });
     if (request.method==="GET" && (url.pathname==="/owner" || url.pathname==="/owner/")) {
-      return Response.redirect(new URL("/owner.html",request.url),302);
+      if (!env.ASSETS) return fail("owner-panel-not-configured",503);
+      return env.ASSETS.fetch(new Request(new URL("/owner.html",request.url),request));
     }
     if (url.pathname==="/v1/owner/config" && request.method==="GET") {
       return json({ ok:true, apiKey:String(env.FIREBASE_WEB_API_KEY||""), projectId:String(env.FIREBASE_PROJECT_ID||""), emailNotificationsEnabled:!!(env.RESEND_API_KEY && env.RESEND_FROM) });
