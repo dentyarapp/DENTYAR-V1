@@ -18,21 +18,28 @@ jobs:
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
       - name: Install Wrangler
         run: npm install --global wrangler@4
-      - name: Create licensing KV namespace automatically
+      - name: Create or reuse licensing KV namespace
         id: kv
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -euo pipefail
           test -n "$CF_TOKEN"
           test -n "$CF_ACCOUNT"
-          RESPONSE=$(curl --fail-with-body -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
-            -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
-            --data '{"title":"DENTYAR_LICENSES"}')
-          KV_ID=$(printf '%s' "$RESPONSE" | jq -r '.result.id // empty')
+          LIST=$(curl --fail-with-body -sS "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
+            -H "Authorization: Bearer $CF_TOKEN")
+          KV_ID=$(printf '%s' "$LIST" | jq -r '[.result[]? | select(.title=="DENTYAR_LICENSES") | .id][0] // empty')
           if [ -z "$KV_ID" ]; then
-            KV_ID=$(curl --fail-with-body -sS "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
-              -H "Authorization: Bearer $CF_TOKEN" | jq -r '.result[] | select(.title=="DENTYAR_LICENSES") | .id' | head -n1)
+            CREATE=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              --data '{"title":"DENTYAR_LICENSES"}')
+            KV_ID=$(printf '%s' "$CREATE" | jq -r '.result.id // empty')
+            if [ -z "$KV_ID" ]; then
+              echo "Cloudflare could not create the licensing KV namespace:"
+              printf '%s' "$CREATE" | jq -c '{success,errors,messages}'
+              exit 1
+            fi
           fi
           test -n "$KV_ID"
           sed -i "s/REPLACE_WITH_NEW_KV_NAMESPACE_ID/$KV_ID/" wrangler.licensing.toml
