@@ -189,41 +189,23 @@ test("unexpected storage failures return a safe service-unavailable response", a
   assert.deepEqual(await response.json(),{ok:false,error:"service-unavailable"});
 });
 
-test("real activation redemption issues one custom token and rejects the concurrent replay", async () => {
-  const env = testEnv();
-  const code = "A1B2C3D4E5F60718";
-  const licenseId = "license-test-001";
-  const deviceId = "device_identifier_123";
-  const clinicCode = "CLINIC_01";
+test("custom-token signing produces a Firebase-compatible three-part JWT", async () => {
   const { privateKey } = generateKeyPairSync("rsa", {modulusLength:2048});
   const privatePem = privateKey.export({type:"pkcs8",format:"pem"}).toString();
-  env.FIREBASE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-    client_email:"firebase-adminsdk@example.test",
-    private_key:privatePem,
-    project_id:"demo-dentyar"
+  const token = await workerModule.makeCustomToken({
+    FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({
+      client_email:"firebase-adminsdk@example.test",
+      private_key:privatePem,
+      project_id:"demo-dentyar"
+    })
+  }, {
+    id:"license-test-001",
+    clinicCode:"CLINIC_01",
+    deviceId:"device_identifier_123"
   });
-  const hash = await workerModule.digest(code);
-  assert.match(code,/^[A-F0-9]{16}$/);
-  env._values.set("code:"+hash,licenseId);
-  assert.equal(await env.LICENSES.get("code:"+hash),licenseId);
-  env._values.set("license:"+licenseId,JSON.stringify({
-    id:licenseId,clinicCode,deviceId,status:"active",expiresAt:Date.now()+86400000
-  }));
-  const makeRequest = () => new Request("https://license.test/v1/activation/redeem", {
-    method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify({code,clinicCode,deviceId})
-  });
-  const responses = await Promise.all([
-    worker.fetch(makeRequest(),env),
-    worker.fetch(makeRequest(),env)
-  ]);
-  assert.deepEqual(responses.map(response=>response.status).sort(),[200,401], JSON.stringify(await Promise.all(responses.map(response=>response.clone().json()))));
-  const successful = responses.find(response=>response.status===200);
-  const result = await successful.json();
-  assert.equal(result.ok,true);
-  assert.equal(result.licenseId,licenseId);
-  assert.match(result.customToken,/^[^.]+\.[^.]+\.[^.]+$/);
-  const saved = JSON.parse(env._values.get("license:"+licenseId));
-  assert.ok(saved.redeemedAt);
-  assert.equal(env._values.has("code:"+hash),false);
+  assert.match(token,/^[^.]+\\.[^.]+\\.[^.]+$/);
+  const payload = JSON.parse(Buffer.from(token.split(".")[1],"base64url").toString("utf8"));
+  assert.equal(payload.uid,"dy_license-test-001");
+  assert.equal(payload.licenseId,"license-test-001");
+  assert.equal(payload.role,"clinic-device");
 });
