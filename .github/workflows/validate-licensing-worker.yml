@@ -8,6 +8,7 @@ on:
       - 'cloudflare/dentyar-licensing-worker.js'
       - 'cloudflare/dentyar-licensing-worker.test.mjs'
       - 'cloudflare/licensing-panel/**'
+      - 'DENTYAR_V101_LICENSE_TRIAL.html'
       - 'wrangler.licensing.toml'
       - 'firebase-database.rules.template.json'
       - '.github/workflows/validate-licensing-worker.yml'
