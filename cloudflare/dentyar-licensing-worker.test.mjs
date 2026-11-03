@@ -9,19 +9,32 @@ const { RedemptionLock, ActivationRateLimiter } = await import("data:text/javasc
 function makeState() {
   const values = new Map();
   let tail = Promise.resolve();
-  return {
+  const state={
     storage: {
       async get(key) { return values.get(key); },
       async put(key, value) { values.set(key, value); },
       async delete(key) { values.delete(key); },
       async setAlarm(timestamp) { values.set("__alarm",timestamp); },
       transaction(fn) {
-        const run = tail.then(() => fn());
-        tail = run.catch(() => {});
+        const run=tail.then(async()=>{
+          const draft=new Map(values);
+          const txn={
+            async get(key){return draft.get(key);},
+            async put(key,value){draft.set(key,value);},
+            async delete(key){draft.delete(key);}
+          };
+          const result=await fn(txn);
+          values.clear();
+          for(const [key,value] of draft) values.set(key,value);
+          return result;
+        });
+        tail=run.catch(()=>{});
         return run;
       }
-    }
+    },
+    _values:values
   };
+  return state;
 }
 
 test("concurrent claims from different devices allow exactly one device", async () => {
