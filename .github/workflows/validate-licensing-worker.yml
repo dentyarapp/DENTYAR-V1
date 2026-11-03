@@ -15,20 +15,6 @@ on:
       - 'cloudflare/test-rtdb-licensing-rules.mjs'
       - 'cloudflare/test-firebase-auth-emulator.mjs'
       - '.github/workflows/validate-licensing-worker.yml'
-  pull_request:
-    branches:
-      - build/v101-parallel-app-20261102
-    paths:
-      - 'cloudflare/dentyar-licensing-worker.js'
-      - 'cloudflare/dentyar-licensing-worker.test.mjs'
-      - 'cloudflare/licensing-panel/**'
-      - 'cloudflare/test-rtdb-licensing-rules.mjs'
-      - 'DENTYAR_V101_LICENSE_TRIAL.html'
-      - 'wrangler.licensing.toml'
-      - 'firebase-database.rules.template.json'
-      - 'firebase.licensing-emulator.json'
-      - '.github/workflows/validate-licensing-worker.yml'
-
 permissions:
   contents: read
 
