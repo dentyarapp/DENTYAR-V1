@@ -261,13 +261,25 @@ export default {
     if (url.pathname==="/v1/owner/activation-code") {
       const license=await env.LICENSES.get("license:"+String(body.licenseId||""),"json");
       if (!license || !license.requestId) return fail("license-not-found",404);
+      if(license.status!=="active" || (license.expiresAt && license.expiresAt<=now())) return fail("license-not-active",403);
       const approvalId=env.REDEMPTION_LOCKS.idFromName("approval:"+license.requestId);
       const approvalLock=env.REDEMPTION_LOCKS.get(approvalId);
-      const approvalResponse=await approvalLock.fetch("https://redemption-lock/approval",{method:"GET"});
-      if (!approvalResponse.ok) return fail("activation-code-expired-or-unavailable",404);
+      let approvalResponse=await approvalLock.fetch("https://redemption-lock/approval",{method:"GET"});
+      let reissued=false;
+      if(!approvalResponse.ok) {
+        const activationCode=randomHex(8).toUpperCase();
+        const remainingDays=Math.max(1,Math.min(3650,Math.ceil((license.expiresAt-now())/(24*60*60*1000))));
+        approvalResponse=await approvalLock.fetch("https://redemption-lock/approve",{
+          method:"POST",headers:{"content-type":"application/json"},
+          body:JSON.stringify({licenseId:license.id,activationCode,expiryDays:remainingDays})
+        });
+        if(!approvalResponse.ok) return fail("activation-code-reissue-failed",409);
+        reissued=true;
+      }
       const approval=await approvalResponse.json();
       if (approval.licenseId!==license.id || !approval.activationCode) return fail("activation-code-expired-or-unavailable",404);
-      return json({ok:true,licenseId:license.id,activationCode:approval.activationCode,clinicCode:license.clinicCode,deviceName:license.deviceName});
+      if(reissued) await env.LICENSES.put("code:"+await digest(approval.activationCode),license.id,{expirationTtl:60*60*24*7});
+      return json({ok:true,licenseId:license.id,activationCode:approval.activationCode,clinicCode:license.clinicCode,deviceName:license.deviceName,reissued});
     }
     if (url.pathname==="/v1/owner/licenses") {
       const keys=await env.LICENSES.list({prefix:"license:"});
