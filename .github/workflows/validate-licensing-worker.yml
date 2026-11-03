@@ -6,6 +6,7 @@ on:
       - feature/dentyar-owner-licensing-20261103
     paths:
       - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
       - 'wrangler.licensing.toml'
       - 'firebase-database.rules.template.json'
       - '.github/workflows/validate-licensing-worker.yml'
