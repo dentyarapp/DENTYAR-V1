@@ -6,3 +6,11 @@ workers_dev = true
 [[kv_namespaces]]
 binding = "LICENSES"
 id = "REPLACE_WITH_NEW_KV_NAMESPACE_ID"
+
+[[durable_objects.bindings]]
+name = "REDEMPTION_LOCKS"
+class_name = "RedemptionLock"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RedemptionLock"]
