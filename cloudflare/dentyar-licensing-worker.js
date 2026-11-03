@@ -44,6 +44,19 @@ async function readJsonLimited(request, maxBytes=16384) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 const randomHex = (n=24) => [...crypto.getRandomValues(new Uint8Array(n))].map(x=>x.toString(16).padStart(2,"0")).join("");
+const ACTIVATION_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+function randomActivationCode() {
+  let code = "";
+  while (code.length < 16) {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    for (const byte of bytes) {
+      if (byte < 252) code += ACTIVATION_ALPHABET[byte % ACTIVATION_ALPHABET.length];
+      if (code.length === 16) break;
+    }
+  }
+  return code;
+}
+const isActivationCode = value => /^[A-Z0-9]{16}$/.test(String(value));
 async function digest(value) {
   return b64url(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
 }
@@ -142,7 +155,7 @@ async function redeem(request, env, body) {
   const rate=await limiter.fetch("https://activation-limit/check",{method:"POST"});
   if (!rate.ok) return fail("activation-attempt-rate-limited",429);
   const normalizedCode = String(body.code||"").trim().toUpperCase();
-  if (!/^[A-F0-9]{16}$/.test(normalizedCode)) return fail("invalid-or-used-code",401);
+  if (!isActivationCode(normalizedCode)) return fail("invalid-or-used-code",401);
   if (!/^[A-Za-z0-9_-]{12,100}$/.test(String(body.deviceId||"")) || !/^[A-Z0-9_-]{4,32}$/.test(String(body.clinicCode||""))) return fail("invalid-request");
   const codeHash = await digest(normalizedCode);
   const id = await env.LICENSES.get("code:"+codeHash);
@@ -242,7 +255,7 @@ export default {
       // retries reuse the same license ID and activation code instead of minting duplicates.
       const approvalLockId=env.REDEMPTION_LOCKS.idFromName("approval:"+item.id);
       const approvalLock=env.REDEMPTION_LOCKS.get(approvalLockId);
-      const proposed={licenseId:randomHex(16),activationCode:randomHex(8).toUpperCase(),expiryDays:requestedExpiry};
+      const proposed={licenseId:randomHex(16),activationCode:randomActivationCode(),expiryDays:requestedExpiry};
       const approvalResponse=await approvalLock.fetch("https://redemption-lock/approve",{
         method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proposed)
       });
@@ -339,7 +352,7 @@ export class RedemptionLock {
       const licenseId=String(body.licenseId||"");
       const activationCode=String(body.activationCode||"");
       const expiryDays=Number(body.expiryDays);
-      if(!/^[a-f0-9]{32}$/.test(licenseId) || !/^[A-F0-9]{16}$/.test(activationCode) || !Number.isInteger(expiryDays) || expiryDays<1 || expiryDays>3650) return new Response("invalid-approval",{status:400});
+      if(!/^[a-f0-9]{32}$/.test(licenseId) || !isActivationCode(activationCode) || !Number.isInteger(expiryDays) || expiryDays<1 || expiryDays>3650) return new Response("invalid-approval",{status:400});
       const approval=await this.state.storage.transaction(async txn=>{
         const existing=await txn.get("approval");
         if(existing && existing.rejected) return {rejected:true};
@@ -400,4 +413,4 @@ export class ActivationRateLimiter {
   }
 }
 
-export { makeCustomToken, databaseBase, digest };
+export { makeCustomToken, databaseBase, digest, randomActivationCode, isActivationCode };
