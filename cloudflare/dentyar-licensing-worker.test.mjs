@@ -458,4 +458,11 @@ test("activation redemption issues a signed Firebase token once and blocks repla
   assert.match(data.customToken,/^[^.]+\.[^.]+\.[^.]+$/);
   const saved=JSON.parse(env._values.get("license:"+licenseId));
   assert.ok(saved.redeemedAt);
+  const wrongDevice=await worker.fetch(new Request("https://license.test/v1/activation/redeem",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({code,clinicCode,deviceId:"another_device_identifier"})
+  }),env);
+  assert.equal(wrongDevice.status,403);
+  const retry=await worker.fetch(makeRequest(),env);
+  assert.equal(retry.status,200);
 });
