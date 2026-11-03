@@ -215,7 +215,7 @@ test("real activation redemption issues one custom token and rejects the concurr
     worker.fetch(makeRequest(),env),
     worker.fetch(makeRequest(),env)
   ]);
-  assert.deepEqual(responses.map(response=>response.status).sort(),[200,401]);
+  assert.deepEqual(responses.map(response=>response.status).sort(),[200,401], JSON.stringify(await Promise.all(responses.map(response=>response.clone().json()))));
   const successful = responses.find(response=>response.status===200);
   const result = await successful.json();
   assert.equal(result.ok,true);
