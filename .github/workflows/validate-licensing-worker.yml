@@ -31,6 +31,8 @@ jobs:
           node-version: 20
       - name: Syntax-check isolated Worker
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Test atomic redemption lock behavior
+        run: node --test cloudflare/dentyar-licensing-worker.test.mjs
       - name: Verify required endpoints and secret boundaries
         run: |
           set -euo pipefail
