@@ -58,7 +58,8 @@ async function verifyOwner(request, env) {
   const match = auth.match(/^Bearer\s+(.+)$/i);
   if (!match) return false;
   const apiKey = String(env.FIREBASE_WEB_API_KEY || "");
-  if (!apiKey) return false;\n  const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+encodeURIComponent(apiKey), {
+  if (!apiKey) return false;
+  const response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+encodeURIComponent(apiKey), {
     method:"POST", headers:{ "content-type":"application/json" },
     body:JSON.stringify({ idToken:match[1] })
   });
