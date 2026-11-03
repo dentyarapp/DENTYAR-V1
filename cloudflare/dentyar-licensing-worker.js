@@ -57,10 +57,21 @@ async function signJwt(payload, privateKeyPem) {
   return input+"."+b64url(signature);
 }
 let cachedAccess = null;
+function databaseBase(env) {
+  const projectId=String(env.FIREBASE_PROJECT_ID||"");
+  const configured=String(env.FIREBASE_DATABASE_URL||"");
+  if(!/^[a-z0-9-]{4,40}$/.test(projectId)) throw new Error("firebase-project-id-invalid");
+  const url=new URL(configured);
+  if(url.protocol!=="https:" || url.hostname!==projectId+"-default-rtdb.firebaseio.com" || url.username || url.password || url.search || url.hash || (url.pathname!=="/" && url.pathname!=="")) {
+    throw new Error("firebase-database-url-mismatch");
+  }
+  return url.origin;
+}
 async function googleAccess(env) {
   if (cachedAccess && cachedAccess.exp > now()+60000) return cachedAccess.token;
   const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
   if (!sa.client_email || !sa.private_key || !sa.project_id) throw new Error("firebase-admin-secret-not-configured");
+  if (sa.project_id !== String(env.FIREBASE_PROJECT_ID||"")) throw new Error("firebase-service-account-project-mismatch");
   const iat = Math.floor(now()/1000);
   const assertion = await signJwt({ iss:sa.client_email, scope:"https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email", aud:"https://oauth2.googleapis.com/token", iat, exp:iat+3600 }, sa.private_key);
   const response = await fetch("https://oauth2.googleapis.com/token", { method:"POST", headers:{ "content-type":"application/x-www-form-urlencoded" }, body:new URLSearchParams({ grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
@@ -102,6 +113,7 @@ async function sendOwnerEmail(env, subject, body) {
 }
 async function makeCustomToken(env, license) {
   const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
+  if(sa.project_id !== String(env.FIREBASE_PROJECT_ID||"")) throw new Error("firebase-service-account-project-mismatch");
   const iat = Math.floor(now()/1000);
   return signJwt({
     iss:sa.client_email, sub:sa.client_email,
@@ -308,4 +320,4 @@ export class ActivationRateLimiter {
   }
 }
 
-export { makeCustomToken };
+export { makeCustomToken, databaseBase };
