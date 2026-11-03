@@ -110,6 +110,19 @@ test("approval-code expiry preserves the approved license lock against later rej
   assert.equal((await lock.fetch(new Request("https://redemption-lock/reject",{method:"POST"}))).status,409);
 });
 
+test("approval expiry alarm reschedules itself if a code was renewed concurrently", async () => {
+  const state=makeState();
+  const lock=new RedemptionLock(state);
+  const future=Date.now()+60000;
+  await state.storage.put("approval",{
+    licenseId:"d".repeat(32),activationCode:"D".repeat(16),
+    expiresAt:future,expiryDays:365,licenseExpiresAt:future+86400000
+  });
+  await lock.alarm();
+  assert.equal(state._values.get("__alarm"),future);
+  assert.equal((await state.storage.get("approval")).activationCode,"D".repeat(16));
+});
+
 test("only POST /claim is accepted", async () => {
   const lock = new RedemptionLock(makeState());
   const response = await lock.fetch(new Request("https://redemption-lock/other", { method: "POST" }));
