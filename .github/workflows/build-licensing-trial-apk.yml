@@ -506,20 +506,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V101-224-LICENSE-TRIAL-APK
-          path: DENTYAR-V101-223.apk
+          path: DENTYAR-V101-224-LICENSE-TRIAL.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه نهایی دنت‌یار
-        if: ${{ steps.signing.outputs.available == 'true' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-v101]') }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v101-223-final
-          name: DENTYAR V101-223 Final
-          body: |
-            نسخه نهایی دنت‌یار V101-223 شامل اصلاح شماره دندان، ویرایش کنترل‌شده پرونده بیمار، و نمایش مرحله و کد خطای همگام‌سازی؛ با شناسه برنامه و کلید امضای ثابت نسخه تولیدی.
-            این APK با کلید امضای ثابت دنت‌یار ساخته می‌شود تا به‌روزرسانی نسخه نصب‌شده امکان‌پذیر باشد.
-          files: DENTYAR-V101-223.apk
-          make_latest: true
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
