@@ -257,6 +257,10 @@ test("owner login receives only the public Firebase client configuration", async
   const response=await worker.fetch(new Request("https://license.test/v1/owner/config"),env);
   assert.equal(response.status,200);
   assert.deepEqual(await response.json(),{ok:true,apiKey:"public-client-key",projectId:"demo-dentyar",emailNotificationsEnabled:false});
+  const configured=await worker.fetch(new Request("https://license.test/v1/owner/config"),{
+    ...env,RESEND_API_KEY:"configured-resend-key",RESEND_FROM:"DENTYAR <licenses@example.test>"
+  });
+  assert.equal((await configured.json()).emailNotificationsEnabled,true);
 });
 
 test("owner panel contains syntactically valid JavaScript and Persian RTL layout", async () => {
