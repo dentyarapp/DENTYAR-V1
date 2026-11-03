@@ -25,21 +25,23 @@ function makeState() {
   };
 }
 
-test("a redemption code can be claimed only once, including concurrent requests", async () => {
+test("concurrent claims from different devices allow exactly one device", async () => {
   const lock = new RedemptionLock(makeState());
-  const claims = await Promise.all([
-    lock.fetch(new Request("https://redemption-lock/claim", { method: "POST" })),
-    lock.fetch(new Request("https://redemption-lock/claim", { method: "POST" }))
-  ]);
-  assert.deepEqual(claims.map(response => response.status).sort(), [200, 409]);
+  const claim = deviceId => lock.fetch(new Request("https://redemption-lock/claim", {
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({deviceId})
+  }));
+  const claims = await Promise.all([claim("device_identifier_123"),claim("device_identifier_456")]);
+  assert.deepEqual(claims.map(response => response.status).sort(), [200,409]);
 });
 
-test("a previously claimed redemption code stays unavailable", async () => {
+test("the bound device can safely retry redemption without opening access to another device", async () => {
   const lock = new RedemptionLock(makeState());
-  const first = await lock.fetch(new Request("https://redemption-lock/claim", { method: "POST" }));
-  const second = await lock.fetch(new Request("https://redemption-lock/claim", { method: "POST" }));
-  assert.equal(first.status, 200);
-  assert.equal(second.status, 409);
+  const claim = deviceId => lock.fetch(new Request("https://redemption-lock/claim", {
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({deviceId})
+  }));
+  assert.equal((await claim("device_identifier_123")).status,200);
+  assert.equal((await claim("device_identifier_123")).status,200);
+  assert.equal((await claim("device_identifier_456")).status,409);
 });
 
 test("only POST /claim is accepted", async () => {
