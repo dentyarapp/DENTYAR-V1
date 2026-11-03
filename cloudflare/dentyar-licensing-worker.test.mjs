@@ -223,6 +223,44 @@ test("disabled Firebase owner accounts cannot access licensing administration", 
   }
 });
 
+test("verified backup owner email is accepted by the owner allowlist", async () => {
+  const env=testEnv();
+  env.OWNER_EMAIL="dentyar.app@gmail.com";
+  env.OWNER_EMAILS="dentyar.app@gmail.com,h.alkasir13@gmail.com";
+  env.FIREBASE_WEB_API_KEY="test-api-key";
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({
+    users:[{email:"h.alkasir13@gmail.com",emailVerified:true,disabled:false}]
+  }),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(new Request("https://license.test/v1/owner/requests",{
+      method:"GET",headers:{authorization:"Bearer backup-owner-id-token"}
+    }),env);
+    assert.equal(response.status,200);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test("unlisted verified email cannot access owner administration", async () => {
+  const env=testEnv();
+  env.OWNER_EMAIL="dentyar.app@gmail.com";
+  env.OWNER_EMAILS="dentyar.app@gmail.com,h.alkasir13@gmail.com";
+  env.FIREBASE_WEB_API_KEY="test-api-key";
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({
+    users:[{email:"outsider@example.test",emailVerified:true,disabled:false}]
+  }),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(new Request("https://license.test/v1/owner/requests",{
+      method:"GET",headers:{authorization:"Bearer outsider-id-token"}
+    }),env);
+    assert.equal(response.status,403);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
 test("unknown POST endpoints do not expose internal routing details", async () => {
   const response = await worker.fetch(new Request("https://license.test/v1/not-a-route", {
     method:"POST", headers:{"content-type":"application/json"}, body:"{}"
