@@ -66,6 +66,7 @@ jobs:
           grep -q '"/v1/owner/approve"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/reject"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/licenses"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/activation-code"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/config"' cloudflare/dentyar-licensing-worker.js
           grep -q '"/v1/owner/revoke"' cloudflare/dentyar-licensing-worker.js
           grep -q 'FIREBASE_SERVICE_ACCOUNT_JSON' cloudflare/dentyar-licensing-worker.js
