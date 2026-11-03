@@ -120,8 +120,15 @@ jobs:
           set -euo pipefail
           HEALTH=$(curl --fail-with-body -sS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/health)
           echo "$HEALTH" | jq -e '.ok == true and .service == "dentyar-licensing"'
-          OWNER_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner)
+          OWNER_BODY=$(mktemp)
+          OWNER_STATUS=$(curl -sS -o "$OWNER_BODY" -w '%{http_code}' https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/owner)
+          echo "Owner panel HTTP status: $OWNER_STATUS"
+          head -c 180 "$OWNER_BODY" || true
+          echo
           test "$OWNER_STATUS" = "200"
-          STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X OPTIONS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/v1/activation/redeem)
+          grep -qi '<html' "$OWNER_BODY"
+          PREFLIGHT_BODY=$(mktemp)
+          STATUS=$(curl -sS -o "$PREFLIGHT_BODY" -w '%{http_code}' -X OPTIONS https://dentyar-licensing-api.dentyar-cloudflare.workers.dev/v1/activation/redeem)
+          echo "CORS preflight HTTP status: $STATUS"
           test "$STATUS" = "204"
-          echo "API health, owner panel HTTP $OWNER_STATUS, and CORS preflight $STATUS verified."
+          echo "API health, owner panel, and CORS preflight verified."
