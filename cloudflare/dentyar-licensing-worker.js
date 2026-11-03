@@ -245,6 +245,17 @@ export default {
       await env.LICENSES.put("license:"+license.id,JSON.stringify(license));
       return json({ ok:true, status:"revoked" });
     }
+    if (url.pathname==="/v1/owner/activation-code") {
+      const license=await env.LICENSES.get("license:"+String(body.licenseId||""),"json");
+      if (!license || !license.requestId) return fail("license-not-found",404);
+      const approvalId=env.REDEMPTION_LOCKS.idFromName("approval:"+license.requestId);
+      const approvalLock=env.REDEMPTION_LOCKS.get(approvalId);
+      const approvalResponse=await approvalLock.fetch("https://redemption-lock/approval",{method:"GET"});
+      if (!approvalResponse.ok) return fail("activation-code-expired-or-unavailable",404);
+      const approval=await approvalResponse.json();
+      if (approval.licenseId!==license.id || !approval.activationCode) return fail("activation-code-expired-or-unavailable",404);
+      return json({ok:true,licenseId:license.id,activationCode:approval.activationCode,clinicCode:license.clinicCode,deviceName:license.deviceName});
+    }
     if (url.pathname==="/v1/owner/licenses") {
       const keys=await env.LICENSES.list({prefix:"license:"});
       const licenses=[];
@@ -264,8 +275,13 @@ export default {
 export class RedemptionLock {
   constructor(state) { this.state = state; }
   async fetch(request) {
-    if(request.method!=="POST") return new Response("not-found",{status:404});
     const path=new URL(request.url).pathname;
+    if(request.method==="GET" && path==="/approval") {
+      const approval=await this.state.storage.get("approval");
+      if(!approval || approval.expiresAt<=now()) return new Response("not-found",{status:404});
+      return new Response(JSON.stringify(approval),{status:200,headers:{"content-type":"application/json"}});
+    }
+    if(request.method!=="POST") return new Response("not-found",{status:404});
     if(path!=="/approve" && path!=="/claim") return new Response("not-found",{status:404});
     let body;
     try { body=await request.json(); } catch { return new Response("invalid-request",{status:400}); }
