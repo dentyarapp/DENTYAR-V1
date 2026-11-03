@@ -384,3 +384,42 @@ test("admin database writes are pinned to the canonical DENTYAR RTDB host", () =
     assert.throws(()=>workerModule.databaseBase({FIREBASE_PROJECT_ID:"dentyar-458d9",FIREBASE_DATABASE_URL}));
   }
 });
+
+test("owner can recover an issued activation code after a lost approval response", async () => {
+  const env=testEnv();
+  const requestId="a".repeat(32);
+  const licenseId="b".repeat(32);
+  const activationCode="A1B2C3D4E5F60718";
+  const approvalLock=env.REDEMPTION_LOCKS.get("approval:"+requestId);
+  const approval=await approvalLock.fetch("https://redemption-lock/approve",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({licenseId,activationCode,expiryDays:365})
+  });
+  assert.equal(approval.status,200);
+  env._values.set("license:"+licenseId,JSON.stringify({
+    id:licenseId,clinicCode:"CLINIC_01",deviceId:"device_identifier_123",
+    deviceName:"Test phone",status:"active",requestId
+  }));
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({
+    users:[{email:"owner@example.test",emailVerified:true}]
+  }),{status:200,headers:{"content-type":"application/json"}});
+  try {
+    const response=await worker.fetch(new Request("https://license.test/v1/owner/activation-code",{
+      method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},
+      body:JSON.stringify({licenseId})
+    }),{...env,OWNER_EMAIL:"owner@example.test",FIREBASE_WEB_API_KEY:"test-api-key"});
+    assert.equal(response.status,200);
+    const data=await response.json();
+    assert.equal(data.activationCode,activationCode);
+    assert.equal(data.licenseId,licenseId);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test("redemption lock exposes no approval details after expiry", async () => {
+  const lock=new RedemptionLock(makeState());
+  const response=await lock.fetch(new Request("https://redemption-lock/approval"));
+  assert.equal(response.status,404);
+});
