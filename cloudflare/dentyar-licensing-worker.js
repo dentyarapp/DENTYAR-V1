@@ -128,11 +128,18 @@ export default {
       requests.sort((a,b)=>a.createdAt-b.createdAt);
       return json({ ok:true, requests });
     }
+    if (url.pathname==="/v1/owner/reject") {
+      const item=await env.LICENSES.get("request:"+String(body.requestId||""),"json");
+      if (!item || item.status!=="pending") return fail("request-not-pending",404);
+      item.status="rejected"; item.reviewedAt=now();
+      await env.LICENSES.put("request:"+item.id,JSON.stringify(item));
+      return json({ ok:true, status:"rejected" });
+    }
     if (url.pathname==="/v1/owner/approve") {
       const item=await env.LICENSES.get("request:"+String(body.requestId||""),"json");
       if (!item || item.status!=="pending") return fail("request-not-pending",404);
       const id=randomHex(16), code=randomHex(8).toUpperCase();
-      const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:body.expiresAt?Number(body.expiresAt):null, requestId:item.id };
+      const license={ id, clinicCode:item.clinicCode, deviceId:item.deviceId, deviceName:item.deviceName, status:"active", createdAt:now(), expiresAt:expiry, requestId:item.id };
       await env.LICENSES.put("license:"+id,JSON.stringify(license));
       await env.LICENSES.put("code:"+await digest(code),id,{expirationTtl:60*60*24*7});
       item.status="approved"; item.licenseId=id; item.reviewedAt=now();
