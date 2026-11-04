@@ -7,7 +7,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DENTYAR</title>
-<script>const DENTYAR_APP_VERSION = "V101.224";</script>
+<script>const DENTYAR_APP_VERSION = "V101.225";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -3956,7 +3956,7 @@ function renderUpdaterPanel(){
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
         <div class="updateStatus">
-          <span>نسخه نصب‌شده: <b id="currentAppVersion">V101.224</b></span>
+          <span>نسخه نصب‌شده: <b id="currentAppVersion">V101.225</b></span>
           <span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span>
         </div>
         <div class="updateHint" id="platformUpdateHint">
@@ -3978,7 +3978,7 @@ function renderUpdaterPanel(){
             این بخش مخصوص نسخه Android است. فایل APK نسخه جدید را به‌صورت دستی انتخاب کنید تا ذخیره و برای نصب آماده شود؛ iPhone/iPad فایل APK را نصب نمی‌کند و از نسخه وب/PWA استفاده می‌کند.
           </p>
           <div class="grid2">
-            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V101.224"></div>
+            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V101.225"></div>
             <div><label>عنوان تغییرات</label><input id="updateNoteInput" placeholder="مثلاً بهبود سازگاری دستگاه‌ها"></div>
           </div>
           <label style="margin-top:8px">فایل APK نسخه جدید</label>
@@ -3994,7 +3994,7 @@ function renderUpdaterPanel(){
       </div>
     </div>`;
   const versionLabel=document.getElementById("currentAppVersion");
-  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V101.224");
+  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V101.225");
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
@@ -4596,7 +4596,7 @@ function renderContact(){
         <div style="flex:1;min-width:180px">
           <h2 style="margin:0;color:#0f766e;font-size:23px">دنت‌یار</h2>
           <div style="font-weight:800;color:#17324d;margin-top:5px">دستیار هوشمند دندان‌پزشکی شما</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه برنامه V101.224 | بسته انتشار ۲۲۴</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه برنامه V101.225 | بسته انتشار ۲۲۵</div>
         </div>
       </div>
     </div>
@@ -4607,31 +4607,9 @@ function renderContact(){
       <div class="kv"><span>رایانامه پشتیبانی</span><b dir="ltr">${esc(contactEmail)}</b></div>
       <p style="font-size:11px;color:var(--muted);margin-top:10px">برای پشتیبانی و دریافت راهنمایی، از راه‌های ارتباطی رسمی بالا استفاده کنید.</p>
     </div>
-    <div class="card" style="padding:0!important;overflow:hidden;border:1px solid #b8dfe0;background:linear-gradient(145deg,#f7ffff 0%,#e7f5f5 48%,#d2eeee 100%)">
-      <div style="padding:18px 16px 14px;text-align:center;background:linear-gradient(135deg,#075b68,#0f766e);color:#fff">
-        <div style="font-size:25px;font-weight:900;letter-spacing:.4px">DENTYAR</div>
-        <div style="font-size:17px;font-weight:800;margin-top:5px">دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما</div>
-        <div style="font-size:12px;margin-top:7px;opacity:.95">مدیریت یکپارچه مطب؛ از پذیرش تا پیگیری درمان</div>
-      </div>
-      <div style="padding:14px 16px">
-        <div style="font-size:14px;font-weight:900;text-align:center;color:#075b68;margin-bottom:12px">امکانات کلیدی دنت‌یار</div>
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پذیرش و نوبت‌دهی</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پرونده الکترونیکی بیماران</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">ثبت و پیگیری طرح درمان</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">مدیریت مالی و بیمه‌ها</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">گزارش‌های مدیریتی</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پشتیبان‌گیری و بازیابی</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">همکاری چنددستگاهی و چندکاربره</div>
-          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پیامک و یادآوری مراجعات</div>
-        </div>
-        <div style="margin-top:12px;padding:12px;border-radius:14px;background:#075b68;color:#fff;text-align:center">
-          <div style="font-size:13px;font-weight:900">مدیریت هوشمند مطب، نظم بیشتر و پیگیری دقیق‌تر</div>
-          <div style="font-size:11px;margin-top:6px;line-height:1.9">طراح، مدیر پروژه و پشتیبان: حمید آل‌کثیر<br>مشاور طرح: محمدامین آل‌کثیر</div>
-          <div style="font-size:12px;font-weight:800;margin-top:7px" dir="ltr">dentyar.app@gmail.com</div>
-          <div style="font-size:12px;margin-top:5px" dir="ltr">${esc(contactPhone)} | ${contactPhoneAlt}</div>
-        </div>
-      </div>
+    <div class="card" style="padding:8px!important;overflow:hidden;border:1px solid #b8dfe0;background:#eaf7f7">
+      <h3 style="margin:8px 8px 12px;text-align:center;color:#075b68">پوستر رسمی معرفی دنت‌یار</h3>
+      <img src="data:image/webp;base64,__POSTER_DATA__" alt="پوستر رسمی معرفی دنت‌یار؛ دستیار هوشمند دندان‌پزشکی" style="display:block;width:100%;height:auto;object-fit:contain;border-radius:12px;background:#fff" loading="eager">
     </div>
     <div class="card" style="border-top:4px solid #0f766e">
       <h3 style="color:#0f766e;font-size:20px;margin-top:0">دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما</h3>
