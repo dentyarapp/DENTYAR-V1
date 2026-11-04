@@ -7,7 +7,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DENTYAR</title>
-<script>const DENTYAR_APP_VERSION = "V101.225";</script>
+<script>const DENTYAR_APP_VERSION = "V101.226";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -3956,7 +3956,7 @@ function renderUpdaterPanel(){
       <h3>🔄 مرکز بروزرسانی DENTYAR</h3>
       <div class="updateBox">
         <div class="updateStatus">
-          <span>نسخه نصب‌شده: <b id="currentAppVersion">V101.225</b></span>
+          <span>نسخه نصب‌شده: <b id="currentAppVersion">V101.226</b></span>
           <span class="platformBadge" id="dentyarPlatformBadge">در حال شناسایی دستگاه…</span>
         </div>
         <div class="updateHint" id="platformUpdateHint">
@@ -3978,7 +3978,7 @@ function renderUpdaterPanel(){
             این بخش مخصوص نسخه Android است. فایل APK نسخه جدید را به‌صورت دستی انتخاب کنید تا ذخیره و برای نصب آماده شود؛ iPhone/iPad فایل APK را نصب نمی‌کند و از نسخه وب/PWA استفاده می‌کند.
           </p>
           <div class="grid2">
-            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V101.225"></div>
+            <div><label>شماره نسخه جدید</label><input id="updateVersionInput" placeholder="مثلاً V101.226"></div>
             <div><label>عنوان تغییرات</label><input id="updateNoteInput" placeholder="مثلاً بهبود سازگاری دستگاه‌ها"></div>
           </div>
           <label style="margin-top:8px">فایل APK نسخه جدید</label>
@@ -3994,7 +3994,7 @@ function renderUpdaterPanel(){
       </div>
     </div>`;
   const versionLabel=document.getElementById("currentAppVersion");
-  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V101.225");
+  if(versionLabel) versionLabel.textContent=String(DENTYAR_APP_VERSION||"V101.226");
   loadSavedUpdateInfo();
   updatePlatformUi();
 }
@@ -4569,18 +4569,18 @@ function renderGuide(){
       <h3>راهنمای استفاده از سامانه</h3>
       <p style="font-size:13px;color:var(--muted)">روی «پخش صوتی» بزنید تا هر بخش با صدای گوشی خوانده شود.</p>
     </div>
-    ${GUIDE_SECTIONS.map((s,i)=>`
-      <div class="card">
-        <div class="helpStep">
-          <div class="num">${i+1}</div>
-          <div style="flex:1">
-            <h3 style="margin:0 0 6px">${esc(s.title)}</h3>
-            <div style="font-size:13.5px;line-height:1.9">${esc(s.text)}</div>
-            <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick='speakText(${JSON.stringify(s.text)})'>🔊 پخش صوتی</button>
-          </div>
-        </div>
-      </div>
-    `).join('')}
+    \${GUIDE_SECTIONS.map((s,i)=>{
+      const steps=s.text.split('\n').map(line=>line.replace(/^\s*\d+[)\.،-]?\s*/, '').trim()).filter(Boolean);
+      return '<section class="card" style="padding:14px!important">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">' +
+          '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;border-radius:10px;background:#e7f5f3;color:#0f766e;font-weight:900">'+(i+1)+'</span>' +
+          '<h3 style="margin:0;font-size:15px">'+esc(s.title.replace(/^\d+\.\s*/,''))+'</h3></div>' +
+        '<ol style="list-style:none;margin:0;padding:0;display:grid;gap:8px">' +
+          steps.map((step,j)=>'<li style="display:grid;grid-template-columns:30px minmax(0,1fr);align-items:start;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card)">' +
+            '<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:#eef6f7;color:#17636b;font-size:12px;font-weight:800">'+(j+1)+'</span>' +
+            '<span style="font-size:13.5px;line-height:1.9;white-space:normal">'+esc(step)+'</span></li>').join('') +
+        '</ol><button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="speakText('+JSON.stringify(s.title+'. '+s.text)+')">🔊 پخش صوتی این بخش</button></section>';
+    }).join('')}
   `;
 }
 
@@ -4596,7 +4596,7 @@ function renderContact(){
         <div style="flex:1;min-width:180px">
           <h2 style="margin:0;color:#0f766e;font-size:23px">دنت‌یار</h2>
           <div style="font-weight:800;color:#17324d;margin-top:5px">دستیار هوشمند دندان‌پزشکی شما</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه برنامه V101.225 | بسته انتشار ۲۲۵</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">نسخه برنامه V101.226 | بسته انتشار ۲۲۶</div>
         </div>
       </div>
     </div>
@@ -4638,7 +4638,7 @@ function renderContact(){
       </div>
     </div>    <div class="card">
       <h3>مشخصات نسخه</h3>
-      <div class="kv"><span>نسخه برنامه</span><b>V70 — نسخه نهایی تثبیت‌شده</b></div>
+      <div class="kv"><span>نسخه برنامه</span><b>V101.226 — نسخه آزمایشی مجوزدهی</b></div>
       <div class="kv"><span>طراح، مدیر فنی و پشتیبان</span><b>حمید آل کثیر</b></div>
     </div>
   `;
