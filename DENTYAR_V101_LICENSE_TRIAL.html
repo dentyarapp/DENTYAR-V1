@@ -5689,12 +5689,13 @@ document.addEventListener('focus',e=>{
       connectStage='device-registration'; SYNC.renderStatus&&SYNC.renderStatus();
       await dbm.set(dbm.ref(db, base()+'/devices/'+deviceId),
         { name: cfg.deviceName||('دستگاه '+deviceId.slice(-4)), lastSeen: dbm.serverTimestamp() });
-      subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){connectStage='ready';SYNC._lastError=null;}else if(started){connectStage='waiting-rtdb';} SYNC.renderStatus&&SYNC.renderStatus(); }));
+      // Set the waiting state BEFORE registering listeners; their initial callback may fire immediately.
+      connectStage='waiting-rtdb';
+      subs.push(dbm.onValue(dbm.ref(db,'.info/connected'), function(s){ connected=!!s.val(); if(connected){connectStage='ready';SYNC._lastError=null;}else{connectStage='waiting-rtdb';} SYNC.renderStatus&&SYNC.renderStatus(); }));
       ['patients','dentists','appointments'].forEach(subscribeCollection);
       ['lists','formFields','treatmentPrices'].forEach(subscribeValue);
       subscribeValue('meta');
       ['patients','dentists','appointments'].forEach(subscribeTombstones);
-      connectStage='waiting-rtdb';
       started=true;
       retryCount=0;
       if(retryTimer){ clearTimeout(retryTimer); retryTimer=null; retryTimerDelay=0; }
@@ -5819,7 +5820,7 @@ document.addEventListener('focus',e=>{
     }
   }
   async function doPush(force){
-    if(!db) return;
+    if(!db) throw new Error('RTDB_NOT_INITIALIZED: پایگاه داده آماده نیست؛ ارسال انجام نشد.');
     const cfg = SYNC.cfg();
     const now = Date.now();
     const b = base();
@@ -5874,10 +5875,19 @@ document.addEventListener('focus',e=>{
     try{
       if(!db || !started || !connected) await SYNC.connect();
       if(!db || !started || !connected){
-        SYNC._lastSyncError = SYNC._lastError ? ('اتصال آماده نیست؛ مرحله '+SYNC._lastError.stage+'؛ کد '+SYNC._lastError.code) : 'اتصال پایگاه داده هنوز برقرار نیست.';
+        SYNC._lastSyncError = SYNC._lastError ? ('اتصال آماده نیست؛ مرحله '+SYNC._lastError.stage+'؛ کد '+SYNC._lastError.code) : 'اتصال شبکه به پایگاه داده هنوز برقرار نشده است.';
         SYNC.renderStatus&&SYNC.renderStatus();
-        toast('اتصال پایگاه داده برقرار نیست؛ جزئیات در همین صفحه نمایش داده شد.');
+        toast('اتصال پایگاه داده برقرار نیست؛ جزئیات خطا در همین صفحه نمایش داده شد.');
         return;
+      }
+      // Verify an authorized read against this clinic before attempting a full upload.
+      const probePath=base()+'/records/meta';
+      try{
+        await dbm.get(dbm.ref(db,probePath));
+      }catch(readError){
+        const code=String((readError&&(readError.code||readError.name))||'unknown');
+        const detail=String((readError&&readError.message)||'');
+        throw new Error('READ '+probePath+' | '+code+(detail?': '+detail:''));
       }
       SYNC._lastSyncError = null;
       await doPush(true);
