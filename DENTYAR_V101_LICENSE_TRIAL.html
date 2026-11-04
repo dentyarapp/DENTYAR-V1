@@ -2903,6 +2903,10 @@ table{width:100%;border-collapse:collapse}td,th{padding:10px 8px;border-bottom:1
 .notice{color:#E2E8F0!important;}
 .notice a{color:#FFFFFF!important;text-decoration:underline;}
 </style>
+<style id="dentyar-logout-label-readable">
+/* برچسب زیر دکمه خروج با رنگ متن نام مطب هماهنگ باشد */
+#topHeader .logoutLabel{color:var(--yz-navy)!important;}
+</style>
 </head><body><main class="sheet">
 <header class="head"><img class="logo" src="${esc(logo)}" alt="لوگوی مطب"><div class="clinic"><h1>${esc(clinicName)}</h1>
 <p>${esc(clinic.address||'')}</p><p>${clinicPhone?'تلفن: '+esc(clinicPhone):''}${clinic.licenseNo?' | شماره مجوز: '+esc(clinic.licenseNo):''}</p></div></header>
