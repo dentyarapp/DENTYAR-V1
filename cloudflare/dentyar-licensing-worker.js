@@ -228,14 +228,14 @@ export default {
     }
     if (url.pathname==="/v1/activation/redeem") return redeem(request,env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
-    if (url.pathname==="/v1/owner/clinics" && request.method==="GET") {
+    if (url.pathname==="/v1/owner/clinics") {
       const keys=await env.LICENSES.list({prefix:"clinic:"});
       const clinics=[];
       for(const key of keys.keys){const item=await env.LICENSES.get(key.name,"json");if(item)clinics.push(item);}
       clinics.sort((a,b)=>a.createdAt-b.createdAt);
       return json({ok:true,clinics});
     }
-    if (url.pathname==="/v1/owner/clinics" && request.method==="POST") {
+    if (url.pathname==="/v1/owner/clinics/register") {
       const clinicCode=String(body.clinicCode||"").trim().toUpperCase();
       const clinicName=String(body.clinicName||"").trim().slice(0,120);
       if(!/^[A-Z0-9_-]{4,32}$/.test(clinicCode) || clinicName.length<2) return fail("invalid-clinic-details");
