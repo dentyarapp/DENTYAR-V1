@@ -228,7 +228,7 @@ export default {
     }
     if (url.pathname==="/v1/activation/redeem") return redeem(request,env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
-    if (url.pathname==="/v1/owner/clinics") {
+    if (url.pathname==="/v1/owner/clinics/list") {
       const keys=await env.LICENSES.list({prefix:"clinic:"});
       const clinics=[];
       for(const key of keys.keys){const item=await env.LICENSES.get(key.name,"json");if(item)clinics.push(item);}
