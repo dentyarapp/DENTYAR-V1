@@ -29,4 +29,4 @@ jobs:
         run: node --test cloudflare/dentyar-licensing-worker.test.mjs
       - name: Validate owner panel script syntax
         run: |
-          node --input-type=module -e "const fs=require('node:fs');const s=fs.readFileSync('cloudflare/licensing-panel/owner.html','utf8');const scripts=[...s.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('owner panel script missing');for(const x of scripts)new Function(x[1]);"
+          node --input-type=module -e "import fs from 'node:fs';const s=fs.readFileSync('cloudflare/licensing-panel/owner.html','utf8');const scripts=[...s.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('owner panel script missing');for(const x of scripts)new Function(x[1]);"
