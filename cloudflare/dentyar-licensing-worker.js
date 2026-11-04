@@ -229,9 +229,13 @@ export default {
     if (url.pathname==="/v1/activation/redeem") return redeem(request,env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
     if (url.pathname==="/v1/owner/clinics/list") {
-      const keys=await env.LICENSES.list({prefix:"clinic:"});
       const clinics=[];
-      for(const key of keys.keys){const item=await env.LICENSES.get(key.name,"json");if(item)clinics.push(item);}
+      let cursor;
+      do {
+        const page=await env.LICENSES.list({prefix:"clinic:",limit:1000,...(cursor?{cursor}:{})});
+        for(const key of page.keys){const item=await env.LICENSES.get(key.name,"json");if(item)clinics.push(item);}
+        cursor=page.list_complete?undefined:page.cursor;
+      } while(cursor); 
       clinics.sort((a,b)=>a.createdAt-b.createdAt);
       return json({ok:true,clinics});
     }
