@@ -64,8 +64,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 2', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.224.0-license-trial"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 3', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.225.0-license-trial"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -455,7 +455,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V101.224"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.225"' www/index.html
           grep -q "installTransportProxy" www/index.html
           grep -q "networkProxyUrl" www/index.html
           test -s cloudflare/dentyar-sync-relay.js
@@ -593,12 +593,12 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-224-LICENSE-TRIAL.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-225-LICENSE-TRIAL.apk
 
       - name: بررسی امضا، شناسه برنامه و نسخه APK
         run: |
           set -euo pipefail
-          APK=DENTYAR-V101-224-LICENSE-TRIAL.apk
+          APK=DENTYAR-V101-225-LICENSE-TRIAL.apk
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$AAPT"
@@ -608,15 +608,15 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='2'"
-          echo "$BADGING" | grep -F "versionName='101.224.0-license-trial'"
+          echo "$BADGING" | grep -F "versionCode='3'"
+          echo "$BADGING" | grep -F "versionName='101.225.0-license-trial'"
           sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-224-LICENSE-TRIAL-APK
+          name: DENTYAR-V101-225-LICENSE-TRIAL-APK
           path: |
-            DENTYAR-V101-224-LICENSE-TRIAL.apk
-            DENTYAR-V101-224-LICENSE-TRIAL.apk.sha256
+            DENTYAR-V101-225-LICENSE-TRIAL.apk
+            DENTYAR-V101-225-LICENSE-TRIAL.apk.sha256
           if-no-files-found: error
 
