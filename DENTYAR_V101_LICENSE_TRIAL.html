@@ -4556,23 +4556,10 @@ const GUIDE_SECTIONS = [
   {title:'۱۵. ارتباط با پشتیبانی', text:'۱) پنل «ارتباط با ما» را باز کنید.\n۲) شماره‌های تماس و رایانامه رسمی درج‌شده را بررسی کنید.\n۳) هنگام گزارش خطا، نام پنل، زمان رخداد، نوع دستگاه و متن دقیق خطا را اعلام کنید.\n۴) رمز عبور، کد فعال‌سازی، اطلاعات هویتی بیماران یا فایل کامل پایگاه داده را در پیام پشتیبانی ارسال نکنید.'},
   {title:'۱۶. چک‌لیست روزانه مسئول مطب', text:'۱) از صحت تاریخ و ساعت دستگاه‌ها مطمئن شوید.\n۲) نوبت‌های روز و نام دندان‌پزشک هر نوبت را مرور کنید.\n۳) ثبت پرونده و خدمات هر مراجعه را در پایان کار بررسی کنید.\n۴) وضعیت همگام‌سازی و آخرین زمان موفق را کنترل کنید.\n۵) در پایان روز یا پیش از تغییر مهم، پشتیبان تازه تهیه کنید.\n۶) دستگاه‌های بدون استفاده را قفل کنید و از باقی نماندن اطلاعات بیمار روی صفحه اطمینان یابید.'}
 ];
-function speakText(text){
-  if(!('speechSynthesis' in window)){ modalAlert('عدم پشتیبانی','مرورگر شما از پخش صوتی پشتیبانی نمی‌کند.'); return; }
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'fa-IR';
-  speechSynthesis.speak(u);
-}
-function speakGuideSection(index){
-  const section=GUIDE_SECTIONS[Number(index)];
-  if(!section){ modalAlert('خطا','بخش راهنما پیدا نشد.'); return; }
-  speakText(section.title+'. '+section.text);
-}
 function renderGuide(){
   document.getElementById('pageContent').innerHTML = `
     <div class="card">
       <h3>راهنمای استفاده از سامانه</h3>
-      <p style="font-size:13px;color:var(--muted)">روی «پخش صوتی» بزنید تا هر بخش با صدای گوشی خوانده شود.</p>
     </div>
     ${GUIDE_SECTIONS.map((s,i)=>{
       const steps=s.text.split('\n').map(line=>line.replace(/^\s*\d+[)\.،-]?\s*/, '').trim()).filter(Boolean);
@@ -4584,7 +4571,7 @@ function renderGuide(){
           steps.map((step,j)=>'<li style="display:grid;grid-template-columns:30px minmax(0,1fr);align-items:start;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card)">' +
             '<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:#eef6f7;color:#17636b;font-size:12px;font-weight:800">'+(j+1)+'</span>' +
             '<span style="font-size:13.5px;line-height:1.9;white-space:normal">'+esc(step)+'</span></li>').join('') +
-        '</ol><button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="speakGuideSection('+i+')">🔊 پخش صوتی این بخش</button></section>';
+        '</ol></section>';
     }).join('')}
   `;
 }
