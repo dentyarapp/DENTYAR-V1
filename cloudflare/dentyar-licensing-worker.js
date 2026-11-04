@@ -208,11 +208,11 @@ export default {
     if (!body || typeof body !== "object" || Array.isArray(body)) return fail("invalid-request-body");
     if (url.pathname==="/v1/activation/request") {
       const clinicCode=String(body.clinicCode||"").trim().toUpperCase();
-      const clinicRecord=await env.LICENSES.get("clinic:"+clinicCode,"json");
-      if(!clinicRecord || clinicRecord.status!=="active") return fail("clinic-not-registered",409);
       const deviceId=String(body.deviceId||"").trim();
       const deviceName=String(body.deviceName||"").trim().slice(0,80);
       if (!/^[A-Z0-9_-]{4,32}$/.test(clinicCode) || !/^[A-Za-z0-9_-]{12,100}$/.test(deviceId) || !deviceName) return fail("invalid-request");
+      const clinicRecord=await env.LICENSES.get("clinic:"+clinicCode,"json");
+      if(!clinicRecord || clinicRecord.status!=="active") return fail("clinic-not-registered",409);
       const clientIp=request.headers.get("cf-connecting-ip") || "unknown";
       const limiterId=env.ACTIVATION_LIMITS.idFromName("activation:"+clientIp);
       const limiter=env.ACTIVATION_LIMITS.get(limiterId);
