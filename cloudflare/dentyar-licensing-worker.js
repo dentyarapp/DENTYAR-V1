@@ -211,6 +211,8 @@ export default {
       const deviceId=String(body.deviceId||"").trim();
       const deviceName=String(body.deviceName||"").trim().slice(0,80);
       if (!/^[A-Z0-9_-]{4,32}$/.test(clinicCode) || !/^[A-Za-z0-9_-]{12,100}$/.test(deviceId) || !deviceName) return fail("invalid-request");
+      const clinicRecord=await env.LICENSES.get("clinic:"+clinicCode,"json");
+      if(!clinicRecord || clinicRecord.status!=="active") return fail("clinic-not-registered",409);
       const clientIp=request.headers.get("cf-connecting-ip") || "unknown";
       const limiterId=env.ACTIVATION_LIMITS.idFromName("activation:"+clientIp);
       const limiter=env.ACTIVATION_LIMITS.get(limiterId);
@@ -226,6 +228,29 @@ export default {
     }
     if (url.pathname==="/v1/activation/redeem") return redeem(request,env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
+    if (url.pathname==="/v1/owner/clinics/list") {
+      const keys=await env.LICENSES.list({prefix:"clinic:"});
+      const clinics=[];
+      for(const key of keys.keys){const item=await env.LICENSES.get(key.name,"json");if(item)clinics.push(item);}
+      clinics.sort((a,b)=>a.createdAt-b.createdAt);
+      return json({ok:true,clinics});
+    }
+    if (url.pathname==="/v1/owner/clinics/register") {
+      const clinicCode=String(body.clinicCode||"").trim().toUpperCase();
+      const clinicName=String(body.clinicName||"").trim().slice(0,120);
+      if(!/^[A-Z0-9_-]{4,32}$/.test(clinicCode) || clinicName.length<2) return fail("invalid-clinic-details");
+      if(await env.LICENSES.get("clinic:"+clinicCode)) return fail("clinic-code-already-registered",409);
+      const registryId=env.CLINIC_REGISTRY.idFromName("clinic:"+clinicCode);
+      const registry=env.CLINIC_REGISTRY.get(registryId);
+      const claim=await registry.fetch("https://clinic-registry/register",{
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({clinicCode,clinicName})
+      });
+      if(!claim.ok) return fail(claim.status===409?"clinic-code-already-registered":"clinic-registry-unavailable",claim.status===409?409:503);
+      const clinic={clinicCode,clinicName,status:"active",createdAt:now()};
+      await env.LICENSES.put("clinic:"+clinicCode,JSON.stringify(clinic));
+      return json({ok:true,clinic},201);
+    }
     if (url.pathname==="/v1/owner/requests") {
       const keys=await env.LICENSES.list({prefix:"request:"});
       const requests=[];
@@ -394,6 +419,25 @@ export class RedemptionLock {
   }
 }
 
+
+// Atomic one-time claim for each clinic code. A code can never be assigned to two clinics.
+export class ClinicRegistry {
+  constructor(state) { this.state=state; }
+  async fetch(request) {
+    if(request.method!=="POST" || new URL(request.url).pathname!=="/register") return new Response("not-found",{status:404});
+    let body={};try{body=await request.json();}catch{return new Response("invalid-request",{status:400});}
+    const clinicCode=String(body.clinicCode||"").trim().toUpperCase();
+    const clinicName=String(body.clinicName||"").trim().slice(0,120);
+    if(!/^[A-Z0-9_-]{4,32}$/.test(clinicCode) || clinicName.length<2) return new Response("invalid-clinic",{status:400});
+    const result=await this.state.storage.transaction(async txn=>{
+      const existing=await txn.get("clinic");
+      if(existing) return existing.clinicName===clinicName ? "same" : "exists";
+      await txn.put("clinic",{clinicCode,clinicName,createdAt:now()});
+      return "created";
+    });
+    return new Response(result,{status:result==="exists"?409:200});
+  }
+}
 
 // Per-IP activation request limiter: five requests per rolling minute window.
 export class ActivationRateLimiter {

@@ -4,7 +4,7 @@ import { createHash, generateKeyPairSync, verify as verifySignature } from "node
 import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
-const { RedemptionLock, ActivationRateLimiter, randomActivationCode, isActivationCode } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
+const { RedemptionLock, ActivationRateLimiter, ClinicRegistry, randomActivationCode, isActivationCode } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
 
 function makeState() {
   const values = new Map();
@@ -136,6 +136,7 @@ function testEnv() {
   const values = new Map();
   const lockStates = new Map();
   const stateFor = name => { if(!lockStates.has(name)) lockStates.set(name,makeState()); return lockStates.get(name); };
+  values.set("clinic:CLINIC_01",JSON.stringify({clinicCode:"CLINIC_01",clinicName:"Test clinic",status:"active",createdAt:Date.now()}));
   return {
     LICENSES: {
       async get(key, type) {
@@ -151,6 +152,10 @@ function testEnv() {
       idFromName(name) { return name; },
       get(name) { return {fetch: (input,init) => new RedemptionLock(stateFor(name)).fetch(input instanceof Request?input:new Request(input,init))}; }
     },
+    CLINIC_REGISTRY: {
+      idFromName(name) { return name; },
+      get(name) { return {fetch: (input,init) => new ClinicRegistry(stateFor(name)).fetch(input instanceof Request?input:new Request(input,init))}; }
+    },
     ACTIVATION_LIMITS: {
       idFromName(name) { return name; },
       get() { return {fetch: async () => new Response("allowed",{status:200})}; }
@@ -159,6 +164,17 @@ function testEnv() {
     _lockStates: lockStates
   };
 }
+
+test("clinic registry atomically claims a code once and rejects a different clinic", async () => {
+  const registry=new ClinicRegistry(makeState());
+  const register=(clinicName)=>registry.fetch(new Request("https://clinic-registry/register",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"CLINIC_02",clinicName})
+  }));
+  assert.equal((await register("Clinic Two")).status,200);
+  assert.equal((await register("Clinic Two")).status,200);
+  assert.equal((await register("Different Clinic")).status,409);
+});
 
 test("health endpoint is public and returns service identity", async () => {
   const response = await worker.fetch(new Request("https://license.test/health"), testEnv());
@@ -173,6 +189,16 @@ test("activation request rejects malformed clinic and device identifiers", async
   }), testEnv());
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, "invalid-request");
+});
+
+test("activation request rejects an unregistered clinic code", async () => {
+  const env=testEnv();
+  const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"CLINIC_99",deviceId:"device_identifier_999",deviceName:"Test phone"})
+  }),env);
+  assert.equal(response.status,409);
+  assert.equal((await response.json()).error,"clinic-not-registered");
 });
 
 test("activation request stores a pending request without requiring owner credentials", async () => {
@@ -202,6 +228,28 @@ test("owner endpoints reject requests without a verified owner token", async () 
   }), testEnv());
   assert.equal(response.status, 403);
   assert.equal((await response.json()).error, "owner-auth-required");
+});
+
+test("owner can register unique clinics and list the clinic directory", async () => {
+  const env=testEnv();env.FIREBASE_WEB_API_KEY="test-api-key";env.OWNER_EMAIL="owner@example.test";
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({users:[{email:"owner@example.test",emailVerified:true}]}),{status:200});
+  const call=(path,body)=>worker.fetch(new Request("https://license.test"+path,{
+    method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},
+    body:JSON.stringify(body||{})
+  }),env);
+  try{
+    const created=await call("/v1/owner/clinics/register",{clinicCode:"CLINIC_02",clinicName:"Second clinic"});
+    assert.equal(created.status,201);
+    assert.equal((await created.json()).clinic.clinicName,"Second clinic");
+    const duplicate=await call("/v1/owner/clinics/register",{clinicCode:"CLINIC_02",clinicName:"Different clinic"});
+    assert.equal(duplicate.status,409);
+    assert.equal((await duplicate.json()).error,"clinic-code-already-registered");
+    const listed=await call("/v1/owner/clinics/list",{});
+    const data=await listed.json();
+    assert.equal(listed.status,200);
+    assert.deepEqual(data.clinics.map(item=>item.clinicCode).sort(),["CLINIC_01","CLINIC_02"]);
+  }finally{globalThis.fetch=originalFetch;}
 });
 
 test("disabled Firebase owner accounts cannot access licensing administration", async () => {
@@ -718,4 +766,12 @@ test("activation codes are exactly 16 uppercase English letters or digits", () =
   assert.equal(isActivationCode("۱۲۳۴۵۶۷۸۹۰ABCDEF"), false);
   assert.equal(isActivationCode("A1B2-C3D4E5F6G7H"), false);
   for (let i=0;i<100;i++) assert.match(randomActivationCode(), /^[A-Z0-9]{16}$/);
+});
+
+
+test("owner panel inline JavaScript parses successfully", async () => {
+  const html=await readFile(new URL("./licensing-panel/owner.html",import.meta.url),"utf8");
+  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.ok(scripts.length>0,"owner panel script missing");
+  for(const script of scripts)new Script(script[1]);
 });
