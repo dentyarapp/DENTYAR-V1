@@ -52,6 +52,26 @@ try {
   }).database();
   await assertFails(get(ref(otherClinic,"clinics/"+clinicCode+"/records/meta")));
 
+  // Two independently licensed clinics can use their own namespace, but never each other's.
+  await env.withSecurityRulesDisabled(async context=>{
+    const db=context.database();
+    await set(ref(db,"licenses/lic_test_002"),{
+      status:"active",clinicCode:"OTHER_01",deviceId:"device_identifier_456",
+      expiresAt:Date.now()+86400000
+    });
+    await set(ref(db,"clinics/OTHER_01/records/meta"),{clinicName:"Other Clinic"});
+  });
+  const licensedOtherClinic=env.authenticatedContext("dy_other_device",{
+    role:"clinic-device",clinicCode:"OTHER_01",deviceId:"device_identifier_456",
+    licenseId:"lic_test_002"
+  }).database();
+  await assertSucceeds(get(ref(licensedOtherClinic,"clinics/OTHER_01/records/meta")));
+  await assertSucceeds(set(ref(licensedOtherClinic,"clinics/OTHER_01/records/meta"),{clinicName:"Updated Other Clinic"}));
+  await assertFails(get(ref(licensedOtherClinic,"clinics/"+clinicCode+"/records/meta")));
+  await assertFails(set(ref(licensedOtherClinic,"clinics/"+clinicCode+"/records/meta"),{clinicName:"Cross-clinic write"}));
+  await assertFails(get(ref(licensed,"clinics/OTHER_01/records/meta")));
+  await assertFails(set(ref(licensed,"clinics/OTHER_01/records/meta"),{clinicName:"Cross-clinic write"}));
+
   const otherDevice=env.authenticatedContext("dy_test_device",{
     role:"clinic-device",clinicCode,deviceId:"other_device_123",licenseId
   }).database();
