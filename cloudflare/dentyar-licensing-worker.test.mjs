@@ -4,7 +4,7 @@ import { createHash, generateKeyPairSync, verify as verifySignature } from "node
 import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
-const { RedemptionLock, ActivationRateLimiter, randomActivationCode, isActivationCode } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
+const { RedemptionLock, ActivationRateLimiter, ClinicRegistry, randomActivationCode, isActivationCode } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
 
 function makeState() {
   const values = new Map();
@@ -160,6 +160,17 @@ function testEnv() {
   };
 }
 
+test("clinic registry atomically claims a code once and rejects a different clinic", async () => {
+  const registry=new ClinicRegistry(makeState());
+  const register=(clinicName)=>registry.fetch(new Request("https://clinic-registry/register",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"CLINIC_02",clinicName})
+  }));
+  assert.equal((await register("Clinic Two")).status,200);
+  assert.equal((await register("Clinic Two")).status,200);
+  assert.equal((await register("Different Clinic")).status,409);
+});
+
 test("health endpoint is public and returns service identity", async () => {
   const response = await worker.fetch(new Request("https://license.test/health"), testEnv());
   assert.equal(response.status, 200);
@@ -173,6 +184,16 @@ test("activation request rejects malformed clinic and device identifiers", async
   }), testEnv());
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, "invalid-request");
+});
+
+test("activation request rejects an unregistered clinic code", async () => {
+  const env=testEnv();
+  const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"CLINIC_99",deviceId:"device_identifier_999",deviceName:"Test phone"})
+  }),env);
+  assert.equal(response.status,409);
+  assert.equal((await response.json()).error,"clinic-not-registered");
 });
 
 test("activation request stores a pending request without requiring owner credentials", async () => {
