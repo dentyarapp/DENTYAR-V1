@@ -230,6 +230,28 @@ test("owner endpoints reject requests without a verified owner token", async () 
   assert.equal((await response.json()).error, "owner-auth-required");
 });
 
+test("owner can register unique clinics and list the clinic directory", async () => {
+  const env=testEnv();env.FIREBASE_WEB_API_KEY="test-api-key";env.OWNER_EMAIL="owner@example.test";
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({users:[{email:"owner@example.test",emailVerified:true}]}),{status:200});
+  const call=(path,body)=>worker.fetch(new Request("https://license.test"+path,{
+    method:"POST",headers:{"content-type":"application/json","authorization":"Bearer owner-id-token"},
+    body:JSON.stringify(body||{})
+  }),env);
+  try{
+    const created=await call("/v1/owner/clinics/register",{clinicCode:"CLINIC_02",clinicName:"Second clinic"});
+    assert.equal(created.status,201);
+    assert.equal((await created.json()).clinic.clinicName,"Second clinic");
+    const duplicate=await call("/v1/owner/clinics/register",{clinicCode:"CLINIC_02",clinicName:"Different clinic"});
+    assert.equal(duplicate.status,409);
+    assert.equal((await duplicate.json()).error,"clinic-code-already-registered");
+    const listed=await call("/v1/owner/clinics/list",{});
+    const data=await listed.json();
+    assert.equal(listed.status,200);
+    assert.deepEqual(data.clinics.map(item=>item.clinicCode).sort(),["CLINIC_01","CLINIC_02"]);
+  }finally{globalThis.fetch=originalFetch;}
+});
+
 test("disabled Firebase owner accounts cannot access licensing administration", async () => {
   const env=testEnv();
   env.OWNER_EMAIL="owner@example.test";
