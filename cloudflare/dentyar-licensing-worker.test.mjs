@@ -771,7 +771,7 @@ test("activation codes are exactly 16 uppercase English letters or digits", () =
 
 test("owner panel inline JavaScript parses successfully", async () => {
   const html=await readFile(new URL("./licensing-panel/owner.html",import.meta.url),"utf8");
-  const scripts=[...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.ok(scripts.length>0,"owner panel script missing");
   for(const script of scripts)new Script(script[1]);
 });
