@@ -5874,6 +5874,23 @@ document.addEventListener('focus',e=>{
     if(button){ button.disabled=true; button.textContent='در حال همگام‌سازی…'; }
     try{
       if(!db || !started || !connected) await SYNC.connect();
+      // connect() installs listeners asynchronously; wait for the first confirmed RTDB
+      // transport state instead of treating a not-yet-fired callback as a failed connection.
+      if(db && started && !connected){
+        await new Promise(function(resolve,reject){
+          let settled=false, unsubscribe=null;
+          const finish=function(error){
+            if(settled) return; settled=true;
+            if(unsubscribe){try{unsubscribe();}catch(_){}}
+            clearTimeout(waitTimer);
+            if(error) reject(error); else resolve(true);
+          };
+          const waitTimer=setTimeout(function(){finish(new Error('RTDB_CONNECTION_TIMEOUT: پایگاه داده در مهلت ۱۵ ثانیه پاسخ اتصال نداد.'));},15000);
+          try{
+            unsubscribe=dbm.onValue(dbm.ref(db,'.info/connected'),function(s){if(s.val()===true) finish();},function(e){finish(e);});
+          }catch(e){finish(e);}
+        });
+      }
       if(!db || !started || !connected){
         SYNC._lastSyncError = SYNC._lastError ? ('اتصال آماده نیست؛ مرحله '+SYNC._lastError.stage+'؛ کد '+SYNC._lastError.code) : 'اتصال شبکه به پایگاه داده هنوز برقرار نشده است.';
         SYNC.renderStatus&&SYNC.renderStatus();
