@@ -1,0 +1,32 @@
+name: Validate DENTYAR multi-clinic registry
+on:
+  push:
+    branches:
+      - feature/dentyar-multi-clinic-registry-20261104
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'cloudflare/licensing-panel/owner.html'
+      - 'wrangler.licensing.toml'
+      - '.github/workflows/test-multi-clinic-registry.yml'
+  pull_request:
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'cloudflare/licensing-panel/owner.html'
+      - 'wrangler.licensing.toml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate Worker syntax
+        run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Run licensing and multi-clinic tests
+        run: node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - name: Validate owner panel script syntax
+        run: |
+          node --input-type=module -e "const fs=require('node:fs');const s=fs.readFileSync('cloudflare/licensing-panel/owner.html','utf8');const scripts=[...s.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('owner panel script missing');for(const x of scripts)new Function(x[1]);"
