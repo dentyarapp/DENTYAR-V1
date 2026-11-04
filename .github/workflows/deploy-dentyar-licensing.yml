@@ -104,8 +104,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OWNER_EMAIL: dentyar.app@gmail.com
-          OWNER_EMAILS: dentyar.app@gmail.com,h.alkasir13@gmail.com
+          OWNER_EMAIL: firebase.dentyar.app@gmail.com
+          OWNER_EMAILS: firebase.dentyar.app@gmail.com,dentyar.app@gmail.com,h.alkasir13@gmail.com
           FIREBASE_PROJECT_ID: dentyar-458d9
           FIREBASE_DATABASE_URL: https://dentyar-458d9-default-rtdb.firebaseio.com
           FIREBASE_WEB_API_KEY: ${{ vars.DENTYAR_FIREBASE_WEB_API_KEY }}
