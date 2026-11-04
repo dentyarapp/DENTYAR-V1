@@ -5731,26 +5731,28 @@ document.addEventListener('focus',e=>{
     SYNC.renderStatus&&SYNC.renderStatus();
   };
 
-  function reportListenerError(error){
+  function reportListenerError(error, path){
     const code = error && (error.code || error.name) ? String(error.code || error.name) : 'unknown';
     const message = error && error.message ? String(error.message) : '';
-    SYNC._lastSyncError = (code + (message ? ': ' + message : '')).slice(0,240);
-    console.warn('DentyarSync listener failed', code, message);
+    SYNC._lastSyncError = ('READ '+path+' | '+code+(message ? ': '+message : '')).slice(0,240);
+    console.warn('DentyarSync listener failed', path, code, message);
     SYNC.renderStatus&&SYNC.renderStatus();
   }
   function subscribeCollection(coll){
-    const r = dbm.ref(db, base()+'/records/'+coll);
-    subs.push(dbm.onChildAdded(r, function(s){ mergeRecord(coll, s.key, s.val()); }, reportListenerError));
-    subs.push(dbm.onChildChanged(r, function(s){ mergeRecord(coll, s.key, s.val()); }, reportListenerError));
+    const path=base()+'/records/'+coll, r = dbm.ref(db,path);
+    const onError=function(error){ reportListenerError(error,path); };
+    subs.push(dbm.onChildAdded(r, function(s){ mergeRecord(coll, s.key, s.val()); }, onError));
+    subs.push(dbm.onChildChanged(r, function(s){ mergeRecord(coll, s.key, s.val()); }, onError));
   }
   function subscribeTombstones(coll){
-    const r = dbm.ref(db, base()+'/tombstones/'+coll);
-    subs.push(dbm.onChildAdded(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }, reportListenerError));
-    subs.push(dbm.onChildChanged(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }, reportListenerError));
+    const path=base()+'/tombstones/'+coll, r = dbm.ref(db,path);
+    const onError=function(error){ reportListenerError(error,path); };
+    subs.push(dbm.onChildAdded(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }, onError));
+    subs.push(dbm.onChildChanged(r, function(s){ applyTombstone(coll, s.key, (s.val()&&s.val()._updatedAt)||0); }, onError));
   }
   function subscribeValue(name){
-    const r = dbm.ref(db, base()+'/records/'+name);
-    subs.push(dbm.onValue(r, function(s){ mergeValue(name, s.val()); }, reportListenerError));
+    const path=base()+'/records/'+name, r = dbm.ref(db,path);
+    subs.push(dbm.onValue(r, function(s){ mergeValue(name, s.val()); }, function(error){ reportListenerError(error,path); }));
   }
 
   function mergeRecord(coll, id, val){
@@ -5806,6 +5808,16 @@ document.addEventListener('focus',e=>{
     pushTimer = setTimeout(function(){ doPush(!!force); }, 900);
   };
 
+  async function writeSyncPath(path,value){
+    try { await dbm.set(dbm.ref(db,path),value); }
+    catch(error){
+      const code=String((error&&(error.code||error.name))||'unknown');
+      const detail=String((error&&error.message)||'');
+      const wrapped=new Error('WRITE '+path+' | '+code+(detail?': '+detail:''));
+      wrapped.code=code;
+      throw wrapped;
+    }
+  }
   async function doPush(force){
     if(!db) return;
     const cfg = SYNC.cfg();
@@ -5816,27 +5828,27 @@ document.addEventListener('focus',e=>{
     const nextIds={};
     try{
       const meta = sanitizedMeta(); meta._updatedAt = now;
-      await dbm.set(dbm.ref(db, b+'/records/meta'), meta);
+      await writeSyncPath(b+'/records/meta', meta);
       const lists = JSON.parse(JSON.stringify(STATE.lists||{})); lists._updatedAt = now;
-      await dbm.set(dbm.ref(db, b+'/records/lists'), lists);
+      await writeSyncPath(b+'/records/lists', lists);
       const ff = JSON.parse(JSON.stringify(STATE.formFields||{})); ff._updatedAt = now;
-      await dbm.set(dbm.ref(db, b+'/records/formFields'), ff);
+      await writeSyncPath(b+'/records/formFields', ff);
       const tp = JSON.parse(JSON.stringify(STATE.treatmentPrices||{})); tp._updatedAt = now;
-      await dbm.set(dbm.ref(db, b+'/records/treatmentPrices'), tp);
+      await writeSyncPath(b+'/records/treatmentPrices', tp);
       for(const coll of ['patients','dentists','appointments']){
         const arr = STATE[coll]||[];
         const curIds = arr.map(function(x){ return x.id; });
         // Await every remote write so a failed sync cannot be reported as successful.
         await Promise.all(arr.map(function(rec){
           const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
-          return dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
+          return writeSyncPath(b+'/records/'+coll+'/'+rec.id, out);
         }));
         const prev = prevIds[coll]||[];
         const deleted = prev.filter(function(id){ return curIds.indexOf(id)===-1; });
         await Promise.all(deleted.flatMap(function(id){
           return [
-            dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null),
-            dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now })
+            writeSyncPath(b+'/records/'+coll+'/'+id, null),
+            writeSyncPath(b+'/tombstones/'+coll+'/'+id, { _updatedAt: now })
           ];
         }));
         nextIds[coll] = curIds;
