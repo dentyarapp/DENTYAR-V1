@@ -456,7 +456,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V101.225"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.226"' www/index.html
           grep -q "installTransportProxy" www/index.html
           grep -q "networkProxyUrl" www/index.html
           test -s cloudflare/dentyar-sync-relay.js
@@ -594,12 +594,12 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-225-LICENSE-TRIAL.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-226-LICENSE-TRIAL.apk
 
       - name: بررسی امضا، شناسه برنامه و نسخه APK
         run: |
           set -euo pipefail
-          APK=DENTYAR-V101-225-LICENSE-TRIAL.apk
+          APK=DENTYAR-V101-226-LICENSE-TRIAL.apk
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$AAPT"
@@ -617,7 +617,7 @@ jobs:
         with:
           name: DENTYAR-V101-226-LICENSE-TRIAL-APK
           path: |
-            DENTYAR-V101-225-LICENSE-TRIAL.apk
-            DENTYAR-V101-225-LICENSE-TRIAL.apk.sha256
+            DENTYAR-V101-226-LICENSE-TRIAL.apk
+            DENTYAR-V101-226-LICENSE-TRIAL.apk.sha256
           if-no-files-found: error
 
