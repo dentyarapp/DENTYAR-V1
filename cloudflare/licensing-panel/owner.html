@@ -31,7 +31,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;
 <h2>ورود مالک</h2>
 <div class="grid"><div><label for="email">ایمیل مالک</label><input id="email" type="email" autocomplete="username" dir="ltr"></div>
 <div><label for="password">رمز عبور حساب Firebase</label><input id="password" type="password" autocomplete="current-password" dir="ltr"></div></div>
-<button id="loginBtn">ورود امن</button><button id="diagnoseBtn" class="secondary" type="button">آزمایش اتصال و تنظیمات</button><button id="resetBtn" class="secondary" type="button">بازیابی رمز عبور</button><div id="loginStatus" class="status" role="status">برای ورود، از حساب مالک تأییدشده استفاده کنید.</div>
+<button id="loginBtn">ورود امن</button><button id="verifyBtn" class="secondary" type="button">ارسال مجدد ایمیل تأیید</button><button id="diagnoseBtn" class="secondary" type="button">آزمایش اتصال و تنظیمات</button><button id="resetBtn" class="secondary" type="button">بازیابی رمز عبور</button><div id="loginStatus" class="status" role="status">برای ورود، از حساب مالک تأییدشده استفاده کنید.</div>
 </section>
 <section id="dashboard" class="hidden">
 <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2>درخواست‌های فعال‌سازی</h2><div><button id="refreshBtn" class="secondary">به‌روزرسانی</button><button id="logoutBtn" class="danger">خروج</button></div></div>
@@ -90,6 +90,7 @@ async function diagnoseConnection(){
  finally{button.disabled=false;}
 }
 async function resetPassword(){const button=$("resetBtn");button.disabled=true;try{if(!apiKey)await getConfig();const email=$("email").value.trim();if(!email)throw new Error("ابتدا نشانی ایمیل مالک را وارد کنید.");await firebasePost("accounts:sendOobCode",{requestType:"PASSWORD_RESET",email});status("loginStatus","اگر این ایمیل در Firebase ثبت شده باشد، پیام بازیابی رمز عبور برای آن ارسال می‌شود. صندوق ورودی و پوشه هرزنامه را بررسی کنید.");}catch(e){status("loginStatus",e.message||"ارسال پیام بازیابی انجام نشد.",true);}finally{button.disabled=false;}}
+async function resendVerification(){const button=$("verifyBtn");button.disabled=true;try{if(!apiKey)await getConfig();const email=$("email").value.trim(),password=$("password").value;if(!email||!password)throw new Error("برای ارسال امن ایمیل تأیید، ایمیل و رمز همان حساب Firebase را وارد کنید.");status("loginStatus","در حال احراز هویت حساب و درخواست ارسال ایمیل تأیید…");const auth=await firebasePost("accounts:signInWithPassword",{email,password,returnSecureToken:true});const profile=await firebasePost("accounts:lookup",{idToken:auth.idToken});const user=profile.users&&profile.users[0];if(!user)throw new Error("حساب Firebase پیدا نشد.");if(user.emailVerified){status("loginStatus","این حساب از قبل تأیید شده است؛ نیازی به ارسال مجدد نیست.");return;}await firebasePost("accounts:sendOobCode",{requestType:"VERIFY_EMAIL",idToken:auth.idToken});status("loginStatus","درخواست ارسال ایمیل تأیید با موفقیت به Firebase ارسال شد. صندوق ورودی و هرزنامه همین ایمیل را بررسی کنید.");}catch(e){status("loginStatus",e.message||"ارسال ایمیل تأیید انجام نشد.",true);}finally{button.disabled=false;$("password").value="";}}
 async function login(){
  $("loginBtn").disabled=true;
  try{
@@ -152,7 +153,7 @@ async function refreshLicenses(){
 }
 async function refreshAll(){if(refreshInFlight)return;refreshInFlight=true;try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}finally{refreshInFlight=false;}}
 function logout(){idToken="";refreshToken="";tokenExpiresAt=0;ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
-$("loginBtn").addEventListener("click",login);$("diagnoseBtn").addEventListener("click",diagnoseConnection);$("resetBtn").addEventListener("click",resetPassword);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
+$("loginBtn").addEventListener("click",login);$("verifyBtn").addEventListener("click",resendVerification);$("diagnoseBtn").addEventListener("click",diagnoseConnection);$("resetBtn").addEventListener("click",resetPassword);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
 $("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);
 getConfig().catch(e=>status("loginStatus",e.message,true));
 setInterval(()=>{if(idToken)refreshAll();},30000);
