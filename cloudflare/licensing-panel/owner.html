@@ -34,6 +34,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;
 <button id="loginBtn">ورود امن</button><button id="verifyBtn" class="secondary" type="button">ارسال مجدد ایمیل تأیید</button><button id="diagnoseBtn" class="secondary" type="button">آزمایش اتصال و تنظیمات</button><button id="resetBtn" class="secondary" type="button">بازیابی رمز عبور</button><div id="loginStatus" class="status" role="status">برای ورود، از حساب مالک تأییدشده استفاده کنید.</div>
 </section>
 <section id="dashboard" class="hidden">
+<div class="card"><h2>ثبت و مدیریت مطب‌ها</h2><p class="muted">برای هر مطب یک کد یکتا ثبت کنید. اطلاعات هر مطب مستقل است و دستگاه‌های آن جداگانه مجوز می‌گیرند.</p><div class="grid"><div><label for="newClinicCode">کد اختصاصی مطب</label><input id="newClinicCode" maxlength="32" dir="ltr" placeholder="مثلاً 14050702"></div><div><label for="newClinicName">نام مطب</label><input id="newClinicName" maxlength="120" placeholder="نام مطب"></div></div><button id="createClinicBtn">ثبت مطب جدید</button><div id="clinicStatus" class="status" role="status"></div><div id="clinics" class="muted">در حال دریافت فهرست مطب‌ها…</div></div>
 <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2>درخواست‌های فعال‌سازی</h2><div><button id="refreshBtn" class="secondary">به‌روزرسانی</button><button id="logoutBtn" class="danger">خروج</button></div></div>
 <p class="muted">با تأیید هر درخواست، کد فعال‌سازی یک‌بارمصرف و مخصوص همان دستگاه صادر می‌شود.</p>
 <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div><label for="expiry">مدت مجوز (روز)</label><input id="expiry" type="number" min="1" max="3650" value="365" style="max-width:150px"></div></div>
@@ -109,6 +110,8 @@ async function login(){
  }catch(e){status("loginStatus",e.message||"خطا در ورود",true);}
  finally{$("loginBtn").disabled=false;}
 }
+async function refreshClinics(){const data=await apiPost("/v1/owner/clinics");const host=$("clinics");host.replaceChildren();if(!data.clinics||!data.clinics.length){host.append(el("p","هنوز مطبی ثبت نشده است."));return;}const table=makeTable(["کد یکتا","نام مطب","وضعیت","تاریخ ثبت"]),body=table.querySelector("tbody");data.clinics.forEach(item=>{const tr=el("tr");[item.clinicCode,item.clinicName,item.status==="active"?"فعال":"غیرفعال",new Date(item.createdAt).toLocaleDateString("fa-IR")].forEach(v=>tr.append(el("td",v)));body.append(tr);});host.append(table);}
+async function createClinic(){const button=$("createClinicBtn");button.disabled=true;try{const clinicCode=$("newClinicCode").value.trim().toUpperCase(),clinicName=$("newClinicName").value.trim();if(!/^[A-Z0-9_-]{4,32}$/.test(clinicCode))throw new Error("کد مطب باید ۴ تا ۳۲ نویسه انگلیسی یا عدد باشد.");if(clinicName.length<2)throw new Error("نام مطب را کامل وارد کنید.");if(!confirm("مطب «"+clinicName+"» با کد "+clinicCode+" ثبت شود؟ این کد یکتا و غیرقابل واگذاری مجدد خواهد بود."))return;const result=await apiPost("/v1/owner/clinics",{clinicCode,clinicName});$("newClinicCode").value="";$("newClinicName").value="";status("clinicStatus","مطب ثبت شد: "+result.clinic.clinicName+" | "+result.clinic.clinicCode);await refreshClinics();}catch(e){status("clinicStatus",e.message||"ثبت مطب انجام نشد.",true);}finally{button.disabled=false;}}
 async function refreshRequests(){
  const data=await apiPost("/v1/owner/requests");
  const host=$("requests");host.replaceChildren();
@@ -151,10 +154,10 @@ async function refreshLicenses(){
  data.licenses.forEach(item=>{const tr=el("tr");[item.clinicCode,item.deviceName,item.status==="active"?"فعال":item.status==="revoked"?"لغوشده":item.status,new Date(item.expiresAt).toLocaleDateString("fa-IR"),item.id].forEach(v=>tr.append(el("td",v)));const td=el("td",undefined,"actions");if(item.status==="active"){const recover=el("button","بازیابی کد","secondary");recover.addEventListener("click",async()=>{recover.disabled=true;try{showCode(await apiPost("/v1/owner/activation-code",{licenseId:item.id}));status("dashboardStatus","کد فعال‌سازی بازیابی شد.");}catch(e){status("dashboardStatus",e.message,true);}finally{recover.disabled=false;}});const b=el("button","لغو مجوز","danger");b.addEventListener("click",async()=>{if(!confirm("مجوز این دستگاه لغو شود؟"))return;b.disabled=true;try{await apiPost("/v1/owner/revoke",{licenseId:item.id});status("dashboardStatus","مجوز لغو شد.");await refreshAll();}catch(e){status("dashboardStatus",e.message,true);b.disabled=false;}});td.append(recover,b);}else td.textContent="—";tr.append(td);body.append(tr);});
  host.append(table);
 }
-async function refreshAll(){if(refreshInFlight)return;refreshInFlight=true;try{await Promise.all([refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}finally{refreshInFlight=false;}}
+async function refreshAll(){if(refreshInFlight)return;refreshInFlight=true;try{await Promise.all([refreshClinics(),refreshRequests(),refreshLicenses()]);}catch(e){status("dashboardStatus",e.message,true);}finally{refreshInFlight=false;}}
 function logout(){idToken="";refreshToken="";tokenExpiresAt=0;ownerEmail="";$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");status("loginStatus","از حساب خارج شدید.");}
 $("loginBtn").addEventListener("click",login);$("verifyBtn").addEventListener("click",resendVerification);$("diagnoseBtn").addEventListener("click",diagnoseConnection);$("resetBtn").addEventListener("click",resetPassword);$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login();});
-$("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);
+$("refreshBtn").addEventListener("click",refreshAll);$("logoutBtn").addEventListener("click",logout);$("createClinicBtn").addEventListener("click",createClinic);
 getConfig().catch(e=>status("loginStatus",e.message,true));
 setInterval(()=>{if(idToken)refreshAll();},30000);
 })();
