@@ -1145,10 +1145,13 @@ function setupV26JalaliDates(root=document){
 let toastTimer=null;
 function toast(msg){
   const el = document.getElementById('toast');
-  el.textContent = msg;
+  if(!el){ console.warn('DENTYAR toast container is missing:',msg); return; }
+  el.textContent = String(msg==null?'':msg);
+  el.setAttribute('role','status');
+  el.setAttribute('aria-live','polite');
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>el.classList.remove('show'), 2200);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 4500);
 }
 
 /* ---------- Modal system (replaces alert/confirm/prompt) ---------- */
@@ -6085,6 +6088,34 @@ document.addEventListener('focus',e=>{
 html body .notice{color:#E2E8F0!important;}
 html body .notice a{color:#FFFFFF!important;text-decoration:underline!important;}
 html body #topHeader .logoutLabel{color:var(--yz-navy,#12305e)!important;}
+
+/* اصلاح سراسری پیام‌ها: بالاتر از همه‌ی لایه‌ها و دور از نوار پایین اندروید */
+html body #toast{
+  position:fixed!important;
+  left:12px!important;right:12px!important;
+  bottom:calc(24px + env(safe-area-inset-bottom,0px))!important;
+  transform:none!important;
+  width:max-content!important;
+  max-width:min(560px,calc(100vw - 24px))!important;
+  margin-left:auto!important;margin-right:auto!important;
+  z-index:2147483000!important;
+  display:block!important;
+  padding:12px 18px!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:14px!important;
+  background:#123b46!important;
+  color:#fff!important;
+  font-size:13px!important;font-weight:800!important;
+  line-height:1.9!important;text-align:center!important;
+  white-space:normal!important;overflow-wrap:anywhere!important;
+  box-shadow:0 8px 28px rgba(0,0,0,.38)!important;
+  opacity:0!important;visibility:hidden!important;
+  pointer-events:none!important;
+}
+html body #toast.show{
+  opacity:1!important;visibility:visible!important;
+  bottom:calc(24px + env(safe-area-inset-bottom,0px))!important;
+}
 </style>
 </body>
 </html>
