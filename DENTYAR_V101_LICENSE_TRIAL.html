@@ -4607,10 +4607,16 @@ function renderContact(){
       <div class="kv"><span>رایانامه پشتیبانی</span><b dir="ltr">${esc(contactEmail)}</b></div>
       <p style="font-size:11px;color:var(--muted);margin-top:10px">برای پشتیبانی و دریافت راهنمایی، از راه‌های ارتباطی رسمی بالا استفاده کنید.</p>
     </div>
-    <div class="card" style="padding:8px!important;overflow:hidden;border:1px solid #b8dfe0;background:#eaf7f7">
-      <h3 style="margin:8px 8px 12px;text-align:center;color:#075b68">پوستر رسمی معرفی دنت‌یار</h3>
-      <img src="data:image/webp;base64,__POSTER_DATA__" alt="پوستر رسمی معرفی دنت‌یار؛ دستیار هوشمند دندان‌پزشکی" style="display:block;width:100%;height:auto;object-fit:contain;border-radius:12px;background:#fff" loading="eager">
-    </div>
+    <section class="card dentyar-poster-page" style="padding:10px!important;overflow:hidden;border:1px solid #b8dfe0;background:linear-gradient(180deg,#eaf7f7,#ffffff);margin:0 0 14px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 4px 12px;text-align:center">
+        <span style="width:9px;height:9px;border-radius:50%;background:#0f766e"></span>
+        <h3 style="margin:0;color:#075b68;font-size:17px">پوستر رسمی معرفی دنت‌یار</h3>
+      </div>
+      <div style="width:100%;min-height:65vh;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #d7e9e8;border-radius:12px;overflow:hidden">
+        <img src="data:image/webp;base64,__POSTER_DATA__" alt="پوستر رسمی معرفی دنت‌یار؛ دستیار هوشمند دندان‌پزشکی" style="display:block;width:100%;height:auto;max-height:calc(100svh - 190px);min-height:65vh;object-fit:contain;object-position:center;background:#fff" loading="eager">
+      </div>
+      <div style="padding:9px 6px 2px;text-align:center;font-size:12px;line-height:1.8;color:#42646a">معرفی کامل قابلیت‌ها و خدمات سامانه دنت‌یار</div>
+    </section>
     <div class="card" style="border-top:4px solid #0f766e">
       <h3 style="color:#0f766e;font-size:20px;margin-top:0">دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما</h3>
       <p style="font-weight:800;color:#17324d;line-height:2">مدیریت یکپارچه، دسترسی آسان، تسریع بیشتر، نظم و دقت بالاتر</p>
