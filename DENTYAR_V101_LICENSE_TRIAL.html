@@ -4587,7 +4587,8 @@ function renderGuide(){
 /* ===================== ارتباط با ما ===================== */
 function renderContact(){
   const contactPhone = STATE.meta.systemContactPhone || STATE.meta.supportPhone || '۰۹۱۶۵۱۲۸۷۱۱';
-  const contactEmail = 'Dentyar.app@gmail.com';
+  const contactPhoneAlt = '۰۹۳۸۱۲۰۸۷۱۱';
+  const contactEmail = 'dentyar.app@gmail.com';
   document.getElementById('pageContent').innerHTML = `
     <div class="card" style="border-top:4px solid #0f766e">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -4601,9 +4602,36 @@ function renderContact(){
     </div>
     <div class="card">
       <h3>ارتباط با ما</h3>
-      <div class="kv"><span>شماره تماس پشتیبانی</span><b dir="ltr">${esc(contactPhone)}</b></div>
-      <div class="kv"><span>ایمیل پشتیبانی</span><b dir="ltr">${esc(contactEmail)}</b></div>
-      <p style="font-size:11px;color:var(--muted);margin-top:10px">برای پشتیبانی و دریافت راهنمایی، از راه‌های ارتباطی بالا استفاده کنید.</p>
+      <div class="kv"><span>تلفن پشتیبانی اول</span><b dir="ltr">${esc(contactPhone)}</b></div>
+      <div class="kv"><span>تلفن پشتیبانی دوم</span><b dir="ltr">${contactPhoneAlt}</b></div>
+      <div class="kv"><span>رایانامه پشتیبانی</span><b dir="ltr">${esc(contactEmail)}</b></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">برای پشتیبانی و دریافت راهنمایی، از راه‌های ارتباطی رسمی بالا استفاده کنید.</p>
+    </div>
+    <div class="card" style="padding:0!important;overflow:hidden;border:1px solid #b8dfe0;background:linear-gradient(145deg,#f7ffff 0%,#e7f5f5 48%,#d2eeee 100%)">
+      <div style="padding:18px 16px 14px;text-align:center;background:linear-gradient(135deg,#075b68,#0f766e);color:#fff">
+        <div style="font-size:25px;font-weight:900;letter-spacing:.4px">DENTYAR</div>
+        <div style="font-size:17px;font-weight:800;margin-top:5px">دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما</div>
+        <div style="font-size:12px;margin-top:7px;opacity:.95">مدیریت یکپارچه مطب؛ از پذیرش تا پیگیری درمان</div>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="font-size:14px;font-weight:900;text-align:center;color:#075b68;margin-bottom:12px">امکانات کلیدی دنت‌یار</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پذیرش و نوبت‌دهی</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پرونده الکترونیکی بیماران</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">ثبت و پیگیری طرح درمان</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">مدیریت مالی و بیمه‌ها</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">گزارش‌های مدیریتی</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پشتیبان‌گیری و بازیابی</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">همکاری چنددستگاهی و چندکاربره</div>
+          <div style="background:#fff;border-radius:12px;padding:10px;font-size:12px;font-weight:800;text-align:center">پیامک و یادآوری مراجعات</div>
+        </div>
+        <div style="margin-top:12px;padding:12px;border-radius:14px;background:#075b68;color:#fff;text-align:center">
+          <div style="font-size:13px;font-weight:900">مدیریت هوشمند مطب، نظم بیشتر و پیگیری دقیق‌تر</div>
+          <div style="font-size:11px;margin-top:6px;line-height:1.9">طراح، مدیر پروژه و پشتیبان: حمید آل‌کثیر<br>مشاور طرح: محمدامین آل‌کثیر</div>
+          <div style="font-size:12px;font-weight:800;margin-top:7px" dir="ltr">dentyar.app@gmail.com</div>
+          <div style="font-size:12px;margin-top:5px" dir="ltr">${esc(contactPhone)} | ${contactPhoneAlt}</div>
+        </div>
+      </div>
     </div>
     <div class="card" style="border-top:4px solid #0f766e">
       <h3 style="color:#0f766e;font-size:20px;margin-top:0">دنت‌یار؛ دستیار هوشمند دندان‌پزشکی شما</h3>
