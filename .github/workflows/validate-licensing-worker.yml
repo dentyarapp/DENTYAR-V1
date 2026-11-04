@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/dentyar-owner-licensing-20261103
+      - feature/dentyar-multi-clinic-registry-20261104
     paths:
       - 'cloudflare/dentyar-licensing-worker.js'
       - 'cloudflare/dentyar-licensing-worker.test.mjs'
@@ -98,6 +99,12 @@ jobs:
           grep -q 'class RedemptionLock' cloudflare/dentyar-licensing-worker.js
           grep -q 'class ActivationRateLimiter' cloudflare/dentyar-licensing-worker.js
           grep -q 'ACTIVATION_LIMITS' cloudflare/dentyar-licensing-worker.js
+          grep -q 'class ClinicRegistry' cloudflare/dentyar-licensing-worker.js
+          grep -q 'CLINIC_REGISTRY' cloudflare/dentyar-licensing-worker.js
+          grep -Fq 'new_sqlite_classes = ["ClinicRegistry"]' wrangler.licensing.toml
+          grep -q '/v1/owner/clinics/register' cloudflare/dentyar-licensing-worker.js
+          grep -q '/v1/owner/clinics/list' cloudflare/dentyar-licensing-worker.js
+          grep -q 'clinic-not-registered' cloudflare/dentyar-licensing-worker.js
           grep -Fq 'env.ASSETS.fetch(new Request(new URL("/owner.html",request.url),request))' cloudflare/dentyar-licensing-worker.js
           grep -q 'binding = "ASSETS"' wrangler.licensing.toml
           test -s cloudflare/licensing-panel/owner.html
