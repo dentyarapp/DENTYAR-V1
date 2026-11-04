@@ -455,7 +455,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V101"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.224"' www/index.html
           grep -q "installTransportProxy" www/index.html
           grep -q "networkProxyUrl" www/index.html
           test -s cloudflare/dentyar-sync-relay.js
