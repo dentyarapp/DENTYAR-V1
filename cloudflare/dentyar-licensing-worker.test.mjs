@@ -136,6 +136,7 @@ function testEnv() {
   const values = new Map();
   const lockStates = new Map();
   const stateFor = name => { if(!lockStates.has(name)) lockStates.set(name,makeState()); return lockStates.get(name); };
+  values.set("clinic:CLINIC_01",JSON.stringify({clinicCode:"CLINIC_01",clinicName:"Test clinic",status:"active",createdAt:Date.now()}));
   return {
     LICENSES: {
       async get(key, type) {
@@ -150,6 +151,10 @@ function testEnv() {
     REDEMPTION_LOCKS: {
       idFromName(name) { return name; },
       get(name) { return {fetch: (input,init) => new RedemptionLock(stateFor(name)).fetch(input instanceof Request?input:new Request(input,init))}; }
+    },
+    CLINIC_REGISTRY: {
+      idFromName(name) { return name; },
+      get(name) { return {fetch: (input,init) => new ClinicRegistry(stateFor(name)).fetch(input instanceof Request?input:new Request(input,init))}; }
     },
     ACTIVATION_LIMITS: {
       idFromName(name) { return name; },
