@@ -37,10 +37,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.224.0",
+            "version": "101.226.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-224 LICENSE TRIAL"
+              "build": "echo DENTYAR V101-226 LICENSE TRIAL"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -58,14 +58,14 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V100-222 baseline package.
+          # Set an explicit Android version code/name for the V101.226 trial package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 3', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.225.0-license-trial"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 4', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.226.0-license-trial"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -447,6 +447,7 @@ jobs:
       - name: بررسی حضور اجزای گزارش
         run: |
           test -s www/index.html
+          ! grep -q "__POSTER_DATA__" www/index.html
           grep -q "async function v31NativeFile" www/index.html
           grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
           grep -q "getOrCreateDeviceId" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
@@ -608,13 +609,13 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='3'"
-          echo "$BADGING" | grep -F "versionName='101.225.0-license-trial'"
+          echo "$BADGING" | grep -F "versionCode='4'"
+          echo "$BADGING" | grep -F "versionName='101.226.0-license-trial'"
           sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-225-LICENSE-TRIAL-APK
+          name: DENTYAR-V101-226-LICENSE-TRIAL-APK
           path: |
             DENTYAR-V101-225-LICENSE-TRIAL.apk
             DENTYAR-V101-225-LICENSE-TRIAL.apk.sha256
