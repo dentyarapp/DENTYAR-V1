@@ -37,7 +37,7 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.226.0",
+            "version": "101.226.2",
             "private": true,
             "scripts": {
               "build": "echo DENTYAR V101-226 FINAL"
@@ -64,8 +64,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 5', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.226.1"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 6', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.226.2"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -594,7 +594,7 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-226-FINAL.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-226-2-FINAL.apk
 
       - name: بررسی امضا، شناسه برنامه و نسخه APK
         run: |
@@ -615,9 +615,9 @@ jobs:
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-226-FINAL-APK
+          name: DENTYAR-V101-226-2-FINAL-APK
           path: |
             DENTYAR-V101-226-FINAL.apk
-            DENTYAR-V101-226-FINAL.apk.sha256
+            DENTYAR-V101-226-2-FINAL.apk.sha256
           if-no-files-found: error
 
