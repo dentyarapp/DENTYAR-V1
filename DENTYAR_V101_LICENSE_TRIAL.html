@@ -5572,7 +5572,13 @@ document.addEventListener('focus',e=>{
     throw lastError || new Error('بارگذاری کتابخانه‌های Firebase ناموفق بود.');
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
-  function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
+  // Always use the canonical ASCII clinic key for every RTDB path. Older app sessions may have persisted Persian/Arabic digits locally.
+  function normalizeClinicCode(value){
+    return String(value||'').trim()
+      .replace(/[۰-۹٠-٩]/g,ch=>String(ch.charCodeAt(0)>=0x06F0&&ch.charCodeAt(0)<=0x06F9?ch.charCodeAt(0)-0x06F0:ch.charCodeAt(0)-0x0660))
+      .toUpperCase();
+  }
+  function base(){ return 'clinics/'+normalizeClinicCode(SYNC.cfg() && SYNC.cfg().clinicCode); }
   function scheduleReconnect(delay){
     const cfg=SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig || permissionBlocked) return;
