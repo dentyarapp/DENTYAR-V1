@@ -1,5 +1,5 @@
-name: Build DENTYAR V101 Licensing Trial APK
-# Build an isolated licensing-enabled V101 trial APK with the established production package ID and signing certificate.
+name: Build DENTYAR V101-226 Final APK
+# Build the finalized V101-226 APK, preserving the exact package ID and signing certificate of the validated 101-226 installation.
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
             "version": "101.226.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-226 LICENSE TRIAL"
+              "build": "echo DENTYAR V101-226 FINAL"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -64,8 +64,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 4', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.226.0-license-trial"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 5', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.226.1"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -594,30 +594,30 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-226-LICENSE-TRIAL.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-226-FINAL.apk
 
       - name: بررسی امضا، شناسه برنامه و نسخه APK
         run: |
           set -euo pipefail
-          APK=DENTYAR-V101-226-LICENSE-TRIAL.apk
+          APK=DENTYAR-V101-226-FINAL.apk
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$AAPT"
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-trial-apk-cert.txt
-          grep -qi 'V2 Signer: certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-trial-apk-cert.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-final-apk-cert.txt
+          grep -qi 'V2 Signer: certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-final-apk-cert.txt
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='4'"
-          echo "$BADGING" | grep -F "versionName='101.226.0-license-trial'"
+          echo "$BADGING" | grep -F "versionCode='5'"
+          echo "$BADGING" | grep -F "versionName='101.226.1'"
           sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-226-LICENSE-TRIAL-APK
+          name: DENTYAR-V101-226-FINAL-APK
           path: |
-            DENTYAR-V101-226-LICENSE-TRIAL.apk
-            DENTYAR-V101-226-LICENSE-TRIAL.apk.sha256
+            DENTYAR-V101-226-FINAL.apk
+            DENTYAR-V101-226-FINAL.apk.sha256
           if-no-files-found: error
 
