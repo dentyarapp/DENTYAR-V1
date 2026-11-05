@@ -4540,17 +4540,13 @@ function renderGuide(){
   let html = '<div class="card"><h3>راهنمای استفاده از سامانه</h3><p style="font-size:13px;color:var(--muted);line-height:1.9">راهنمای گام‌به‌گام بخش‌های مختلف دنت‌یار</p></div>';
   sections.forEach((section, index) => {
     const title = esc(String(section && section.title ? section.title : ('بخش ' + (index + 1))));
-    const rawText = String(section && section.text ? section.text : '');
-    const steps = rawText.split(/\\r?\\n+/).map(line => line.replace(/^\\s*\\d+[)\\.،-]?\\s*/, '').trim()).filter(Boolean);
+    const body = esc(String(section && section.text ? section.text : ''));
     html += '<section class="card" style="padding:14px!important">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">' +
       '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;border-radius:10px;background:#e7f5f3;color:#0f766e;font-weight:900">' + (index + 1) + '</span>' +
       '<h3 style="margin:0;font-size:15px">' + title + '</h3></div>' +
-      '<ol style="list-style:none;margin:0;padding:0;display:grid;gap:8px">' +
-      steps.map((step, stepIndex) => '<li style="display:grid;grid-template-columns:30px minmax(0,1fr);align-items:start;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card)">' +
-        '<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:#eef6f7;color:#17636b;font-size:12px;font-weight:800">' + (stepIndex + 1) + '</span>' +
-        '<span style="font-size:13.5px;line-height:1.9;white-space:normal">' + esc(step) + '</span></li>').join('') +
-      '</ol></section>';
+      '<div style="font-size:13.5px;line-height:2;white-space:pre-wrap;overflow-wrap:anywhere">' + body + '</div>' +
+      '</section>';
   });
   host.innerHTML = html;
 }
