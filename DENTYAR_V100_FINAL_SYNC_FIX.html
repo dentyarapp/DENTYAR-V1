@@ -4533,32 +4533,26 @@ const GUIDE_SECTIONS = [
   {title:'پشتیبان‌گیری', text:'به‌طور منظم از دکمه‌ی «تهیه‌ی پشتیبان» استفاده کنید تا یک فایل کامل از اطلاعات دانلود شود. برای بازگرداندن اطلاعات، می‌توانید از تاریخچه‌ی داخل برنامه یا فایل دانلودشده استفاده کنید و انتخاب کنید که اطلاعات «ادغام» شود یا به‌طور کامل «جایگزین» گردد. برای انتقال برنامه به گوشی یا لپ‌تاپ دیگر، از گزینه‌ی «ارسال برنامه به دستگاه دیگر» استفاده کنید.'},
   {title:'تنظیمات', text:'از این بخش می‌توانید رمز عبور ورود، نام کلینیک و لیست‌های قابل انتخاب (مانند انواع درمان، نتایج درمان، تخصص‌ها و انواع بیمه) را مدیریت کنید.'},
 ];
-function speakText(text){
-  if(!('speechSynthesis' in window)){ modalAlert('عدم پشتیبانی','مرورگر شما از پخش صوتی پشتیبانی نمی‌کند.'); return; }
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'fa-IR';
-  speechSynthesis.speak(u);
-}
 function renderGuide(){
-  document.getElementById('pageContent').innerHTML = `
-    <div class="card">
-      <h3>راهنمای استفاده از سامانه</h3>
-      <p style="font-size:13px;color:var(--muted)">روی «پخش صوتی» بزنید تا هر بخش با صدای گوشی خوانده شود.</p>
-    </div>
-    ${GUIDE_SECTIONS.map((s,i)=>`
-      <div class="card">
-        <div class="helpStep">
-          <div class="num">${i+1}</div>
-          <div style="flex:1">
-            <h3 style="margin:0 0 6px">${esc(s.title)}</h3>
-            <div style="font-size:13.5px;line-height:1.9">${esc(s.text)}</div>
-            <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick='speakText(${JSON.stringify(s.text)})'>🔊 پخش صوتی</button>
-          </div>
-        </div>
-      </div>
-    `).join('')}
-  `;
+  const host = document.getElementById('pageContent');
+  if (!host) return;
+  const sections = Array.isArray(GUIDE_SECTIONS) ? GUIDE_SECTIONS : [];
+  let html = '<div class="card"><h3>راهنمای استفاده از سامانه</h3><p style="font-size:13px;color:var(--muted);line-height:1.9">راهنمای گام‌به‌گام بخش‌های مختلف دنت‌یار</p></div>';
+  sections.forEach((section, index) => {
+    const title = esc(String(section && section.title ? section.title : ('بخش ' + (index + 1))));
+    const rawText = String(section && section.text ? section.text : '');
+    const steps = rawText.split(/\\r?\\n+/).map(line => line.replace(/^\\s*\\d+[)\\.،-]?\\s*/, '').trim()).filter(Boolean);
+    html += '<section class="card" style="padding:14px!important">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">' +
+      '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;border-radius:10px;background:#e7f5f3;color:#0f766e;font-weight:900">' + (index + 1) + '</span>' +
+      '<h3 style="margin:0;font-size:15px">' + title + '</h3></div>' +
+      '<ol style="list-style:none;margin:0;padding:0;display:grid;gap:8px">' +
+      steps.map((step, stepIndex) => '<li style="display:grid;grid-template-columns:30px minmax(0,1fr);align-items:start;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card)">' +
+        '<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:#eef6f7;color:#17636b;font-size:12px;font-weight:800">' + (stepIndex + 1) + '</span>' +
+        '<span style="font-size:13.5px;line-height:1.9;white-space:normal">' + esc(step) + '</span></li>').join('') +
+      '</ol></section>';
+  });
+  host.innerHTML = html;
 }
 
 /* ===================== ارتباط با ما ===================== */
