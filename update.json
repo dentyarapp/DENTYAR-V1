@@ -1,13 +1,13 @@
 {
-  "version": "V70",
-  "notes": "دنت‌یار V70: حفظ نشست امن Firebase روی هر دستگاه پس از اتصال اولیه؛ همگام‌سازی خودکار در مراجعات بعدی بدون درخواست مکرر رمز. رمز عبور در برنامه ذخیره نمی‌شود.",
+  "version": "V100",
+  "notes": "دنت‌یار V100: تلاش برای پایداری همگام‌سازی در شبکه‌های محدود با انتقال پایگاه داده از WebSocket به HTTPS long-polling، به‌همراه نمایش مرحله و کد خطای اتصال؛ رمز عبور در برنامه ذخیره نمی‌شود.",
   "android": {
-    "version": "V70",
-    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v70-final/DENTYAR-V70.apk",
-    "fileName": "DENTYAR-V70.apk"
+    "version": "V100",
+    "apkUrl": "https://github.com/dentyarapp/DENTYAR-V1/releases/download/v100-final/DENTYAR-V100.apk",
+    "fileName": "DENTYAR-V100.apk"
   },
   "web": {
-    "version": "V70",
-    "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html"
+    "version": "V100",
+    "url": "https://raw.githubusercontent.com/dentyarapp/DENTYAR-V1/main/DENTYAR_V100_FINAL_SYNC_FIX.html"
   }
 }

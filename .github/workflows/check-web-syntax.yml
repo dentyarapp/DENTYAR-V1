@@ -5,6 +5,7 @@ on:
       - main
       - fix/v59-safe-numeric-serial-20261009
       - fix/dentyar-sync-auth-session-20261015
+      - fix/v100-223-sync-records-teeth-20261025
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,5 +1,6 @@
-name: Build DENTYAR V70 APK
-# Trigger V70 signed release workflow; publish only after the V70 APK path is verified.
+name: Build DENTYAR V101-223 Parallel Package APK
+# Build corrected V101-223 for the existing production DENTYAR Android package, with canonical ASCII clinic keys on every RTDB path.
+# Includes the explicit draft-to-finalized patient transition and manager-PIN edit gate.
 
 permissions:
   contents: write
@@ -7,12 +8,20 @@ permissions:
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
       - fix/v59-safe-numeric-serial-20261009
       - test/dentyar-comprehensive-fixes-20261009
       - fix/dentyar-sync-auth-session-20261015
+      - fix/dentyar-v100-sync-transport-20261016
+      - rebuild/v100-222-final-baseline-238
+      - fix/v100-223-sync-records-teeth-20261025
+      - build/v101-parallel-app-20261102
+      - fix/v101-sync-root-diagnostics-20261102
 
 jobs:
   build-apk:
@@ -32,15 +41,15 @@ jobs:
       - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
         run: |
           mkdir -p www
-          cp DENTYAR_V59_NUMBERS_UNIFIED_FINAL.html www/index.html
+          cp DENTYAR_V100_FINAL_SYNC_FIX.html www/index.html
 
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "70.0.0",
+            "version": "101.223.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V70"
+              "build": "echo DENTYAR V101-223"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -58,16 +67,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V70 package.
+          # Set an explicit Android version code/name for the V100-222 installed package.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 70', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "70.0.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 71', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0"', s, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not set Android V70 versionCode/versionName")
+              raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
           PY
 
@@ -316,6 +325,10 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
+          # Capacitor creates a default MainActivity during cap add android.
+          # Replace that file instead of creating a second class with the same package/name.
+          find android/app/src/main/java -name MainActivity.java -delete
+          mkdir -p android/app/src/main/java/com/dentyar/testapp
           cat > android/app/src/main/java/com/dentyar/testapp/MainActivity.java <<'EOF'
           package com.dentyar.testapp;
 
@@ -368,7 +381,13 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V70"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101"' www/index.html
+          grep -q "installTransportProxy" www/index.html
+          grep -q "networkProxyUrl" www/index.html
+          grep -Fq "function base(){ const code=toEnDigits(String((SYNC.cfg()&&SYNC.cfg().clinicCode)||'').trim()); return 'clinics/'+code; }" www/index.html
+          ! grep -Fq "function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }" www/index.html
+          test -s cloudflare/dentyar-sync-relay.js
+          node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
           grep -q "installApk" android/app/src/main/java/com/dentyar/testapp/DentyarNativePlugin.java
@@ -428,13 +447,39 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/dentyar-signing"
           if [ -n "$DENTYAR_KEYSTORE_BASE64" ]; then
-            printf '%s' "$DENTYAR_KEYSTORE_BASE64" | base64 --decode > android/app/dentyar-release.keystore
+            # Accept standard base64 with line breaks, URL-safe base64, or a data-URI prefix.
+            # Never write a partially decoded keystore: validate the complete payload first.
+            export DENTYAR_KEYSTORE_BASE64
+            python - <<'PY'
+          import base64, os, re, sys
+          raw = os.environ.get("DENTYAR_KEYSTORE_BASE64", "").strip()
+          raw = re.sub(r"^data:[^,]*;base64,", "", raw, flags=re.IGNORECASE)
+          raw = re.sub(r"\s+", "", raw).replace("-", "+").replace("_", "/")
+          raw += "=" * ((-len(raw)) % 4)
+          try:
+              decoded = base64.b64decode(raw, validate=True)
+          except Exception:
+              print("ERROR: DENTYAR_KEYSTORE_BASE64 is not valid base64. The keystore was not written.")
+              sys.exit(2)
+          if len(decoded) < 1024:
+              print("ERROR: decoded keystore is unexpectedly small; refusing to use it.")
+              sys.exit(3)
+          with open("android/app/dentyar-release.keystore", "wb") as f:
+              f.write(decoded)
+          print("Keystore payload decoded and structurally sized; validating alias/password next.")
+          PY
           else
             gh run download 38471109738 --repo "$GITHUB_REPOSITORY" --name DENTYAR-SIGNING-KEY-PRIVATE --dir "$RUNNER_TEMP/dentyar-signing"
             test -s "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore"
             cp "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore" android/app/dentyar-release.keystore
           fi
           keytool -list -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release
+          # Refuse to publish an APK signed with the established DENTYAR release certificate.
+          keytool -list -v -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release > "$RUNNER_TEMP/dentyar-signing/certificate.txt"
+          if ! grep -qi 'SHA256: 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
+            echo "::error::Signing certificate mismatch. Expected the established DENTYAR release certificate SHA-256 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2. Build stopped to protect existing installations."
+            exit 1
+          fi
           python - <<'PY'
           from pathlib import Path
           p = Path("android/app/build.gradle")
@@ -446,6 +491,9 @@ jobs:
                       storePassword System.getenv("DENTYAR_KEYSTORE_PASSWORD")
                       keyAlias System.getenv("DENTYAR_KEY_ALIAS")
                       keyPassword System.getenv("DENTYAR_KEY_PASSWORD")
+                      // Keep the established V1/V2 signing settings; use Android Gradle Plugin defaults for newer schemes.
+                      v1SigningEnabled true
+                      v2SigningEnabled true
                   }
               }
 
@@ -476,25 +524,57 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V70.apk
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223.apk
+          test -s DENTYAR-V101-223.apk
+          unzip -t DENTYAR-V101-223.apk >/dev/null
+          BUILD_TOOLS="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/zipalign"
+          "$BUILD_TOOLS/zipalign" -c -v 4 DENTYAR-V101-223.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs DENTYAR-V101-223.apk | tee "$RUNNER_TEMP/dentyar-apk-signature.txt"
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          report = Path(__import__("os").environ["RUNNER_TEMP"] + "/dentyar-apk-signature.txt").read_text()
+          expected = "9DFF5F46570C491DE88AD86A669C6B823AF0D42ACF6BA17BAD33AF580BD92FB2"
+          found = re.findall(r"certificate SHA-256 digest:\s*([0-9a-fA-F:]+)", report, re.I)
+          normalized = [re.sub(r"[^0-9a-f]", "", value).upper() for value in found]
+          if expected not in normalized:
+              raise SystemExit("APK signer certificate does not match the established DENTYAR release key")
+          PY
+          "$BUILD_TOOLS/aapt" dump badging DENTYAR-V101-223.apk | tee "$RUNNER_TEMP/dentyar-apk-manifest.txt"
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          report = Path(__import__("os").environ["RUNNER_TEMP"] + "/dentyar-apk-manifest.txt").read_text()
+          match = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']*)'", report, re.M)
+          if not match:
+              raise SystemExit("Could not read APK package/version metadata")
+          package, code, name = match.groups()
+          if (package, code, name) != ("com.dentyar.testapp", "71", "101.223.0"):
+              raise SystemExit(f"Unexpected APK metadata: {package} {code} {name}")
+          PY
+          echo "APK archive, alignment, signing certificate, package ID and version metadata verified."
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V70-APK
-          path: DENTYAR-V70.apk
+          name: DENTYAR-V101-223-APK
+          path: DENTYAR-V101-223.apk
           if-no-files-found: error
 
-      - name: انتشار نسخه اصلاحی V70 در Release
-        if: ${{ steps.signing.outputs.available == 'true' && (contains(github.event.head_commit.message, '[publish-v70]') || (github.event_name == 'push' && github.event.head_commit.message == 'Publish V70 signed release')) }}
+      - name: انتشار نسخه نهایی دنت‌یار
+        if: ${{ steps.signing.outputs.available == 'true' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-v101-223-production]') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v70-final
-          name: DENTYAR V70 Signed APK — Firebase Sync Session Fix
+          tag_name: v101-223-production-final
+          name: DENTYAR V101-223 Final
           body: |
-            نسخه امضاشده دنت‌یار V70 با اصلاح حفظ نشست ورود Firebase و اتصال مجدد همگام‌سازی؛ با حفظ امضای ثابت برای به‌روزرسانی روی نصب موجود.
-            این APK با کلید امضای ثابت دنت‌یار ساخته شده است تا امکان به‌روزرسانی روی نصب موجود فراهم شود.
-          files: DENTYAR-V70.apk
+            نسخه نهایی دنت‌یار V101-223 شامل اصلاح شماره دندان، ویرایش کنترل‌شده پرونده بیمار، و نمایش مرحله و کد خطای همگام‌سازی؛ با شناسه برنامه و کلید امضای ثابت نسخه تولیدی.
+            این APK با کلید امضای ثابت دنت‌یار ساخته می‌شود تا به‌روزرسانی نسخه نصب‌شده امکان‌پذیر باشد.
+          files: DENTYAR-V101-223.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
