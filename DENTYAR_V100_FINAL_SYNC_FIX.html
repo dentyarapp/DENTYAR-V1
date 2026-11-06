@@ -5487,6 +5487,8 @@ document.addEventListener('focus',e=>{
   SYNC.cfg = function(){ return (STATE && STATE.meta && STATE.meta.sync) ? STATE.meta.sync : null; };
   SYNC.isReady = function(){ return started && connected; };
   SYNC._lastError = null;
+  let pushRunning = false;
+  let pushQueued = false;
   SYNC._lastSyncError = null;
   SYNC.diagnosticText = function(){
     if(SYNC._lastSyncError) return 'اتصال برقرار است، اما همگام‌سازی ناموفق شد: '+String(SYNC._lastSyncError).slice(0,220)+'؛ تاریخ آخرین همگام‌سازی موفق تغییر نکرده است.';
@@ -5765,9 +5767,17 @@ document.addEventListener('focus',e=>{
     pushTimer = setTimeout(function(){ doPush(!!force); }, 900);
   };
 
+  async function writeInBatches(items, worker, batchSize){
+    const size = Math.max(1, Number(batchSize)||4);
+    for(let i=0;i<items.length;i+=size){
+      await Promise.all(items.slice(i,i+size).map(worker));
+    }
+  }
+
   async function doPush(force){
-    if(!db) return;
-    const cfg = SYNC.cfg();
+    if(pushRunning){ pushQueued = true; return; }
+    if(!db || !dbm || !connected) return;
+    pushRunning = true;
     const now = Date.now();
     const b = base();
     let prevIds={};
@@ -5785,19 +5795,18 @@ document.addEventListener('focus',e=>{
       for(const coll of ['patients','dentists','appointments']){
         const arr = STATE[coll]||[];
         const curIds = arr.map(function(x){ return x.id; });
-        // Await every remote write so a failed sync cannot be reported as successful.
-        await Promise.all(arr.map(function(rec){
+        await writeInBatches(arr, function(rec){
           const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
           return dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+rec.id), out);
-        }));
+        }, 4);
         const prev = prevIds[coll]||[];
         const deleted = prev.filter(function(id){ return curIds.indexOf(id)===-1; });
-        await Promise.all(deleted.flatMap(function(id){
-          return [
+        await writeInBatches(deleted, function(id){
+          return Promise.all([
             dbm.set(dbm.ref(db, b+'/records/'+coll+'/'+id), null),
             dbm.set(dbm.ref(db, b+'/tombstones/'+coll+'/'+id), { _updatedAt: now })
-          ];
-        }));
+          ]);
+        }, 4);
         nextIds[coll] = curIds;
       }
       localStorage.setItem(PUSHED_KEY, JSON.stringify(nextIds));
@@ -5810,6 +5819,12 @@ document.addEventListener('focus',e=>{
       SYNC._lastSyncError = (e && (e.code || e.message)) ? String(e.code||'')+' '+String(e.message||'') : String(e||'خطای نامشخص');
       console.warn('DentyarSync push failed', e);
       SYNC.renderStatus&&SYNC.renderStatus();
+    }finally{
+      pushRunning = false;
+      if(pushQueued){
+        pushQueued = false;
+        SYNC.schedulePush(true);
+      }
     }
   }
 
