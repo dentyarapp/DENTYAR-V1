@@ -45,7 +45,7 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.223.0",
+            "version": "101.226.0-test",
             "private": true,
             "scripts": {
               "build": "echo DENTYAR V101-223"
@@ -62,7 +62,7 @@ jobs:
 
           npm install
 
-          npx cap init "DENTYAR" "com.dentyar.parallelv101" --web-dir www
+          npx cap init "DENTYAR" "com.dentyar.parallelv101test" --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -73,7 +73,7 @@ jobs:
           p = Path("android/app/build.gradle")
           s = p.read_text()
           s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 1', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0-parallel"', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.226.0-test-parallel"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -95,10 +95,10 @@ jobs:
 
       - name: ایجاد Native Direct Export Plugin
         run: |
-          mkdir -p android/app/src/main/java/com/dentyar/parallelv101
+          mkdir -p android/app/src/main/java/com/dentyar/parallelv101test
 
-          cat > android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java <<'EOF'
-          package com.dentyar.parallelv101;
+          cat > android/app/src/main/java/com/dentyar/parallelv101test/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.parallelv101test;
 
           import android.content.ContentResolver;
           import android.content.ContentValues;
@@ -324,8 +324,8 @@ jobs:
 
       - name: ثبت Native Plugin
         run: |
-          cat > android/app/src/main/java/com/dentyar/parallelv101/MainActivity.java <<'EOF'
-          package com.dentyar.parallelv101;
+          cat > android/app/src/main/java/com/dentyar/parallelv101test/MainActivity.java <<'EOF'
+          package com.dentyar.parallelv101test;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -372,7 +372,7 @@ jobs:
         run: |
           test -s www/index.html
           grep -q "async function v31NativeFile" www/index.html
-          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101test/DentyarNativePlugin.java
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
@@ -383,8 +383,8 @@ jobs:
           node --input-type=module --check < cloudflare/dentyar-sync-relay.js
           grep -q "@capacitor/filesystem" package.json
           grep -q "@capacitor/share" package.json
-          grep -q "installApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
-          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "installApk" android/app/src/main/java/com/dentyar/parallelv101test/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/parallelv101test/DentyarNativePlugin.java
           test -s android/app/src/main/res/xml/file_paths.xml
           # Parse each inline JavaScript block before packaging the APK.
           python - <<'PY'
@@ -514,13 +514,13 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-226-TEST.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-223-APK
-          path: DENTYAR-V101-223.apk
+          name: DENTYAR-V101-226-TEST-APK
+          path: DENTYAR-V101-226-TEST.apk
           if-no-files-found: error
 
       - name: انتشار نسخه نهایی دنت‌یار
@@ -532,7 +532,7 @@ jobs:
           body: |
             نسخه نهایی دنت‌یار V101-223 شامل اصلاح شماره دندان، ویرایش کنترل‌شده پرونده بیمار، و نمایش مرحله و کد خطای همگام‌سازی؛ با شناسه برنامه و کلید امضای ثابت نسخه تولیدی.
             این APK با کلید امضای ثابت دنت‌یار ساخته می‌شود تا به‌روزرسانی نسخه نصب‌شده امکان‌پذیر باشد.
-          files: DENTYAR-V101-223.apk
+          files: DENTYAR-V101-226-TEST.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
