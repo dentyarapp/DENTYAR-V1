@@ -21,6 +21,7 @@ on:
       - rebuild/v100-222-final-baseline-238
       - fix/v100-223-sync-records-teeth-20261025
       - build/v101-parallel-app-20261102
+      - fix/dentyar-sync-write-queue-20261106
 
 jobs:
   build-apk:
