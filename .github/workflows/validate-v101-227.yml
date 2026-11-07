@@ -5,18 +5,19 @@ on:
     branches:
       - fix/dentyar-license-isolated-v101-223-20261107
     paths:
+      - 'DENTYAR_V100_FINAL_SYNC_FIX.html'
+      - 'DENTYAR_V101_LICENSED_227.html'
       - 'cloudflare/dentyar-licensing-worker.js'
       - 'cloudflare/dentyar-licensing-worker.test.mjs'
-      - 'cloudflare/licensing-panel/**'
-      - 'DENTYAR_V101_LICENSED_227.html'
-      - 'wrangler.licensing.toml'
-      - 'firebase-database.rules.template.json'
-      - 'firebase.licensing-emulator.json'
       - 'cloudflare/test-rtdb-licensing-rules.mjs'
       - 'cloudflare/test-firebase-auth-emulator.mjs'
-      - '.github/workflows/validate-licensing-worker.yml'
-      - '.github/workflows/deploy-dentyar-licensing.yml'
+      - 'cloudflare/licensing-panel/**'
+      - 'firebase-database.rules.template.json'
+      - 'firebase.licensing-emulator.json'
+      - 'wrangler.licensing.toml'
+      - 'scripts/verify-v101-sync-preserved.mjs'
       - '.github/workflows/build-v101-227-licensed.yml'
+      - '.github/workflows/validate-v101-227.yml'
 permissions:
   contents: read
 
@@ -34,6 +35,36 @@ jobs:
             .github/workflows/build-v101-227-licensed.yml
       - name: Syntax-check isolated Worker
         run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Verify original sync engine and app JavaScript syntax
+        run: |
+          node scripts/verify-v101-sync-preserved.mjs
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.current=None; self.items=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower()=="script":
+                      attrs=dict(attrs)
+                      if attrs.get("type","").lower() in ("application/json","application/ld+json"):
+                          self.current=None
+                      else:
+                          self.current=[]
+              def handle_endtag(self, tag):
+                  if tag.lower()=="script" and self.current is not None:
+                      code="".join(self.current)
+                      if code.strip(): self.items.append(code)
+                      self.current=None
+              def handle_data(self, data):
+                  if self.current is not None: self.current.append(data)
+          parser=Scripts(); parser.feed(Path("DENTYAR_V101_LICENSED_227.html").read_text(encoding="utf-8"))
+          if not parser.items: raise SystemExit("No inline JavaScript blocks found")
+          for i,code in enumerate(parser.items):
+              Path(f"/tmp/dentyar-inline-{i}.js").write_text(code,encoding="utf-8")
+          print(f"Extracted {len(parser.items)} inline JavaScript blocks.")
+          PY
+          for file in /tmp/dentyar-inline-*.js; do node --check "$file"; done
       - name: Syntax-check owner panel and verify safe DOM rendering
         run: |
           python - <<'PY'
@@ -103,14 +134,21 @@ jobs:
           test -s .github/workflows/build-v101-227-licensed.yml
           grep -q 'DENTYAR_V101_LICENSED_227.html' .github/workflows/build-v101-227-licensed.yml
           grep -q 'versionCode 7' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'versionName "101.227.0"' .github/workflows/build-v101-227-licensed.yml
           grep -q 'DENTYAR-V101-227-LICENSED.apk' .github/workflows/build-v101-227-licensed.yml
           grep -q 'verify --verbose --print-certs' .github/workflows/build-v101-227-licensed.yml
           grep -q 'sha256sum' .github/workflows/build-v101-227-licensed.yml
           grep -q 'V2 Signer: certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' .github/workflows/build-v101-227-licensed.yml
           grep -q 'getOrCreateDeviceId' DENTYAR_V101_LICENSED_227.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.227"' DENTYAR_V101_LICENSED_227.html
           grep -q 'AndroidKeyStore' .github/workflows/build-v101-227-licensed.yml
           grep -q 'AES/GCM/NoPadding' .github/workflows/build-v101-227-licensed.yml
           grep -q 'AEADBadTagException' .github/workflows/build-v101-227-licensed.yml
           grep -q 'could not reset an unavailable device identity' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'canonicalClinicCode' cloudflare/dentyar-licensing-worker.js
+          grep -q 'registryClinicCode=canonicalClinicCode(clinicCode)' cloudflare/dentyar-licensing-worker.js
+          grep -q 'license.clinicCode!==clinicCode' cloudflare/dentyar-licensing-worker.js
+          grep -q 'auth.token.licenseId' firebase-database.rules.template.json
           grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
           grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
+          ! grep -q 'firebase deploy --only database' .github/workflows/build-v101-227-licensed.yml
