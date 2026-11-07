@@ -223,6 +223,35 @@ test("activation request stores a pending request without requiring owner creden
   assert.equal(env._values.get("request:"+data.requestId) !== undefined, true);
 });
 
+async function mockClinicPathReads(env, results) {
+  const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  env.FIREBASE_PROJECT_ID="dentyar-458d9";
+  env.FIREBASE_DATABASE_URL="https://dentyar-458d9-default-rtdb.firebaseio.com";
+  env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({
+    client_email:"firebase-adminsdk@dentyar-458d9.iam.gserviceaccount.com",
+    private_key:privateKey.export({type:"pkcs8",format:"pem"}).toString(),
+    project_id:"dentyar-458d9"
+  });
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.startsWith("https://oauth2.googleapis.com/token")){
+      return new Response(JSON.stringify({access_token:"test-admin-access-token",expires_in:3600}),{status:200});
+    }
+    if(url.includes(".json?shallow=true")){
+      const path=decodeURIComponent(new URL(url).pathname);
+      if(path.includes("/clinics/۱۴۰۵۰۷۰۱/records")){
+        return new Response(JSON.stringify(results.persian?{patients:true}:null),{status:200});
+      }
+      if(path.includes("/clinics/14050701/records")){
+        return new Response(JSON.stringify(results.ascii?{patients:true}:null),{status:200});
+      }
+    }
+    return originalFetch(input,init);
+  };
+  return ()=>{globalThis.fetch=originalFetch;};
+}
+
 test("activation request preserves a Persian clinic path while looking up its ASCII registry code", async () => {
   const env=testEnv();
   await env.LICENSES.put("clinic:14050701",JSON.stringify({
@@ -236,6 +265,52 @@ test("activation request preserves a Persian clinic path while looking up its AS
   assert.equal(response.status,202);
   const request=await env.LICENSES.get("request:"+data.requestId,"json");
   assert.equal(request.clinicCode,"۱۴۰۵۰۷۰۱");
+});
+
+test("path detection selects the existing Persian RTDB namespace without changing records", async () => {
+  const env=testEnv();
+  await env.LICENSES.put("clinic:14050701",JSON.stringify({clinicCode:"14050701",clinicName:"DENTYAR clinic",status:"active"}));
+  const restore=await mockClinicPathReads(env,{persian:true,ascii:false});
+  try{
+    const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({clinicCode:"۱۴۰۵۰۷۰۱",deviceId:"device_identifier_401",deviceName:"Persian path phone"})
+    }),env);
+    const data=await response.json();
+    assert.equal(response.status,202);
+    assert.equal(data.clinicCode,"۱۴۰۵۰۷۰۱");
+    assert.equal(data.clinicPathSelection,"existing-input");
+  }finally{restore();}
+});
+
+test("path detection selects the existing ASCII RTDB namespace when the UI supplied Persian digits", async () => {
+  const env=testEnv();
+  await env.LICENSES.put("clinic:14050701",JSON.stringify({clinicCode:"14050701",clinicName:"DENTYAR clinic",status:"active"}));
+  const restore=await mockClinicPathReads(env,{persian:false,ascii:true});
+  try{
+    const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({clinicCode:"۱۴۰۵۰۷۰۱",deviceId:"device_identifier_402",deviceName:"ASCII path phone"})
+    }),env);
+    const data=await response.json();
+    assert.equal(response.status,202);
+    assert.equal(data.clinicCode,"14050701");
+    assert.equal(data.clinicPathSelection,"existing-ascii");
+  }finally{restore();}
+});
+
+test("path detection refuses an ambiguous clinic when both Persian and ASCII namespaces contain records", async () => {
+  const env=testEnv();
+  await env.LICENSES.put("clinic:14050701",JSON.stringify({clinicCode:"14050701",clinicName:"DENTYAR clinic",status:"active"}));
+  const restore=await mockClinicPathReads(env,{persian:true,ascii:true});
+  try{
+    const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({clinicCode:"۱۴۰۵۰۷۰۱",deviceId:"device_identifier_403",deviceName:"Ambiguous path phone"})
+    }),env);
+    assert.equal(response.status,409);
+    assert.equal((await response.json()).error,"clinic-path-ambiguous");
+  }finally{restore();}
 });
 
 test("Persian clinic path is preserved in the redeemed Firebase custom-token claims", async () => {
