@@ -1,0 +1,633 @@
+name: Build DENTYAR V101-227 Licensed APK
+# Build V101.227 from the proven parallel V101 baseline, preserving package ID and the established release certificate.
+
+permissions:
+  contents: write
+  actions: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/dentyar-license-isolated-v101-223-20261107
+    paths:
+      - 'DENTYAR_V101_LICENSED_227.html'
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'cloudflare/test-rtdb-licensing-rules.mjs'
+      - 'cloudflare/test-firebase-auth-emulator.mjs'
+      - 'cloudflare/licensing-panel/**'
+      - 'firebase-database.rules.template.json'
+      - 'firebase.licensing-emulator.json'
+      - 'wrangler.licensing.toml'
+      - 'scripts/verify-v101-sync-preserved.mjs'
+      - '.github/workflows/build-v101-227-licensed.yml'
+      - '.github/workflows/validate-v101-227.yml'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: دریافت کد پروژه
+        uses: actions/checkout@v4
+
+      - name: نصب Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          # npm cache disabled because package-lock.json is created during the build
+
+      - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
+        run: |
+          mkdir -p www
+          cp DENTYAR_V101_LICENSED_227.html www/index.html
+
+          cat > package.json <<'EOF'
+          {
+            "name": "dentyar",
+            "version": "101.227.0",
+            "private": true,
+            "scripts": {
+              "build": "echo DENTYAR V101-227 FINAL"
+            },
+            "dependencies": {
+              "@capacitor/core": "7.4.3",
+              "@capacitor/android": "7.4.3",
+              "@capacitor/cli": "7.4.3",
+              "@capacitor/filesystem": "7.1.4",
+              "@capacitor/share": "7.0.2"
+            }
+          }
+          EOF
+
+          npm install
+
+          npx cap init "DENTYAR" "com.dentyar.parallelv101" --web-dir www
+          npx cap add android
+          npx cap sync android
+
+          # Set an explicit Android version code/name for the V101.227 trial package.
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 7', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.227.0"', s, count=1)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not set Android update-compatible versionCode/versionName")
+          p.write_text(s)
+          PY
+
+          # Allow Android's system package installer to handle a user-confirmed APK update.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          permission = '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          if permission not in s:
+              marker = '    <application'
+              if marker not in s:
+                  raise SystemExit("AndroidManifest.xml application marker not found")
+              s = s.replace(marker, permission + "\n" + marker, 1)
+              p.write_text(s)
+          PY
+
+      - name: ایجاد Native Direct Export Plugin
+        run: |
+          mkdir -p android/app/src/main/java/com/dentyar/parallelv101
+
+          cat > android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java <<'EOF'
+          package com.dentyar.parallelv101;
+
+          import android.content.ContentResolver;
+          import android.content.ContentValues;
+          import android.content.Intent;
+          import android.provider.Settings;
+          import androidx.core.content.FileProvider;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Environment;
+          import android.provider.MediaStore;
+          import android.util.Base64;
+          import android.content.SharedPreferences;
+          import android.security.keystore.KeyGenParameterSpec;
+          import android.security.keystore.KeyProperties;
+
+          import javax.crypto.Cipher;
+          import javax.crypto.AEADBadTagException;
+          import javax.crypto.KeyGenerator;
+          import javax.crypto.SecretKey;
+          import javax.crypto.spec.GCMParameterSpec;
+          import java.nio.charset.StandardCharsets;
+          import java.security.Key;
+          import java.security.KeyStore;
+          import java.security.SecureRandom;
+
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          import java.io.OutputStream;
+          import java.io.File;
+          import java.io.FileOutputStream;
+          import java.io.FileInputStream;
+          import java.io.InputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+
+          @CapacitorPlugin(name = "DentyarNative")
+          public class DentyarNativePlugin extends Plugin {
+              private static final String DEVICE_KEY_ALIAS = "dentyar_device_identity_v1";
+              private static final String DEVICE_PREFS = "dentyar_secure_identity";
+
+              @PluginMethod
+              public void getOrCreateDeviceId(PluginCall call) {
+                  try {
+                      String id = loadOrCreateSecureDeviceId();
+                      JSObject result = new JSObject();
+                      result.put("deviceId", id);
+                      call.resolve(result);
+                  } catch (Exception e) {
+                      call.reject("Secure Android device identity is unavailable: " + e.getMessage(), e);
+                  }
+              }
+
+              private String loadOrCreateSecureDeviceId() throws Exception {
+                  SharedPreferences prefs = getContext().getSharedPreferences(DEVICE_PREFS, android.content.Context.MODE_PRIVATE);
+                  String ivText = prefs.getString("device_iv", null);
+                  String encryptedText = prefs.getString("device_ciphertext", null);
+                  if (ivText != null && encryptedText != null) {
+                      try {
+                          byte[] iv = Base64.decode(ivText, Base64.NO_WRAP);
+                          byte[] encrypted = Base64.decode(encryptedText, Base64.NO_WRAP);
+                          Cipher decrypt = Cipher.getInstance("AES/GCM/NoPadding");
+                          decrypt.init(Cipher.DECRYPT_MODE, getOrCreateDeviceKey(), new GCMParameterSpec(128, iv));
+                          String existing = new String(decrypt.doFinal(encrypted), StandardCharsets.UTF_8);
+                          if (existing.matches("dev_[A-Fa-f0-9]{48}")) return existing;
+                      } catch (AEADBadTagException | IllegalArgumentException invalidStoredIdentity) {
+                          // A restored backup may contain ciphertext without its non-exportable Android Keystore key.
+                      }
+                      if (!prefs.edit().remove("device_iv").remove("device_ciphertext").commit()) {
+                          throw new Exception("could not reset an unavailable device identity");
+                      }
+                  }
+
+                  byte[] random = new byte[24];
+                  new SecureRandom().nextBytes(random);
+                  StringBuilder hex = new StringBuilder("dev_");
+                  for (byte value : random) hex.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+                  String id = hex.toString();
+
+                  Cipher encrypt = Cipher.getInstance("AES/GCM/NoPadding");
+                  encrypt.init(Cipher.ENCRYPT_MODE, getOrCreateDeviceKey());
+                  byte[] encrypted = encrypt.doFinal(id.getBytes(StandardCharsets.UTF_8));
+                  boolean saved = prefs.edit()
+                      .putString("device_iv", Base64.encodeToString(encrypt.getIV(), Base64.NO_WRAP))
+                      .putString("device_ciphertext", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                      .commit();
+                  if (!saved) throw new Exception("could not persist encrypted device identity");
+                  return id;
+              }
+
+              private SecretKey getOrCreateDeviceKey() throws Exception {
+                  KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+                  keyStore.load(null);
+                  Key existing = keyStore.getKey(DEVICE_KEY_ALIAS, null);
+                  if (existing instanceof SecretKey) return (SecretKey) existing;
+
+                  KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+                  KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
+                      DEVICE_KEY_ALIAS,
+                      KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
+                  )
+                      .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                      .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                      .setKeySize(256)
+                      .setRandomizedEncryptionRequired(true)
+                      .build();
+                  generator.init(spec);
+                  return generator.generateKey();
+              }
+
+              @PluginMethod
+              public void saveToDownloads(PluginCall call) {
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                      call.reject("Android 10 or newer is required");
+                      return;
+                  }
+
+                  String fileName = call.getString("filename", "DENTYAR-report");
+                  String mimeType = call.getString("mimeType", "application/octet-stream");
+                  String data = call.getString("data", "");
+                  String folder = call.getString("folder", "Reports");
+                  if (!"Reports".equals(folder) && !"Backups".equals(folder) && !"Transfers".equals(folder) && !"Updates".equals(folder)) { folder = "Reports"; }
+
+                  if (data == null || data.isEmpty()) {
+                      call.reject("Empty report data");
+                      return;
+                  }
+
+                  fileName = fileName.replaceAll("[\\\\/:*?\\\"<>|]", "_");
+
+                  ContentResolver resolver = getContext().getContentResolver();
+                  ContentValues values = new ContentValues();
+                  values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+                  values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
+                  values.put(
+                      MediaStore.Downloads.RELATIVE_PATH,
+                      Environment.DIRECTORY_DOWNLOADS + "/DENTYAR/" + folder
+                  );
+                  values.put(MediaStore.Downloads.IS_PENDING, 1);
+
+                  Uri uri = null;
+
+                  try {
+                      uri = resolver.insert(
+                          MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                          values
+                      );
+
+                      if (uri == null) {
+                          throw new Exception("MediaStore could not create the report file");
+                      }
+
+                      byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+
+                      try (OutputStream out = resolver.openOutputStream(uri)) {
+                          if (out == null) {
+                              throw new Exception("Could not open report output stream");
+                          }
+                          out.write(bytes);
+                          out.flush();
+                      }
+
+                      ContentValues done = new ContentValues();
+                      done.put(MediaStore.Downloads.IS_PENDING, 0);
+                      resolver.update(uri, done, null, null);
+
+                      JSObject result = new JSObject();
+                      result.put("saved", true);
+                      result.put("uri", uri.toString());
+                      result.put("path", "Download/DENTYAR/" + folder + "/" + fileName);
+                      call.resolve(result);
+
+                  } catch (Exception e) {
+                      if (uri != null) {
+                          try {
+                              resolver.delete(uri, null, null);
+                          } catch (Exception ignored) {}
+                      }
+                      call.reject("Direct export failed: " + e.getMessage(), e);
+                  }
+              }
+
+              @PluginMethod
+              public void installApk(PluginCall call) {
+                  String fileName = call.getString("filename", "DENTYAR-update.apk");
+                  String data = call.getString("data", "");
+                  fileName = fileName.replaceAll("[\\\\/:*?\\\"<>|]", "_");
+                  if (!fileName.toLowerCase().endsWith(".apk")) {
+                      fileName = fileName + ".apk";
+                  }
+                  if (data == null || data.isEmpty()) {
+                      call.reject("Empty APK data");
+                      return;
+                  }
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                          !getContext().getPackageManager().canRequestPackageInstalls()) {
+                          Intent settings = new Intent(
+                              Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                              Uri.parse("package:" + getContext().getPackageName())
+                          );
+                          settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          getContext().startActivity(settings);
+                          call.reject("اجازه نصب برنامه از این منبع را فعال کنید و دوباره تلاش کنید.");
+                          return;
+                      }
+                      File apk = new File(getContext().getCacheDir(), fileName);
+                      try (FileOutputStream out = new FileOutputStream(apk)) {
+                          out.write(Base64.decode(data, Base64.DEFAULT));
+                          out.flush();
+                      }
+                      Uri apkUri = FileProvider.getUriForFile(
+                          getContext(),
+                          getContext().getPackageName() + ".fileprovider",
+                          apk
+                      );
+                      Intent intent = new Intent(Intent.ACTION_VIEW);
+                      intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                      getContext().startActivity(intent);
+                      JSObject result = new JSObject();
+                      result.put("opened", true);
+                      result.put("fileName", fileName);
+                      call.resolve(result);
+                  } catch (Exception e) {
+                      call.reject("Could not open Android package installer: " + e.getMessage(), e);
+                  }
+              }
+
+              @PluginMethod
+              public void downloadAndInstallApk(PluginCall call) {
+                  String url = call.getString("url", "");
+                  String fileName = call.getString("filename", "DENTYAR-update.apk");
+                  fileName = fileName.replace("/", "_").replace("\\", "_").replace(":", "_").replace("?", "_").replace("*", "_").replace("\"", "_").replace("<", "_").replace(">", "_").replace("|", "_");
+                  if (!fileName.toLowerCase().endsWith(".apk")) fileName = fileName + ".apk";
+                  if (url == null || !url.startsWith("https://github.com/dentyarapp/DENTYAR-V1/releases/download/")) {
+                      call.reject("Untrusted DENTYAR update URL");
+                      return;
+                  }
+                  final String safeName = fileName;
+                  new Thread(() -> {
+                      HttpURLConnection connection = null;
+                      File apk = new File(getContext().getCacheDir(), safeName);
+                      try {
+                          URL source = new URL(url);
+                          connection = (HttpURLConnection) source.openConnection();
+                          connection.setInstanceFollowRedirects(true);
+                          connection.setConnectTimeout(20000);
+                          connection.setReadTimeout(45000);
+                          connection.setRequestProperty("User-Agent", "DENTYAR-Updater/1.0");
+                          int status = connection.getResponseCode();
+                          if (status != HttpURLConnection.HTTP_OK) throw new Exception("HTTP " + status);
+                          long total = 0;
+                          byte[] buffer = new byte[8192];
+                          try (InputStream in = connection.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
+                              int count;
+                              while ((count = in.read(buffer)) != -1) {
+                                  total += count;
+                                  if (total > 100L * 1024L * 1024L) throw new Exception("APK exceeds 100 MB");
+                                  out.write(buffer, 0, count);
+                              }
+                              out.flush();
+                          }
+                          if (total < 1000000L) throw new Exception("Downloaded file is too small to be a valid APK");
+                          try (FileInputStream in = new FileInputStream(apk)) {
+                              byte[] magic = new byte[4];
+                              if (in.read(magic) != 4 || magic[0] != 'P' || magic[1] != 'K' || magic[2] != 3 || magic[3] != 4) {
+                                  throw new Exception("Downloaded file is not an APK ZIP archive");
+                              }
+                          }
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                              !getContext().getPackageManager().canRequestPackageInstalls()) {
+                              Intent settings = new Intent(
+                                  Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                  Uri.parse("package:" + getContext().getPackageName())
+                              );
+                              settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              getContext().startActivity(settings);
+                              call.reject("اجازه نصب برنامه از این منبع را فعال کنید و دوباره تلاش کنید.");
+                              return;
+                          }
+                          Uri apkUri = FileProvider.getUriForFile(
+                              getContext(),
+                              getContext().getPackageName() + ".fileprovider",
+                              apk
+                          );
+                          Intent intent = new Intent(Intent.ACTION_VIEW);
+                          intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                          intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                          getContext().startActivity(intent);
+                          JSObject result = new JSObject();
+                          result.put("opened", true);
+                          result.put("fileName", safeName);
+                          call.resolve(result);
+                      } catch (Exception e) {
+                          call.reject("DENTYAR update download/install failed: " + e.getMessage(), e);
+                      } finally {
+                          if (connection != null) connection.disconnect();
+                      }
+                  }).start();
+              }
+          }
+          EOF
+
+      - name: ثبت Native Plugin
+        run: |
+          cat > android/app/src/main/java/com/dentyar/parallelv101/MainActivity.java <<'EOF'
+          package com.dentyar.parallelv101;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(DentyarNativePlugin.class);
+                  super.onCreate(savedInstanceState);
+              }
+          }
+          EOF
+
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="apk_updates" path="." />
+          </paths>
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          provider = '''        <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>'''
+          if "androidx.core.content.FileProvider" not in s:
+              marker = "    </application>"
+              if marker not in s:
+                  raise SystemExit("AndroidManifest.xml application close marker not found")
+              s = s.replace(marker, provider + "\n" + marker, 1)
+              p.write_text(s)
+          PY
+
+      - name: بررسی حضور اجزای گزارش
+        run: |
+          test -s www/index.html
+          ! grep -q "__POSTER_DATA__" www/index.html
+          grep -q "async function v31NativeFile" www/index.html
+          grep -q "DentyarNative" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "getOrCreateDeviceId" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "AndroidKeyStore" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "AES/GCM/NoPadding" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "native && native.cancelled" www/index.html
+          grep -q "numberingSystem" www/index.html
+          grep -q "DENTYAR V68 FIX" www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.227"' www/index.html
+          grep -q "installTransportProxy" www/index.html
+          grep -q "networkProxyUrl" www/index.html
+          test -s cloudflare/dentyar-sync-relay.js
+          node --input-type=module --check < cloudflare/dentyar-sync-relay.js
+          grep -q "@capacitor/filesystem" package.json
+          grep -q "@capacitor/share" package.json
+          grep -q "installApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          grep -q "downloadAndInstallApk" android/app/src/main/java/com/dentyar/parallelv101/DentyarNativePlugin.java
+          test -s android/app/src/main/res/xml/file_paths.xml
+          # Parse each inline JavaScript block before packaging the APK.
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class ScriptExtractor(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.inside = False
+                  self.current = []
+                  self.scripts = []
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == "script":
+                      self.inside = True
+                      self.current = []
+              def handle_endtag(self, tag):
+                  if tag.lower() == "script" and self.inside:
+                      self.scripts.append("".join(self.current))
+                      self.inside = False
+              def handle_data(self, data):
+                  if self.inside:
+                      self.current.append(data)
+          parser = ScriptExtractor()
+          parser.feed(Path("www/index.html").read_text(encoding="utf-8"))
+          if not parser.scripts:
+              raise SystemExit("No inline script blocks found")
+          for i, script in enumerate(parser.scripts):
+              Path(f"/tmp/dentyar-inline-{i}.js").write_text(script, encoding="utf-8")
+          print(f"Extracted {len(parser.scripts)} script blocks")
+          PY
+          for js in /tmp/dentyar-inline-*.js; do node --check "$js"; done
+          npx cap sync android
+
+      - name: نصب Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: آماده‌سازی امضای ثابت برای به‌روزرسانی درون‌برنامه‌ای
+        id: signing
+        env:
+          DENTYAR_KEYSTORE_BASE64: ${{ secrets.DENTYAR_KEYSTORE_BASE64 }}
+          DENTYAR_KEYSTORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+          DENTYAR_KEY_ALIAS: dentyar-release
+          DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DENTYAR_KEYSTORE_PASSWORD" ]; then
+            echo "ERROR: DENTYAR_KEYSTORE_PASSWORD is missing."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/dentyar-signing"
+          if [ -n "$DENTYAR_KEYSTORE_BASE64" ]; then
+            # Accept standard base64 with line breaks, URL-safe base64, or a data-URI prefix.
+            # Never write a partially decoded keystore: validate the complete payload first.
+            export DENTYAR_KEYSTORE_BASE64
+            python - <<'PY'
+          import base64, os, re, sys
+          raw = os.environ.get("DENTYAR_KEYSTORE_BASE64", "").strip()
+          raw = re.sub(r"^data:[^,]*;base64,", "", raw, flags=re.IGNORECASE)
+          raw = re.sub(r"\s+", "", raw).replace("-", "+").replace("_", "/")
+          raw += "=" * ((-len(raw)) % 4)
+          try:
+              decoded = base64.b64decode(raw, validate=True)
+          except Exception:
+              print("ERROR: DENTYAR_KEYSTORE_BASE64 is not valid base64. The keystore was not written.")
+              sys.exit(2)
+          if len(decoded) < 1024:
+              print("ERROR: decoded keystore is unexpectedly small; refusing to use it.")
+              sys.exit(3)
+          with open("android/app/dentyar-release.keystore", "wb") as f:
+              f.write(decoded)
+          print("Keystore payload decoded and structurally sized; validating alias/password next.")
+          PY
+          else
+            gh run download 38471109738 --repo "$GITHUB_REPOSITORY" --name DENTYAR-SIGNING-KEY-PRIVATE --dir "$RUNNER_TEMP/dentyar-signing"
+            test -s "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore"
+            cp "$RUNNER_TEMP/dentyar-signing/dentyar-release.keystore" android/app/dentyar-release.keystore
+          fi
+          keytool -list -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release
+          # Refuse to publish an APK signed with any certificate other than the parallel V101 build.
+          keytool -list -v -storetype PKCS12 -keystore android/app/dentyar-release.keystore -storepass "$DENTYAR_KEYSTORE_PASSWORD" -alias dentyar-release > "$RUNNER_TEMP/dentyar-signing/certificate.txt"
+          if ! grep -qi 'SHA256: 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2' "$RUNNER_TEMP/dentyar-signing/certificate.txt"; then
+            echo "::error::Signing certificate mismatch. Expected the established DENTYAR release certificate SHA-256 9D:FF:5F:46:57:0C:49:1D:E8:8A:D8:6A:66:9C:6B:82:3A:F0:D4:2A:CF:6B:A1:7B:AD:33:AF:58:0B:D9:2F:B2. Build stopped to protect existing installations."
+            exit 1
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          s = p.read_text()
+          if "signingConfigs {" not in s:
+              s = s.replace("    buildTypes {", """    signingConfigs {
+                  release {
+                      storeFile file("dentyar-release.keystore")
+                      storePassword System.getenv("DENTYAR_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("DENTYAR_KEY_ALIAS")
+                      keyPassword System.getenv("DENTYAR_KEY_PASSWORD")
+                  }
+              }
+
+              buildTypes {""", 1)
+          if "signingConfig signingConfigs.release" not in s:
+              marker = "    buildTypes {"
+              if marker not in s:
+                  raise SystemExit("Android buildTypes marker not found")
+              prefix, rest = s.split(marker, 1)
+              if "        release {" not in rest:
+                  raise SystemExit("Android release build type not found")
+              rest = rest.replace("        release {", "        release {\n            signingConfig signingConfigs.release", 1)
+              s = prefix + marker + rest
+          p.write_text(s)
+          PY
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: ساخت APK امضاشده با کلید ثابت
+        if: ${{ steps.signing.outputs.available == 'true' }}
+        working-directory: android
+        env:
+          DENTYAR_KEYSTORE_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+          DENTYAR_KEY_ALIAS: dentyar-release
+          DENTYAR_KEY_PASSWORD: ${{ secrets.DENTYAR_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: آماده‌سازی APK نهایی امضاشده
+        if: ${{ steps.signing.outputs.available == 'true' }}
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-227-LICENSED.apk
+
+      - name: بررسی امضا، شناسه برنامه و نسخه APK
+        run: |
+          set -euo pipefail
+          APK=DENTYAR-V101-227-LICENSED.apk
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-final-apk-cert.txt
+          grep -qi 'V2 Signer: certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-final-apk-cert.txt
+          BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
+          echo "$BADGING"
+          echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
+          echo "$BADGING" | grep -F "versionCode='6'"
+          echo "$BADGING" | grep -F "versionName='101.227.0'"
+          sha256sum "$APK" > "$APK.sha256"
+      - name: بارگذاری APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DENTYAR-V101-227-LICENSED-APK
+          path: |
+            DENTYAR-V101-227-LICENSED.apk
+            DENTYAR-V101-227-LICENSED.apk.sha256
+          if-no-files-found: error
+
