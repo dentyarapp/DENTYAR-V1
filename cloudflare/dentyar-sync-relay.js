@@ -107,7 +107,7 @@ export default {
         }
         return new Response("Database namespace is not allowed", { status: 403, headers: cors(origin) });
       }
-      host = "dentyar-458d9-default-rtdb.firebaseio.com"; // Canonical host for root /.lp, /.ws and /.json requests; do not use regional firebasedatabase.app here.
+      host = "dentyar-458d9-default-rtdb.firebaseio.com";
       if (!DATABASE_HOSTS.has(host)) {
         return new Response("Upstream is not allowed", { status: 403, headers: cors(origin) });
       }
@@ -134,13 +134,13 @@ export default {
       responseHeaders.delete("content-security-policy-report-only");
       responseHeaders.delete("x-frame-options");
 
-      // Firebase long-poll handshake advertises a sharded *.firebaseio.com host in
-      // the "h" field. Rewrite only that shard hostname to this Worker origin so
-      // follow-up /.lp requests continue through the relay instead of bypassing it.
+      // Firebase long-poll handshake may advertise a sharded *.firebaseio.com
+      // host in its "h" field. Keep follow-up /.lp requests on this relay;
+      // otherwise they bypass the proxy and fail on VPN-restricted networks.
       if (incoming.pathname === "/.lp" && upstream.ok) {
         let body = await upstream.text();
         const workerHost = incoming.host;
-        body = body.replace(/("h"\s*:\s*")s-[a-z0-9-]+\.firebaseio\.com(")/gi, "$1" + workerHost + "$2");
+        body = body.replace(/("h"\\s*:\\s*")s-[a-z0-9-]+\\.firebaseio\\.com(")/gi, "$1" + workerHost + "$2");
         responseHeaders.delete("content-length");
         responseHeaders.delete("content-encoding");
         responseHeaders.delete("etag");
