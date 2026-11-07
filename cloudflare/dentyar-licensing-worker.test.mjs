@@ -462,8 +462,8 @@ test("owner panel contains syntactically valid JavaScript and Persian RTL layout
   assert.match(html,/v1\/owner\/approve/);
 });
 
-test("isolated V101 app licensing integration script parses", async () => {
-  const html=await readFile(new URL("../DENTYAR_V101_LICENSE_TRIAL.html",import.meta.url),"utf8");
+test("V101.227 licensed app integration script parses", async () => {
+  const html=await readFile(new URL("../DENTYAR_V101_LICENSED_227.html",import.meta.url),"utf8");
   const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(match=>match[1]);
   const target=scripts.find(script=>script.includes("LICENSE_API_URL"));
   assert.ok(target,"licensing integration script exists");
@@ -478,6 +478,8 @@ test("isolated V101 app licensing integration script parses", async () => {
   assert.match(target,/dev_\[A-Fa-f0-9\]\{48\}/);
   assert.match(target,/getIdTokenResult\(true\)/);
   assert.match(target,/claims\.role!==['"]clinic-device['"]/);
+  assert.match(target,/function base\(\)\{ return 'clinics\/\'+String/);
+  assert.match(target,/کد مطب معتبر نیست؛ مسیر اطلاعات قبلی باید بدون تغییر حفظ شود/);
   assert.doesNotMatch(target,/signInWithEmailAndPassword/);
 });
 
