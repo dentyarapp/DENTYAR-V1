@@ -609,7 +609,7 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='6'"
+          echo "$BADGING" | grep -F "versionCode='7'"
           echo "$BADGING" | grep -F "versionName='101.227.0'"
           sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
