@@ -1,0 +1,38 @@
+name = "dentyar-licensing-api"
+main = "cloudflare/dentyar-licensing-worker.js"
+compatibility_date = "2026-10-16"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "REPLACE_WITH_NEW_KV_NAMESPACE_ID"
+
+[[durable_objects.bindings]]
+name = "REDEMPTION_LOCKS"
+class_name = "RedemptionLock"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RedemptionLock"]
+
+[[durable_objects.bindings]]
+name = "ACTIVATION_LIMITS"
+class_name = "ActivationRateLimiter"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ActivationRateLimiter"]
+
+[assets]
+directory = "./cloudflare/licensing-panel"
+html_handling = "none"
+binding = "ASSETS"
+run_worker_first = true
+
+[[durable_objects.bindings]]
+name = "CLINIC_REGISTRY"
+class_name = "ClinicRegistry"
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["ClinicRegistry"]
