@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   const WORKER='https://dentyar-sync-relay.dentyar-cloudflare.workers.dev';
-  const DB='https://dentyar-458d9-default-rtdb.europe-west1.firebasedatabase.app';
+  const DB='https://dentyar-458d9-default-rtdb.firebaseio.com';
   const NS='dentyar-458d9-default-rtdb';
   const nativeFetch=window.__dentyarProbeNativeFetch || window.fetch.bind(window);
   const timeoutMs=8000;
