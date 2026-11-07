@@ -1,0 +1,142 @@
+name: Deploy DENTYAR licensing Worker only (no Firebase rule changes)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/dentyar-license-isolated-v101-223-20261107
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/licensing-panel/**'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'wrangler.licensing.toml'
+      - 'firebase.licensing-emulator.json'
+      - 'cloudflare/test-rtdb-licensing-rules.mjs'
+      - 'cloudflare/test-firebase-auth-emulator.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate Worker and run unit tests
+        run: |
+          set -euo pipefail
+          node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+          node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Test Firebase Auth and RTDB rules in emulators
+        run: |
+          npm install --global firebase-tools
+          npm install --no-save @firebase/rules-unit-testing firebase
+          firebase emulators:exec --only auth,database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs && node cloudflare/test-firebase-auth-emulator.mjs"
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Create or reuse licensing KV namespace
+        id: kv
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CF_TOKEN"
+          test -n "$CF_ACCOUNT"
+          LIST=$(curl --fail-with-body -sS "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
+            -H "Authorization: Bearer $CF_TOKEN")
+          KV_ID=$(printf '%s' "$LIST" | jq -r '[.result[]? | select(.title=="DENTYAR_LICENSES") | .id][0] // empty')
+          if [ -z "$KV_ID" ]; then
+            CREATE=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces" \
+              -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+              --data '{"title":"DENTYAR_LICENSES"}')
+            KV_ID=$(printf '%s' "$CREATE" | jq -r '.result.id // empty')
+            if [ -z "$KV_ID" ]; then
+              echo "Cloudflare could not create the licensing KV namespace:"
+              printf '%s' "$CREATE" | jq -c '{success,errors,messages}'
+              exit 1
+            fi
+          fi
+          test -n "$KV_ID"
+          sed -i "s/REPLACE_WITH_NEW_KV_NAMESPACE_ID/$KV_ID/" wrangler.licensing.toml
+          wrangler deploy --dry-run --outdir /tmp/dentyar-licensing-dry-run --config wrangler.licensing.toml
+      - name: Run licensing unit and integration tests
+        run: node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - name: Dry-run the exact licensing Worker deployment
+        run: wrangler deploy --dry-run --outdir /tmp/dentyar-licensing-dry-run --config wrangler.licensing.toml
+      - name: Configure Firebase Admin secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          node -e 'const s=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON); if(s.project_id!=="dentyar-458d9"||!s.client_email||!s.private_key) process.exit(1);'
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.licensing.toml
+      - name: Configure optional Resend secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ vars.DENTYAR_RESEND_FROM }}
+        run: |
+          if [ -n "$RESEND_API_KEY" ] && [ -z "$RESEND_FROM" ]; then
+            echo "DENTYAR_RESEND_FROM must be configured when RESEND_API_KEY is set."
+            exit 1
+          fi
+          if [ -n "$RESEND_FROM" ] && [ -z "$RESEND_API_KEY" ]; then
+            echo "RESEND_API_KEY must be configured when DENTYAR_RESEND_FROM is set."
+            exit 1
+          fi
+          if [ -n "$RESEND_API_KEY" ]; then
+            printf '%s' "$RESEND_API_KEY" | wrangler secret put RESEND_API_KEY --config wrangler.licensing.toml
+          fi
+      - name: Deploy isolated licensing Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OWNER_EMAIL: firebase.dentyar.app@gmail.com
+          OWNER_EMAILS: firebase.dentyar.app@gmail.com,dentyar.app@gmail.com,h.alkasir13@gmail.com
+          FIREBASE_PROJECT_ID: dentyar-458d9
+          FIREBASE_DATABASE_URL: https://dentyar-458d9-default-rtdb.firebaseio.com
+          FIREBASE_WEB_API_KEY: ${{ vars.DENTYAR_FIREBASE_WEB_API_KEY }}
+          RESEND_FROM: ${{ vars.DENTYAR_RESEND_FROM }}
+        run: |
+          test -n "$OWNER_EMAIL"
+          test -n "$FIREBASE_WEB_API_KEY"
+          args=(--config wrangler.licensing.toml --var "OWNER_EMAIL:$OWNER_EMAIL" --var "OWNER_EMAILS:$OWNER_EMAILS" --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "FIREBASE_DATABASE_URL:$FIREBASE_DATABASE_URL" --var "FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY")
+          if [ -n "$RESEND_FROM" ]; then args+=(--var "RESEND_FROM:$RESEND_FROM"); fi
+          wrangler deploy "${args[@]}"
+
+      - name: Verify deployed API and owner panel
+        run: |
+          set -uo pipefail
+          BASE=https://dentyar-licensing-api.dentyar-cloudflare.workers.dev
+          curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 --fail-with-body -sS "$BASE/health" -o /tmp/health.json || { echo "Health endpoint transport failed"; exit 1; }
+          cat /tmp/health.json
+          jq -e '.ok == true and .service == "dentyar-licensing"' /tmp/health.json
+          OWNER_BODY=$(mktemp)
+          OWNER_STATUS=$(curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 -sS -o "$OWNER_BODY" -w '%{http_code}' "$BASE/owner") || { echo "Owner panel transport failed"; exit 1; }
+          echo "Owner panel HTTP status: $OWNER_STATUS"
+          head -c 180 "$OWNER_BODY" || true
+          echo
+          test "$OWNER_STATUS" = "200"
+          grep -qi '<html' "$OWNER_BODY"
+          CONFIG=$(curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 30 -sS "$BASE/v1/owner/config")
+          echo "$CONFIG" | jq -e '.ok == true and .projectId == "dentyar-458d9" and (.apiKey | type == "string" and length > 0)'
+          INVALID_BODY=$(mktemp)
+          INVALID_STATUS=$(curl -sS -o "$INVALID_BODY" -w '%{http_code}' -H 'content-type: application/json' -X POST --data '{}' "$BASE/v1/activation/request")
+          echo "Invalid activation request HTTP status: $INVALID_STATUS"
+          test "$INVALID_STATUS" = "400"
+          PREFLIGHT_BODY=$(mktemp)
+          STATUS=$(curl -sS -o "$PREFLIGHT_BODY" -w '%{http_code}' -X OPTIONS "$BASE/v1/activation/redeem")
+          echo "CORS preflight HTTP status: $STATUS"
+          test "$STATUS" = "204"
+          echo "API health, owner panel, Firebase public config, request validation, and CORS preflight verified."
