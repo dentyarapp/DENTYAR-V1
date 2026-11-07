@@ -1,6 +1,6 @@
-name: Build DENTYAR V101-228 Final APK
-# Release gate: package ID, signer certificate, and Android versionCode 8 must match the installed DENTYAR line.
-# Build the finalized V101-228 APK, preserving the exact package ID and signing certificate of the validated 101-226 installation.
+name: Build DENTYAR V101-229 Final APK
+# Release gate: package ID, signer certificate, and Android versionCode 9 must match the installed DENTYAR line.
+# Build the finalized V101-229 APK, preserving the exact package ID and signing certificate of the validated 101-226 installation.
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ on:
   push:
     branches:
       - feature/dentyar-owner-licensing-20261103
-      - fix/dentyar-v101-228-guide-poster-sync-20261107
+      - fix/dentyar-v101-229-sync-restore-intro-20261107
     paths:
       - 'DENTYAR_V101_LICENSE_TRIAL.html'
       - '.github/workflows/build-licensing-trial-apk.yml'
@@ -39,10 +39,10 @@ jobs:
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.228.0",
+            "version": "101.229.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-228 FINAL"
+              "build": "echo DENTYAR V101-229 FINAL"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -66,8 +66,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 8', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.228.0"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 9', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.229.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -461,6 +461,13 @@ jobs:
           grep -q 'DENTYAR_APP_VERSION = "V101.228"' www/index.html
           grep -q "id:'poster', label:'معرفی دنت‌یار'" www/index.html
           grep -q "poster: renderPoster" www/index.html
+          grep -q "const DENTYAR_INTRO_HTML" www/index.html
+          grep -q "خدمات و قابلیت‌های کلیدی" www/index.html
+          grep -q "ارزش‌آفرینی برای مطب" www/index.html
+          grep -q "async function pullRemoteSnapshot()" www/index.html
+          grep -q "await pullRemoteSnapshot()" www/index.html
+          grep -q "شبکه متصل؛ همگام‌سازی تأیید نشده" www/index.html
+          grep -q "DEVICE_REGISTER" www/index.html
           grep -q "const batchSize = 4" www/index.html
           grep -q "await writeSyncPath(b+'/records/meta', meta)" www/index.html
           grep -q "installTransportProxy" www/index.html
@@ -600,12 +607,12 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-228-FINAL.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-229-FINAL.apk
 
       - name: بررسی امضا، شناسه برنامه و نسخه APK
         run: |
           set -euo pipefail
-          APK=DENTYAR-V101-228-FINAL.apk
+          APK=DENTYAR-V101-229-FINAL.apk
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$AAPT"
@@ -615,15 +622,15 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='8'"
-          echo "$BADGING" | grep -F "versionName='101.228.0'"
+          echo "$BADGING" | grep -F "versionCode='9'"
+          echo "$BADGING" | grep -F "versionName='101.229.0'"
           sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-228-FINAL-APK
+          name: DENTYAR-V101-229-FINAL-APK
           path: |
-            DENTYAR-V101-228-FINAL.apk
-            DENTYAR-V101-228-FINAL.apk.sha256
+            DENTYAR-V101-229-FINAL.apk
+            DENTYAR-V101-229-FINAL.apk.sha256
           if-no-files-found: error
 
