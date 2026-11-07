@@ -521,27 +521,27 @@ jobs:
         run: |
           set -euo pipefail
           APK=DENTYAR-V101-225.apk
-          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
+          APKANALYZER=$(command -v apkanalyzer || find "$ANDROID_HOME" -type f -name apkanalyzer | sort -V | tail -n1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
-          test -x "$AAPT"
+          test -x "$APKANALYZER"
           test -x "$APKSIGNER"
           unzip -tq "$APK"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-final-cert.txt
           grep -qi 'Signer #1 certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-final-cert.txt
-          # Keep the complete aapt output: some SDK build-tools emit a preamble
-          # before the package line, so checking only line 1 can reject a valid APK.
-          "$AAPT" dump badging "$APK" > /tmp/dentyar-badging.txt 2>&1
-          cat /tmp/dentyar-badging.txt
-          grep -F "name='com.dentyar.parallelv101'" /tmp/dentyar-badging.txt
-          grep -F "versionCode='3'" /tmp/dentyar-badging.txt
-          grep -F "versionName='101.225.0'" /tmp/dentyar-badging.txt
+          APP_ID=$("$APKANALYZER" manifest application-id "$APK")
+          VERSION_CODE=$("$APKANALYZER" manifest version-code "$APK")
+          VERSION_NAME=$("$APKANALYZER" manifest version-name "$APK")
+          printf 'APK applicationId=%s\\nversionCode=%s\\nversionName=%s\\n' "$APP_ID" "$VERSION_CODE" "$VERSION_NAME"
+          test "$APP_ID" = "com.dentyar.parallelv101"
+          test "$VERSION_CODE" = "3"
+          test "$VERSION_NAME" = "101.225.0"
           sha256sum "$APK" > "$APK.sha256"
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
           name: DENTYAR-V101-225-APK
-          path: DENTYAR-V101-223.apk
+          path: DENTYAR-V101-225.apk
           if-no-files-found: error
 
       - name: انتشار نسخه نهایی دنت‌یار
@@ -553,7 +553,7 @@ jobs:
           body: |
             نسخه نهایی دنت‌یار V101-223 شامل اصلاح شماره دندان، ویرایش کنترل‌شده پرونده بیمار، و نمایش مرحله و کد خطای همگام‌سازی؛ با شناسه برنامه و کلید امضای ثابت نسخه تولیدی.
             این APK با کلید امضای ثابت دنت‌یار ساخته می‌شود تا به‌روزرسانی نسخه نصب‌شده امکان‌پذیر باشد.
-          files: DENTYAR-V101-223.apk
+          files: DENTYAR-V101-225.apk
           make_latest: true
           fail_on_unmatched_files: true
         env:
