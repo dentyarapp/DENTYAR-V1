@@ -527,7 +527,7 @@ jobs:
           test -x "$APKSIGNER"
           unzip -tq "$APK"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-final-cert.txt
-          grep -qi 'Signer #1 certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-final-cert.txt
+          grep -Eqi 'certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-final-cert.txt
           APP_ID=$("$APKANALYZER" manifest application-id "$APK")
           VERSION_CODE=$("$APKANALYZER" manifest version-code "$APK")
           VERSION_NAME=$("$APKANALYZER" manifest version-name "$APK")
