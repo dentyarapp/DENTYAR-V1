@@ -458,7 +458,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V101.228"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.229"' www/index.html
           grep -q "id:'poster', label:'معرفی دنت‌یار'" www/index.html
           grep -q "poster: renderPoster" www/index.html
           grep -q "const DENTYAR_INTRO_HTML" www/index.html
