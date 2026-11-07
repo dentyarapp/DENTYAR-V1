@@ -149,7 +149,9 @@ jobs:
           grep -q 'could not reset an unavailable device identity' .github/workflows/build-v101-227-licensed.yml
           grep -q 'canonicalClinicCode' cloudflare/dentyar-licensing-worker.js
           grep -q 'registryClinicCode=canonicalClinicCode(clinicCode)' cloudflare/dentyar-licensing-worker.js
-          grep -q 'license.clinicCode!==clinicCode' cloudflare/dentyar-licensing-worker.js
+          grep -q 'canonicalClinicCode(license.clinicCode)!==canonicalClinicCode(clinicCode)' cloudflare/dentyar-licensing-worker.js
+          grep -q 'async function dbReadShallow' cloudflare/dentyar-licensing-worker.js
+          grep -q 'clinic-path-ambiguous' cloudflare/dentyar-licensing-worker.js
           grep -q 'auth.token.licenseId' firebase-database.rules.template.json
           grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
           grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
