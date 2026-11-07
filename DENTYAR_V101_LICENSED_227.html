@@ -10606,6 +10606,12 @@ document.addEventListener('focus',e=>{
   // Use the deployed DENTYAR relay by default so first-time and existing devices do not silently fall back to blocked Firebase endpoints.
   const DEFAULT_SYNC_PROXY_URL='https://dentyar-sync-relay.dentyar-cloudflare.workers.dev';
   const LICENSE_API_URL='https://dentyar-licensing-api.dentyar-cloudflare.workers.dev';
+  function canonicalClinicPathCode(value){
+    return String(value||'').trim().toUpperCase().replace(/[۰-۹٠-٩]/g,ch=>{
+      const cp=ch.charCodeAt(0);
+      return String(cp>=0x06F0&&cp<=0x06F9?cp-0x06F0:cp-0x0660);
+    });
+  }
   let dentyarOriginalFetch = null;
   function installTransportProxy(cfg){
     const proxyText = String((cfg && cfg.networkProxyUrl) || DEFAULT_SYNC_PROXY_URL).trim();
@@ -10827,9 +10833,15 @@ document.addEventListener('focus',e=>{
           throw new Error('برای اتصال این دستگاه، دریافت و ثبت مجوز اختصاصی دنت‌یار الزامی است.');
         }
       }
-      const expectedDeviceId=await ensureDeviceId();
       const idTokenResult=await auth.currentUser.getIdTokenResult(true);
       const claims=idTokenResult.claims||{};
+      // The signed token's clinic path is authoritative for already-licensed devices.
+      // Compare canonical digits only; retain the exact claim value for the RTDB path.
+      if(claims.role==='clinic-device' && claims.clinicCode && canonicalClinicPathCode(claims.clinicCode)===canonicalClinicPathCode(cfg.clinicCode)){
+        cfg.clinicCode=String(claims.clinicCode);
+        if(STATE.meta.sync){ STATE.meta.sync.clinicCode=cfg.clinicCode; saveState(); }
+      }
+      const expectedDeviceId=await ensureDeviceId();
       if(claims.role!=='clinic-device' || !claims.licenseId || claims.clinicCode!==cfg.clinicCode || claims.deviceId!==expectedDeviceId){
         await fa.signOut(auth);
         throw new Error('مجوز این دستگاه معتبر نیست یا با کد مطب و شناسه دستگاه مطابقت ندارد. درخواست مجوز را دوباره ثبت کنید.');
@@ -11134,7 +11146,7 @@ document.addEventListener('focus',e=>{
   SYNC.requestLicense = async function(){
     try{
       const cfg=SYNC.readForm();
-      // یکسان‌سازی ارقام فارسی و عربی با انگلیسی پیش از اعتبارسنجی و ارسال
+      // کد مطب برای حفظ مسیر قبلی بدون تبدیل رقم‌ها ارسال می‌شود؛ انتخاب مسیر نهایی با بررسی فقط‌خواندنی سرور انجام می‌گیرد.
       cfg.clinicCode=String(cfg.clinicCode||'').trim().toUpperCase();
       const clinicInput=document.getElementById('syncClinicCode');
       if(clinicInput) clinicInput.value=cfg.clinicCode;
@@ -11149,7 +11161,14 @@ document.addEventListener('focus',e=>{
       const response=await fetch(LICENSE_API_URL+'/v1/activation/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({clinicCode:cfg.clinicCode,deviceId:id,deviceName:cfg.deviceName,appVersion:'101.227.0'})});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error||'ثبت درخواست فعال‌سازی ناموفق بود.');
-      toast('درخواست فعال‌سازی ثبت شد. '+(data.emailNotified?'اطلاع مالک از طریق ایمیل ارسال شد.':'مالک باید درخواست را در پنل مدیریت بررسی کند.')+' شناسه پیگیری: '+data.requestId);
+      if(data.clinicCode && data.clinicCode!==cfg.clinicCode){
+        cfg.clinicCode=String(data.clinicCode);
+        STATE.meta.sync=Object.assign({},STATE.meta.sync||{},{clinicCode:cfg.clinicCode});
+        saveState();
+        const clinicInputAfter=document.getElementById('syncClinicCode');
+        if(clinicInputAfter) clinicInputAfter.value=cfg.clinicCode;
+      }
+      toast('درخواست فعال‌سازی ثبت شد. مسیر اطلاعات قبلی: '+cfg.clinicCode+'؛ '+(data.emailNotified?'اطلاع مالک از طریق ایمیل ارسال شد.':'مالک باید درخواست را در پنل مدیریت بررسی کند.')+' شناسه پیگیری: '+data.requestId);
       renderSettings();
     }catch(error){toast(error.message||'خطا در ثبت درخواست فعال‌سازی.');}
   };
