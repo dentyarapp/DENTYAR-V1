@@ -5847,17 +5847,8 @@ document.addEventListener('focus',e=>{
     pushTimer = setTimeout(function(){ doPush(!!force); }, 900);
   };
 
-  // Firebase's connected flag confirms transport only. Bound every database
-  // operation so a stalled relay/write cannot leave manual sync pending forever.
-  function withSyncTimeout(promise,label,timeoutMs){
-    let timer=null;
-    const timeout=new Promise(function(_,reject){
-      timer=setTimeout(function(){reject(new Error('SYNC_TIMEOUT: '+label+' بیش از '+Math.round(timeoutMs/1000)+' ثانیه پاسخ نداد.'));},timeoutMs);
-    });
-    return Promise.race([promise,timeout]).finally(function(){if(timer)clearTimeout(timer);});
-  }
   async function writeSyncPath(path,value){
-    try { await withSyncTimeout(dbm.set(dbm.ref(db,path),value),'WRITE '+path,12000); }
+    try { await dbm.set(dbm.ref(db,path),value); }
     catch(error){
       const code=String((error&&(error.code||error.name))||'unknown');
       const detail=String((error&&error.message)||'');
@@ -5866,6 +5857,7 @@ document.addEventListener('focus',e=>{
       throw wrapped;
     }
   }
+
   async function doPush(force){
     if(!db) throw new Error('RTDB_NOT_INITIALIZED: پایگاه داده آماده نیست؛ ارسال انجام نشد.');
     const cfg = SYNC.cfg();
@@ -5947,7 +5939,7 @@ document.addEventListener('focus',e=>{
       // Verify an authorized read against this clinic before attempting a full upload.
       const probePath=base()+'/records/meta';
       try{
-        await withSyncTimeout(dbm.get(dbm.ref(db,probePath)),'READ '+probePath,12000);
+        await dbm.get(dbm.ref(db,probePath));
       }catch(readError){
         const code=String((readError&&(readError.code||readError.name))||'unknown');
         const detail=String((readError&&readError.message)||'');
@@ -5966,6 +5958,7 @@ document.addEventListener('focus',e=>{
       if(button){ button.disabled=false; button.textContent='همگام‌سازی اکنون'; }
     }
   };
+
   SYNC.renderStatus = function(){
     const b=document.getElementById('syncStatusBadge');
     if(b){ b.textContent = SYNC._lastSyncError ? 'متصل؛ خطای همگام‌سازی' : (SYNC.isReady() ? 'اتصال برقرار' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال')); }
