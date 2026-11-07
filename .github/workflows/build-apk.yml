@@ -528,11 +528,13 @@ jobs:
           unzip -tq "$APK"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee /tmp/dentyar-final-cert.txt
           grep -qi 'Signer #1 certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' /tmp/dentyar-final-cert.txt
-          BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
-          echo "$BADGING"
-          echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='3'"
-          echo "$BADGING" | grep -F "versionName='101.225.0'"
+          # Keep the complete aapt output: some SDK build-tools emit a preamble
+          # before the package line, so checking only line 1 can reject a valid APK.
+          "$AAPT" dump badging "$APK" > /tmp/dentyar-badging.txt 2>&1
+          cat /tmp/dentyar-badging.txt
+          grep -F "name='com.dentyar.parallelv101'" /tmp/dentyar-badging.txt
+          grep -F "versionCode='3'" /tmp/dentyar-badging.txt
+          grep -F "versionName='101.225.0'" /tmp/dentyar-badging.txt
           sha256sum "$APK" > "$APK.sha256"
 
       - name: بارگذاری APK
