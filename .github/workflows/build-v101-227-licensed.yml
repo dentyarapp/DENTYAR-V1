@@ -12,17 +12,7 @@ on:
       - fix/dentyar-license-isolated-v101-223-20261107
     paths:
       - 'DENTYAR_V101_LICENSED_227.html'
-      - 'cloudflare/dentyar-licensing-worker.js'
-      - 'cloudflare/dentyar-licensing-worker.test.mjs'
-      - 'cloudflare/test-rtdb-licensing-rules.mjs'
-      - 'cloudflare/test-firebase-auth-emulator.mjs'
-      - 'cloudflare/licensing-panel/**'
-      - 'firebase-database.rules.template.json'
-      - 'firebase.licensing-emulator.json'
-      - 'wrangler.licensing.toml'
-      - 'scripts/verify-v101-sync-preserved.mjs'
       - '.github/workflows/build-v101-227-licensed.yml'
-      - '.github/workflows/validate-v101-227.yml'
 
 jobs:
   build-apk:
