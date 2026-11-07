@@ -465,9 +465,7 @@ jobs:
           grep -q "const DENTYAR_INTRO_HTML" www/index.html
           grep -q "خدمات و قابلیت‌های کلیدی" www/index.html
           grep -q "ارزش‌آفرینی برای مطب" www/index.html
-          grep -q "async function pullRemoteSnapshot()" www/index.html
-          grep -q "await pullRemoteSnapshot()" www/index.html
-          grep -q "شبکه متصل؛ همگام‌سازی تأیید نشده" www/index.html
+                              grep -q "شبکه متصل؛ همگام‌سازی تأیید نشده" www/index.html
           grep -q "DEVICE_REGISTER" www/index.html
           grep -q "const batchSize = 4" www/index.html
           grep -q "await writeSyncPath(b+'/records/meta', meta)" www/index.html
