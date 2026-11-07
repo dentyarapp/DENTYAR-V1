@@ -183,7 +183,7 @@ async function redeem(request, env, body) {
   const id = await env.LICENSES.get("code:"+codeHash);
   if (!id) return fail("invalid-or-used-code", 401);
   const license = await env.LICENSES.get("license:"+id, "json");
-  if (!license || license.status!=="active" || license.deviceId!==body.deviceId || license.clinicCode!==clinicCode) return fail("license-not-active-for-this-device", 403);
+  if (!license || license.status!=="active" || license.deviceId!==body.deviceId || canonicalClinicCode(license.clinicCode)!==canonicalClinicCode(clinicCode)) return fail("license-not-active-for-this-device", 403);
   if (license.expiresAt && license.expiresAt<now()) return fail("license-expired", 403);
   // Prepare the token before the irreversible one-time claim. A signing/configuration
   // failure must not consume an otherwise valid activation code.
