@@ -5730,7 +5730,7 @@ document.addEventListener('focus',e=>{
       // Configuration is saved, but connection is not considered successful
       // until the .info/connected listener confirms a live RTDB connection.
       toast('تنظیمات ذخیره شد؛ در انتظار تأیید اتصال واقعی پایگاه داده');
-      setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
+      setTimeout(function(){ SYNC.syncNow(); }, 1500);
     }catch(e){
       console.error('DentyarSync connect failed', e);
       SYNC._lastError={stage:connectStage,code:String((e&&e.code)||(e&&e.message)||(e&&e.name)||'unknown').replace(/[^a-zA-Z0-9_./-]/g,'').slice(0,80)||'unknown'};
