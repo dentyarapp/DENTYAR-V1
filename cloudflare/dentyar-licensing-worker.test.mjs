@@ -523,7 +523,7 @@ test("V101.227 licensed app integration script parses", async () => {
   assert.match(target,/dev_\[A-Fa-f0-9\]\{48\}/);
   assert.match(target,/getIdTokenResult\(true\)/);
   assert.match(target,/claims\.role!==['"]clinic-device['"]/);
-  assert.match(target,/function base\(\)\{ return 'clinics\/\'+String/);
+  assert.ok(target.includes("function base(){ return 'clinics/'+String("));
   assert.match(target,/کد مطب معتبر نیست؛ مسیر اطلاعات قبلی باید بدون تغییر حفظ شود/);
   assert.doesNotMatch(target,/signInWithEmailAndPassword/);
 });
