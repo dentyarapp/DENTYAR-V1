@@ -118,6 +118,16 @@ async function dbWrite(env, path, value) {
   const response = await fetch(url, { method:"PUT", headers:{ authorization:"Bearer "+token, "content-type":"application/json" }, body:JSON.stringify(value) });
   if (!response.ok) throw new Error("firebase-admin-db-write-failed");
 }
+async function dbReadShallow(env, path) {
+  const token = await googleAccess(env);
+  const base = databaseBase(env);
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const url = base+"/"+encodedPath+".json?shallow=true";
+  const response = await fetch(url,{headers:{authorization:"Bearer "+token}});
+  if(!response.ok) throw new Error("firebase-admin-db-read-failed");
+  const value=await response.json();
+  return !!(value && typeof value==="object" && Object.keys(value).length);
+}
 async function verifyOwner(request, env) {
   const auth = request.headers.get("authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
@@ -228,18 +238,35 @@ export default {
       if (!isClinicPathCode(clinicCode) || !/^[A-Z0-9_-]{4,32}$/.test(registryClinicCode) || !/^[A-Za-z0-9_-]{12,100}$/.test(deviceId) || !deviceName) return fail("invalid-request");
       const clinicRecord=await env.LICENSES.get("clinic:"+registryClinicCode,"json");
       if(!clinicRecord || clinicRecord.status!=="active") return fail("clinic-not-registered",409);
+      // Read-only path detection prevents an ASCII/Persian digit conversion from
+      // silently splitting an existing clinic's patient and appointment records.
+      let clinicPathCode=clinicCode;
+      let clinicPathSelection="input";
+      if(env.FIREBASE_SERVICE_ACCOUNT_JSON){
+        try{
+          const rawExists=await dbReadShallow(env,"clinics/"+clinicCode+"/records");
+          const asciiExists=registryClinicCode===clinicCode ? rawExists : await dbReadShallow(env,"clinics/"+registryClinicCode+"/records");
+          if(rawExists && asciiExists && registryClinicCode!==clinicCode) return fail("clinic-path-ambiguous",409);
+          if(!rawExists && asciiExists){ clinicPathCode=registryClinicCode; clinicPathSelection="existing-ascii"; }
+          else if(rawExists){ clinicPathSelection="existing-input"; }
+          else { clinicPathSelection="new-input"; }
+        }catch(pathError){
+          console.error("Clinic RTDB path check failed",pathError);
+          return fail("clinic-path-check-unavailable",503);
+        }
+      }
       const clientIp=request.headers.get("cf-connecting-ip") || "unknown";
       const limiterId=env.ACTIVATION_LIMITS.idFromName("activation:"+clientIp);
       const limiter=env.ACTIVATION_LIMITS.get(limiterId);
       const rate=await limiter.fetch("https://activation-limit/check",{method:"POST"});
       if (!rate.ok) return fail("activation-request-rate-limited",429);
       const requestId=randomHex(16);
-      const item={ id:requestId, clinicCode, deviceId, deviceName, appVersion:String(body.appVersion||"").slice(0,40), status:"pending", createdAt:now() };
+      const item={ id:requestId, clinicCode:clinicPathCode, clinicRegistryCode:registryClinicCode, clinicPathSelection, deviceId, deviceName, appVersion:String(body.appVersion||"").slice(0,40), status:"pending", createdAt:now() };
       await env.LICENSES.put("request:"+requestId,JSON.stringify(item),{expirationTtl:60*60*24*30});
       await env.LICENSES.put("request-index:"+requestId,requestId,{expirationTtl:60*60*24*30});
       let emailNotified=false;
       try { emailNotified=await sendOwnerEmail(env,"درخواست فعال‌سازی دنت‌یار", "درخواست جدید دستگاه دنت‌یار\nمطب: "+clinicCode+"\nدستگاه: "+deviceName+"\nشناسه درخواست: "+requestId+"\nبرای بررسی، پنل مالک را باز کنید."); } catch (emailError) { console.error("Owner notification failed",emailError); }
-      return json({ ok:true, requestId, status:"pending", emailNotified },202);
+      return json({ ok:true, requestId, status:"pending", emailNotified, clinicCode:clinicPathCode, clinicPathSelection },202);
     }
     if (url.pathname==="/v1/activation/redeem") return redeem(request,env,body);
     if (!await verifyOwner(request,env)) return fail("owner-auth-required",403);
