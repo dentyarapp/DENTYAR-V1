@@ -1,5 +1,5 @@
-name: Build DENTYAR V101-223 Production APK
-# Build corrected V101-223 for the existing production DENTYAR Android package.
+name: Build DENTYAR V101-225 Baseline-Safe APK
+# Build isolated V101-225 from the 071922 baseline source; preserve package ID and release certificate.
 # Includes the explicit draft-to-finalized patient transition and manager-PIN edit gate.
 
 permissions:
@@ -21,6 +21,7 @@ on:
       - rebuild/v100-222-final-baseline-238
       - fix/v100-223-sync-records-teeth-20261025
       - build/v101-parallel-app-20261102
+      - fix/dentyar-baseline-071922-poster-guide-v101-225-20261107
 
 jobs:
   build-apk:
@@ -40,15 +41,15 @@ jobs:
       - name: ساخت پروژه Capacitor و نصب افزونه‌های گزارش
         run: |
           mkdir -p www
-          cp DENTYAR_V100_FINAL_SYNC_FIX.html www/index.html
+          cp DENTYAR_V101_LICENSE_TRIAL.html www/index.html
 
           cat > package.json <<'EOF'
           {
             "name": "dentyar",
-            "version": "101.223.0",
+            "version": "101.225.0",
             "private": true,
             "scripts": {
-              "build": "echo DENTYAR V101-223"
+              "build": "echo DENTYAR V101-225"
             },
             "dependencies": {
               "@capacitor/core": "7.4.3",
@@ -72,8 +73,8 @@ jobs:
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 1', s, count=1)
-          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.223.0-parallel"', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 3', s, count=1)
+          s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.225.0"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
           p.write_text(s)
@@ -376,7 +377,7 @@ jobs:
           grep -q "native && native.cancelled" www/index.html
           grep -q "numberingSystem" www/index.html
           grep -q "DENTYAR V68 FIX" www/index.html
-          grep -q 'DENTYAR_APP_VERSION = "V101"' www/index.html
+          grep -q 'DENTYAR_APP_VERSION = "V101.225"' www/index.html
           grep -q "installTransportProxy" www/index.html
           grep -q "networkProxyUrl" www/index.html
           test -s cloudflare/dentyar-sync-relay.js
@@ -514,21 +515,21 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-223.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-225.apk
 
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-223-APK
+          name: DENTYAR-V101-225-APK
           path: DENTYAR-V101-223.apk
           if-no-files-found: error
 
       - name: انتشار نسخه نهایی دنت‌یار
-        if: ${{ steps.signing.outputs.available == 'true' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-v101]') }}
+        if: ${{ steps.signing.outputs.available == 'true' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-v101-225]') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v101-223-final
-          name: DENTYAR V101-223 Final
+          tag_name: v101-225-final
+          name: DENTYAR V101-225 Final
           body: |
             نسخه نهایی دنت‌یار V101-223 شامل اصلاح شماره دندان، ویرایش کنترل‌شده پرونده بیمار، و نمایش مرحله و کد خطای همگام‌سازی؛ با شناسه برنامه و کلید امضای ثابت نسخه تولیدی.
             این APK با کلید امضای ثابت دنت‌یار ساخته می‌شود تا به‌روزرسانی نسخه نصب‌شده امکان‌پذیر باشد.
