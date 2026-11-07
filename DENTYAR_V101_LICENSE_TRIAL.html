@@ -10992,7 +10992,7 @@ document.addEventListener('focus',e=>{
     return Promise.race([promise,timeout]).finally(function(){if(timer)clearTimeout(timer);});
   }
   async function writeSyncPath(path,value){
-    try { await withSyncTimeout(dbm.set(dbm.ref(db,path),value),'WRITE '+path,12000); }
+    try { await withSyncTimeout(dbm.set(dbm.ref(db,path),value),'WRITE '+path,30000); }
     catch(error){
       const code=String((error&&(error.code||error.name))||'unknown');
       const detail=String((error&&error.message)||'');
@@ -11022,10 +11022,16 @@ document.addEventListener('focus',e=>{
         const arr = STATE[coll]||[];
         const curIds = arr.map(function(x){ return x.id; });
         // Await every remote write so a failed sync cannot be reported as successful.
-        await Promise.all(arr.map(function(rec){
-          const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
-          return writeSyncPath(b+'/records/'+coll+'/'+rec.id, out);
-        }));
+        // Send a small batch at a time. Large clinics and slower mobile relays
+        // must not receive hundreds of simultaneous patient writes.
+        const batchSize = 4;
+        for(let offset=0; offset<arr.length; offset+=batchSize){
+          const batch = arr.slice(offset, offset+batchSize);
+          await Promise.all(batch.map(function(rec){
+            const out = Object.assign({}, rec, { _updatedAt: (rec._updatedAt&&!force)?rec._updatedAt:now });
+            return writeSyncPath(b+'/records/'+coll+'/'+rec.id, out);
+          }));
+        }
         const prev = prevIds[coll]||[];
         const deleted = prev.filter(function(id){ return curIds.indexOf(id)===-1; });
         await Promise.all(deleted.flatMap(function(id){
