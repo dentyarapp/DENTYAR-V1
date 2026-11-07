@@ -5984,7 +5984,7 @@ document.addEventListener('focus',e=>{
       await pullRemoteSnapshot();
       SYNC._lastSyncError = null;
       await doPush(true);
-      if(!SYNC._lastSyncError){ SYNC._lastDataSyncAt=Date.now(); }
+      if(!SYNC._lastSyncError){ SYNC._lastDataSyncAt=Date.now(); SYNC.renderStatus&&SYNC.renderStatus(); }
       if(SYNC._lastSyncError) toast('همگام‌سازی ناموفق بود؛ جزئیات خطا در همین صفحه آمده است.');
       else toast('ارسال اطلاعات این دستگاه با موفقیت انجام شد.');
     }catch(error){
