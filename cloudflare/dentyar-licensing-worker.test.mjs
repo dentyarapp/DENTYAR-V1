@@ -313,6 +313,33 @@ test("path detection refuses an ambiguous clinic when both Persian and ASCII nam
   }finally{restore();}
 });
 
+test("an existing ASCII license can be redeemed from Persian-digit UI input without changing its signed path", async () => {
+  const env=testEnv();
+  const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  env.FIREBASE_PROJECT_ID="demo-dentyar";
+  env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({
+    client_email:"firebase-adminsdk@demo-dentyar.iam.gserviceaccount.com",
+    private_key:privateKey.export({type:"pkcs8",format:"pem"}).toString(),
+    project_id:"demo-dentyar"
+  });
+  const code="QRSTUVWX12345678";
+  const licenseId="lic_ascii_redeem_001";
+  const deviceId="device_identifier_655";
+  await env.LICENSES.put("license:"+licenseId,JSON.stringify({
+    id:licenseId,clinicCode:"14050701",deviceId,status:"active",expiresAt:Date.now()+86400000
+  }));
+  await env.LICENSES.put("code:"+await digest(code),licenseId);
+  const response=await worker.fetch(new Request("https://license.test/v1/activation/redeem",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({code,clinicCode:"۱۴۰۵۰۷۰۱",deviceId})
+  }),env);
+  const data=await response.json();
+  assert.equal(response.status,200,JSON.stringify(data));
+  const claims=JSON.parse(Buffer.from(data.customToken.split(".")[1],"base64url").toString("utf8")).claims;
+  assert.equal(claims.clinicCode,"14050701");
+  assert.equal(claims.deviceId,deviceId);
+});
+
 test("Persian clinic path is preserved in the redeemed Firebase custom-token claims", async () => {
   const env=testEnv();
   const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
