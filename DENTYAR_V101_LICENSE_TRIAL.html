@@ -7,7 +7,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DENTYAR</title>
-<script>const DENTYAR_APP_VERSION = "V101.229";</script>
+<script>const DENTYAR_APP_VERSION = "V101.230";</script>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -5593,13 +5593,7 @@ document.addEventListener('focus',e=>{
     throw lastError || new Error('بارگذاری کتابخانه‌های Firebase ناموفق بود.');
   }
   function clearSubs(){ subs.forEach(function(u){ try{u();}catch(_){} }); subs=[]; }
-  // Always use the canonical ASCII clinic key for every RTDB path, including data persisted with Persian/Arabic digits by older app sessions.
-  function normalizeClinicCode(value){
-    return String(value||'').trim()
-      .replace(/[۰-۹٠-٩]/g,ch=>String(ch.charCodeAt(0)>=0x06F0&&ch.charCodeAt(0)<=0x06F9?ch.charCodeAt(0)-0x06F0:ch.charCodeAt(0)-0x0660))
-      .toUpperCase();
-  }
-  function base(){ return 'clinics/'+normalizeClinicCode(SYNC.cfg() && SYNC.cfg().clinicCode); }
+  function base(){ return 'clinics/'+SYNC.cfg().clinicCode; }
   function scheduleReconnect(delay){
     const cfg=SYNC.cfg();
     if(!cfg || !cfg.enabled || !cfg.clinicCode || !cfg.firebaseConfig || permissionBlocked) return;
@@ -5730,7 +5724,7 @@ document.addEventListener('focus',e=>{
       // Configuration is saved, but connection is not considered successful
       // until the .info/connected listener confirms a live RTDB connection.
       toast('تنظیمات ذخیره شد؛ در انتظار تأیید اتصال واقعی پایگاه داده');
-      setTimeout(function(){ SYNC.syncNow(); }, 1500);
+      setTimeout(function(){ SYNC.schedulePush(true); }, 1500);
     }catch(e){
       console.error('DentyarSync connect failed', e);
       SYNC._lastError={stage:connectStage,code:String((e&&e.code)||(e&&e.message)||(e&&e.name)||'unknown').replace(/[^a-zA-Z0-9_./-]/g,'').slice(0,80)||'unknown'};
@@ -5855,39 +5849,6 @@ document.addEventListener('focus',e=>{
       throw wrapped;
     }
   }
-  async function pullRemoteSnapshot(){
-    if(!db) throw new Error('RTDB_NOT_INITIALIZED: پایگاه داده برای دریافت اطلاعات آماده نیست.');
-    const b=base();
-    const readPath=async function(path){
-      try{
-        return await withSyncTimeout(dbm.get(dbm.ref(db,path)),'READ '+path,20000);
-      }catch(error){
-        const code=String((error&&(error.code||error.name))||'unknown');
-        const detail=String((error&&error.message)||'');
-        throw new Error('READ '+path+' | '+code+(detail?': '+detail:''));
-      }
-    };
-    const names=['patients','dentists','appointments','lists','formFields','treatmentPrices','meta'];
-    const tombstoneNames=['patients','dentists','appointments'];
-    const results=await Promise.all(names.map(async name=>[name,await readPath(b+'/records/'+name)]));
-    results.forEach(([name,snapshot])=>{
-      const value=snapshot&&snapshot.val?snapshot.val():null;
-      if(!value) return;
-      if(['patients','dentists','appointments'].includes(name)){
-        Object.keys(value).forEach(id=>mergeRecord(name,id,value[id]));
-      }else{
-        mergeValue(name,value);
-      }
-    });
-    const tombstones=await Promise.all(tombstoneNames.map(async name=>[name,await readPath(b+'/tombstones/'+name)]));
-    tombstones.forEach(([name,snapshot])=>{
-      const value=snapshot&&snapshot.val?snapshot.val():null;
-      if(value) Object.keys(value).forEach(id=>applyTombstone(name,id,(value[id]&&value[id]._updatedAt)||0));
-    });
-    SYNC._lastPullSuccessAt=Date.now();
-    return true;
-  }
-
   async function doPush(force){
     if(!db) throw new Error('RTDB_NOT_INITIALIZED: پایگاه داده آماده نیست؛ ارسال انجام نشد.');
     const cfg = SYNC.cfg();
@@ -5981,7 +5942,6 @@ document.addEventListener('focus',e=>{
         const detail=String((readError&&readError.message)||'');
         throw new Error('READ '+probePath+' | '+code+(detail?': '+detail:''));
       }
-      await pullRemoteSnapshot();
       SYNC._lastSyncError = null;
       await doPush(true);
       if(!SYNC._lastSyncError){ SYNC._lastDataSyncAt=Date.now(); SYNC.renderStatus&&SYNC.renderStatus(); }
