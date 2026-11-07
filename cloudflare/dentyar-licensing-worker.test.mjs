@@ -4,7 +4,7 @@ import { createHash, generateKeyPairSync, verify as verifySignature } from "node
 import { Script } from "node:vm";
 import { readFile } from "node:fs/promises";
 const workerSource = await readFile(new URL("./dentyar-licensing-worker.js", import.meta.url), "utf8");
-const { RedemptionLock, ActivationRateLimiter, ClinicRegistry, randomActivationCode, isActivationCode, canonicalClinicCode, isClinicPathCode } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
+const { RedemptionLock, ActivationRateLimiter, ClinicRegistry, randomActivationCode, isActivationCode, canonicalClinicCode, isClinicPathCode, makeCustomToken, digest } = await import("data:text/javascript;base64," + Buffer.from(workerSource).toString("base64"));
 
 function makeState() {
   const values = new Map();
@@ -221,6 +221,51 @@ test("activation request stores a pending request without requiring owner creden
   assert.equal(data.emailNotified,false);
   assert.ok(data.requestId);
   assert.equal(env._values.get("request:"+data.requestId) !== undefined, true);
+});
+
+test("activation request preserves a Persian clinic path while looking up its ASCII registry code", async () => {
+  const env=testEnv();
+  await env.LICENSES.put("clinic:14050701",JSON.stringify({
+    clinicCode:"14050701",clinicName:"DENTYAR clinic",status:"active",createdAt:Date.now()
+  }));
+  const response=await worker.fetch(new Request("https://license.test/v1/activation/request",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({clinicCode:"۱۴۰۵۰۷۰۱",deviceId:"device_identifier_321",deviceName:"Persian path phone"})
+  }),env);
+  const data=await response.json();
+  assert.equal(response.status,202);
+  const request=await env.LICENSES.get("request:"+data.requestId,"json");
+  assert.equal(request.clinicCode,"۱۴۰۵۰۷۰۱");
+});
+
+test("Persian clinic path is preserved in the redeemed Firebase custom-token claims", async () => {
+  const env=testEnv();
+  const {privateKey}=generateKeyPairSync("rsa",{modulusLength:2048});
+  const privatePem=privateKey.export({type:"pkcs8",format:"pem"}).toString();
+  env.FIREBASE_PROJECT_ID="demo-dentyar";
+  env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({
+    client_email:"firebase-adminsdk@demo-dentyar.iam.gserviceaccount.com",
+    private_key:privatePem,
+    project_id:"demo-dentyar"
+  });
+  const code="ABCDEFGHIJKLMNOP";
+  const licenseId="lic_persian_redeem_001";
+  const clinicCode="۱۴۰۵۰۷۰۱";
+  const deviceId="device_identifier_654";
+  await env.LICENSES.put("license:"+licenseId,JSON.stringify({
+    id:licenseId,clinicCode,deviceId,status:"active",expiresAt:Date.now()+86400000
+  }));
+  await env.LICENSES.put("code:"+await digest(code),licenseId);
+  const response=await worker.fetch(new Request("https://license.test/v1/activation/redeem",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({code,clinicCode,deviceId})
+  }),env);
+  const data=await response.json();
+  assert.equal(response.status,200,JSON.stringify(data));
+  const claims=JSON.parse(Buffer.from(data.customToken.split(".")[1],"base64url").toString("utf8")).claims;
+  assert.equal(claims.clinicCode,clinicCode);
+  assert.equal(claims.deviceId,deviceId);
+  assert.equal(claims.role,"clinic-device");
 });
 
 test("oversized activation requests are rejected before parsing", async () => {
