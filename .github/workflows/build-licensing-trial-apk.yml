@@ -1,4 +1,5 @@
 name: Build DENTYAR V101-228 Final APK
+# Release gate: package ID, signer certificate, and Android versionCode 8 must match the installed DENTYAR line.
 # Build the finalized V101-228 APK, preserving the exact package ID and signing certificate of the validated 101-226 installation.
 
 permissions:
