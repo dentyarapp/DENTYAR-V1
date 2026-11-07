@@ -1,0 +1,116 @@
+name: Validate DENTYAR V101.227 licensed integration
+
+on:
+  push:
+    branches:
+      - fix/dentyar-license-isolated-v101-223-20261107
+    paths:
+      - 'cloudflare/dentyar-licensing-worker.js'
+      - 'cloudflare/dentyar-licensing-worker.test.mjs'
+      - 'cloudflare/licensing-panel/**'
+      - 'DENTYAR_V101_LICENSED_227.html'
+      - 'wrangler.licensing.toml'
+      - 'firebase-database.rules.template.json'
+      - 'firebase.licensing-emulator.json'
+      - 'cloudflare/test-rtdb-licensing-rules.mjs'
+      - 'cloudflare/test-firebase-auth-emulator.mjs'
+      - '.github/workflows/validate-licensing-worker.yml'
+      - '.github/workflows/deploy-dentyar-licensing.yml'
+      - '.github/workflows/build-v101-227-licensed.yml'
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate deployment workflow YAML syntax
+        run: |
+          ruby -e 'require "yaml"; ARGV.each { |file| YAML.load_file(file, aliases: true); puts "YAML OK: #{file}" }' \
+            .github/workflows/build-v101-227-licensed.yml
+      - name: Syntax-check isolated Worker
+        run: node --input-type=module --check < cloudflare/dentyar-licensing-worker.js
+      - name: Syntax-check owner panel and verify safe DOM rendering
+        run: |
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.inside=False; self.current=[]; self.items=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower()=="script": self.inside=True; self.current=[]
+              def handle_endtag(self, tag):
+                  if tag.lower()=="script" and self.inside:
+                      self.items.append("".join(self.current)); self.inside=False
+              def handle_data(self, data):
+                  if self.inside: self.current.append(data)
+          html=Path("cloudflare/licensing-panel/owner.html").read_text(encoding="utf-8")
+          parser=Scripts(); parser.feed(html)
+          if len(parser.items)!=1 or not parser.items[0].strip():
+              raise SystemExit("Owner panel must contain exactly one inline application script")
+          Path("/tmp/dentyar-owner-panel.js").write_text(parser.items[0],encoding="utf-8")
+          if "Content-Security-Policy" not in html or "default-src 'self'" not in html:
+              raise SystemExit("Owner panel CSP is missing")
+          if "innerHTML" in parser.items[0] or "eval(" in parser.items[0]:
+              raise SystemExit("Unsafe dynamic HTML or eval found in owner panel")
+          print("Owner panel script extracted; CSP and safe DOM rendering checks passed.")
+          PY
+          node --check /tmp/dentyar-owner-panel.js
+      - name: Test atomic redemption lock behavior
+        run: node --test cloudflare/dentyar-licensing-worker.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Test Firebase RTDB licensing rules in emulator
+        run: |
+          npm install --global firebase-tools
+          npm install --no-save @firebase/rules-unit-testing firebase
+          firebase emulators:exec --only auth,database --project demo-dentyar --config firebase.licensing-emulator.json "node cloudflare/test-rtdb-licensing-rules.mjs && node cloudflare/test-firebase-auth-emulator.mjs"
+      - name: Validate Wrangler configuration and Durable Object migrations
+        run: |
+          npm install --global wrangler@4
+          sed -i 's/REPLACE_WITH_NEW_KV_NAMESPACE_ID/00000000000000000000000000000000/' wrangler.licensing.toml
+          wrangler deploy --dry-run --outdir /tmp/dentyar-licensing-dry-run --config wrangler.licensing.toml
+      - name: Verify required endpoints and secret boundaries
+        run: |
+          set -euo pipefail
+          grep -q '"/v1/activation/request"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/activation/redeem"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/requests"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/approve"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/reject"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/licenses"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/activation-code"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/config"' cloudflare/dentyar-licensing-worker.js
+          grep -q '"/v1/owner/revoke"' cloudflare/dentyar-licensing-worker.js
+          grep -q 'FIREBASE_SERVICE_ACCOUNT_JSON' cloudflare/dentyar-licensing-worker.js
+          ! grep -q 'BEGIN PRIVATE KEY' cloudflare/dentyar-licensing-worker.js
+          ! grep -q '"private_key":' cloudflare/dentyar-licensing-worker.js
+          grep -q 'auth.token.licenseId' firebase-database.rules.template.json
+          grep -q 'REDEMPTION_LOCKS' cloudflare/dentyar-licensing-worker.js
+          grep -q 'class RedemptionLock' cloudflare/dentyar-licensing-worker.js
+          grep -q 'class ActivationRateLimiter' cloudflare/dentyar-licensing-worker.js
+          grep -q 'ACTIVATION_LIMITS' cloudflare/dentyar-licensing-worker.js
+          grep -Fq 'env.ASSETS.fetch(new Request(new URL("/owner.html",request.url),request))' cloudflare/dentyar-licensing-worker.js
+          grep -q 'binding = "ASSETS"' wrangler.licensing.toml
+          test -s cloudflare/licensing-panel/owner.html
+          test -s .github/workflows/build-v101-227-licensed.yml
+          grep -q 'DENTYAR_V101_LICENSED_227.html' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'versionCode 7' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'DENTYAR-V101-227-LICENSED.apk' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'verify --verbose --print-certs' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'sha256sum' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'V2 Signer: certificate SHA-256 digest: 9dff5f46570c491de88ad86a669c6b823af0d42acf6ba17bad33af580bd92fb2' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'getOrCreateDeviceId' DENTYAR_V101_LICENSED_227.html
+          grep -q 'AndroidKeyStore' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'AES/GCM/NoPadding' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'AEADBadTagException' .github/workflows/build-v101-227-licensed.yml
+          grep -q 'could not reset an unavailable device identity' .github/workflows/build-v101-227-licensed.yml
+          grep -Fq 'new_sqlite_classes = ["ActivationRateLimiter"]' wrangler.licensing.toml
+          grep -Fq 'new_sqlite_classes = ["RedemptionLock"]' wrangler.licensing.toml
