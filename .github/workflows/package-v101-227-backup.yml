@@ -1,0 +1,76 @@
+name: Package DENTYAR V101.227 source backup
+
+on:
+  push:
+    branches:
+      - fix/dentyar-license-isolated-v101-223-20261107
+    paths:
+      - 'DENTYAR_V101_227_TEST_REPORT.md'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  package-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verified source
+        uses: actions/checkout@v4
+
+      - name: Download the verified V101.227 APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DENTYAR-V101-227-LICENSED-APK
+          run-id: 42381472743
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release
+
+      - name: Create complete source and release backup
+        run: |
+          set -euo pipefail
+          test -s release/DENTYAR-V101-227-LICENSED.apk
+          test -s release/DENTYAR-V101-227-LICENSED.apk.sha256
+          mkdir -p backup/source backup/backend backup/tests backup/workflows backup/release
+          cp DENTYAR_V100_FINAL_SYNC_FIX.html backup/source/
+          cp DENTYAR_V101_LICENSED_227.html backup/source/
+          cp cloudflare/dentyar-licensing-worker.js backup/backend/
+          cp cloudflare/licensing-panel/owner.html backup/backend/
+          cp wrangler.licensing.toml backup/backend/
+          cp firebase-database.rules.template.json backup/backend/
+          cp firebase.licensing-emulator.json backup/backend/
+          cp cloudflare/dentyar-licensing-worker.test.mjs backup/tests/
+          cp cloudflare/test-rtdb-licensing-rules.mjs backup/tests/
+          cp cloudflare/test-firebase-auth-emulator.mjs backup/tests/
+          cp scripts/verify-v101-sync-preserved.mjs backup/tests/
+          cp DENTYAR_V101_227_TEST_REPORT.md backup/
+          cp .github/workflows/build-v101-227-licensed.yml backup/workflows/
+          cp .github/workflows/validate-v101-227.yml backup/workflows/
+          cp .github/workflows/deploy-dentyar-licensing-worker-only.yml backup/workflows/
+          cp .github/workflows/package-v101-227-backup.yml backup/workflows/
+          cp release/DENTYAR-V101-227-LICENSED.apk backup/release/
+          cp release/DENTYAR-V101-227-LICENSED.apk.sha256 backup/release/
+          cat > backup/README.txt <<'EOF'
+          DENTYAR V101.227 backup
+          Includes the verified APK, SHA-256 checksum, integrated HTML source,
+          original parallel V101 baseline source, licensing Worker, rules template,
+          emulator tests, build/validation/deployment workflows, and test report.
+          No private keys, keystore files, passwords, Firebase service-account JSON,
+          patient records, or production database exports are included.
+          The report clearly marks real-device tests that remain pending.
+          EOF
+          zip -qr DENTYAR-V101-227-SOURCE-BACKUP.zip backup
+          sha256sum DENTYAR-V101-227-SOURCE-BACKUP.zip > DENTYAR-V101-227-SOURCE-BACKUP.zip.sha256
+          ls -lh DENTYAR-V101-227-SOURCE-BACKUP.zip DENTYAR-V101-227-SOURCE-BACKUP.zip.sha256
+
+      - name: Upload source backup archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: DENTYAR-V101-227-SOURCE-BACKUP
+          path: |
+            DENTYAR-V101-227-SOURCE-BACKUP.zip
+            DENTYAR-V101-227-SOURCE-BACKUP.zip.sha256
+          if-no-files-found: error
+          retention-days: 90
