@@ -5857,7 +5857,6 @@ document.addEventListener('focus',e=>{
       throw wrapped;
     }
   }
-
   async function doPush(force){
     if(!db) throw new Error('RTDB_NOT_INITIALIZED: پایگاه داده آماده نیست؛ ارسال انجام نشد.');
     const cfg = SYNC.cfg();
@@ -5958,7 +5957,6 @@ document.addEventListener('focus',e=>{
       if(button){ button.disabled=false; button.textContent='همگام‌سازی اکنون'; }
     }
   };
-
   SYNC.renderStatus = function(){
     const b=document.getElementById('syncStatusBadge');
     if(b){ b.textContent = SYNC._lastSyncError ? 'متصل؛ خطای همگام‌سازی' : (SYNC.isReady() ? 'اتصال برقرار' : (SYNC.cfg()&&SYNC.cfg().enabled ? 'در حال اتصال…' : 'غیرفعال')); }
