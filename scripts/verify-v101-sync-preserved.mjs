@@ -34,6 +34,8 @@ for (const marker of ["SYNC.requestLicense = async function", "SYNC.redeemLicens
 }
 assert.ok(newSync.includes("maxlength=\"16\""), "16-character activation input is present");
 assert.ok(newSync.includes("function base(){ return 'clinics/'+String((SYNC.cfg() && SYNC.cfg().clinicCode)||'').trim(); }"), "Original clinic path is preserved exactly");
+assert.ok(newSync.includes("canonicalClinicPathCode(claims.clinicCode)"), "Existing license claims retain their exact clinic path");
+assert.ok(newSync.includes("if(data.clinicCode && data.clinicCode!==cfg.clinicCode)"), "Server path selection is applied to local sync settings");
 assert.ok(!newSync.includes("function base(){ return 'clinics/'+normalizeClinicCode"), "No silent clinic-path conversion");
 assert.ok(!newSync.includes("signInWithEmailAndPassword"), "Legacy email/password sign-in is not used under licensed rules");
 assert.ok(integrated.includes("پوستر رسمی معرفی دنت‌یار"), "Official poster is included");
