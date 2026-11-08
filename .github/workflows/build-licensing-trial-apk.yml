@@ -35,14 +35,15 @@ jobs:
               text=True
           )
           current = Path("DENTYAR_V101_LICENSE_TRIAL.html").read_text(encoding="utf-8")
-          marker = "<script>\\n(function(){\\n  const SYNC = {};"
+          needle = "const SYNC = {};"
           def sync_block(source):
-              start = source.find(marker)
-              if start < 0:
-                  raise SystemExit("SYNC block start not found")
-              end = source.find("</script>", start)
-              if end < 0:
-                  raise SystemExit("SYNC block end not found")
+              position = source.find(needle)
+              if position < 0:
+                  raise SystemExit("SYNC marker not found")
+              start = source.rfind("<script>", 0, position)
+              end = source.find("</script>", position)
+              if start < 0 or end < 0:
+                  raise SystemExit("SYNC script boundaries not found")
               return source[start:end + len("</script>")]
           if sync_block(current) != sync_block(baseline):
               raise SystemExit("The baseline SYNC block changed; refusing to build")
