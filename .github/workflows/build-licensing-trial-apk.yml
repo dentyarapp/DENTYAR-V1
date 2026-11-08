@@ -1,4 +1,4 @@
-name: Build DENTYAR V101 Licensing Trial APK
+name: Build DENTYAR V101.224 Baseline Poster APK
 # Build an isolated licensing-enabled V101 trial APK with the established production package ID and signing certificate.
 
 permissions:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/dentyar-owner-licensing-20261103
+      - fix/dentyar-baseline-poster-guide-only-20261108
     paths:
       - 'DENTYAR_V101_LICENSE_TRIAL.html'
       - '.github/workflows/build-licensing-trial-apk.yml'
@@ -22,6 +22,39 @@ jobs:
     steps:
       - name: دریافت کد پروژه
         uses: actions/checkout@v4
+
+      - name: کنترل عدم تغییر موتور همگام‌سازی نسخه مبنا
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin fix/dentyar-baseline-071922-poster-guide-v101-225-20261107
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          baseline = subprocess.check_output(
+              ["git", "show", "origin/fix/dentyar-baseline-071922-poster-guide-v101-225-20261107:DENTYAR_V101_LICENSE_TRIAL.html"],
+              text=True
+          )
+          current = Path("DENTYAR_V101_LICENSE_TRIAL.html").read_text(encoding="utf-8")
+          pattern = r'<script>\\s*\\(function\\(\\)\\{\\s*const SYNC = \\{\\};[\\s\\S]*?</script>'
+          def sync_block(source):
+              match = re.search(pattern, source)
+              if not match:
+                  raise SystemExit("SYNC block not found")
+              return match.group(0)
+          if sync_block(current) != sync_block(baseline):
+              raise SystemExit("The baseline SYNC block changed; refusing to build")
+          required = [
+              "پوستر رسمی معرفی دنت‌یار",
+              "function renderPoster()",
+              "{id:'poster', label:'معرفی دنت‌یار'",
+              "title:'۱۶. چک‌لیست روزانه مسئول مطب'",
+              "speakText("
+          ]
+          for marker in required:
+              if marker not in current:
+                  raise SystemExit("Missing required poster/guide feature: " + marker)
+          print("Baseline SYNC is byte-for-byte unchanged; poster and 16-section voice guide are present.")
+          PY
 
       - name: نصب Node.js
         uses: actions/setup-node@v4
@@ -58,13 +91,13 @@ jobs:
           npx cap add android
           npx cap sync android
 
-          # Set an explicit Android version code/name for the V100-222 baseline package.
+          # Keep the V101.224 baseline identity and use a higher internal code for an in-place update.
           python - <<'PY'
           from pathlib import Path
           import re
           p = Path("android/app/build.gradle")
           s = p.read_text()
-          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 2', s, count=1)
+          s, code_count = re.subn(r'versionCode\s+\d+', 'versionCode 11', s, count=1)
           s, name_count = re.subn(r'versionName\s+"[^"]+"', 'versionName "101.224.0-license-trial"', s, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not set Android update-compatible versionCode/versionName")
@@ -593,12 +626,12 @@ jobs:
 
       - name: آماده‌سازی APK نهایی امضاشده
         if: ${{ steps.signing.outputs.available == 'true' }}
-        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-224-LICENSE-TRIAL.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk DENTYAR-V101-224-BASELINE-POSTER.apk
 
       - name: بررسی امضا، شناسه برنامه و نسخه APK
         run: |
           set -euo pipefail
-          APK=DENTYAR-V101-224-LICENSE-TRIAL.apk
+          APK=DENTYAR-V101-224-BASELINE-POSTER.apk
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$AAPT"
@@ -608,15 +641,15 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK" | sed -n '1p')
           echo "$BADGING"
           echo "$BADGING" | grep -F "name='com.dentyar.parallelv101'"
-          echo "$BADGING" | grep -F "versionCode='2'"
+          echo "$BADGING" | grep -F "versionCode='11'"
           echo "$BADGING" | grep -F "versionName='101.224.0-license-trial'"
           sha256sum "$APK" > "$APK.sha256"
       - name: بارگذاری APK
         uses: actions/upload-artifact@v4
         with:
-          name: DENTYAR-V101-224-LICENSE-TRIAL-APK
+          name: DENTYAR-V101-224-BASELINE-POSTER-APK
           path: |
-            DENTYAR-V101-224-LICENSE-TRIAL.apk
-            DENTYAR-V101-224-LICENSE-TRIAL.apk.sha256
+            DENTYAR-V101-224-BASELINE-POSTER.apk
+            DENTYAR-V101-224-BASELINE-POSTER.apk.sha256
           if-no-files-found: error
 
